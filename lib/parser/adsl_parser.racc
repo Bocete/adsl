@@ -1,0 +1,151 @@
+class ADSLParser
+  prechigh
+    left '==' '!='
+    noassoc NOT
+    left '<=>'
+    left '<=' '=>'
+    left and or
+  preclow
+  token class extends inverseof action foreach either or create delete subset oneof dotall invariant forall exists in empty true false not and equal equiv implies IDENT
+  start adslspec
+rule
+  adslspec: root_elems { return ADSLSpec.new :lineno => lineno, :classes => val[0][0], :actions => val[0][1], :invariants => val[0][2] }
+  
+  root_elems: class_decl root_elems     { val[1][0].unshift val[0]; return val[1] }
+            | action_decl root_elems    { val[1][1].unshift val[0]; return val[1] }
+            | invariant_decl root_elems { val[1][2].unshift val[0]; return val[1] }
+            |                           { return [[], [], []] }
+
+  class_decl: class IDENT '{' rel_decls '}' 
+                       { return ADSLClass.new :lineno => val[0], :name => val[1], :relations => val[3] }
+            | class IDENT extends IDENT '{' rel_decls '}' 
+                       { return ADSLClass.new :lineno => val[0], :name => val[1], :parent_name => val[3], :relations => val[5] }
+
+  rel_decls: rel_decls rel_decl { val[0] << val[1]; return val[0] }
+           |                    { return [] }
+
+  rel_decl: cardinality IDENT IDENT inverse_suffix { return ADSLRelation.new :lineno => val[0][2], :cardinality => val[0].first(2), :to_class_name => val[1], :name => val[2], :inverse_of_name => val[3] }
+
+  cardinality: card_number                  { return [val[0][0], val[0][0], val[0][1]] }
+             | card_number '..' card_number { return [val[0][0], val[2][0], val[0][1]] }
+             | card_number '+'              { return [val[0][0], 1.0/0.0, val[0][1]] }
+
+  card_number: '0'    { return [0, lineno] }
+             | '1'    { return [1, lineno] }
+
+  inverse_suffix: inverseof IDENT { return val[1] }
+                |                 { return nil }
+
+  action_decl: action IDENT '(' action_args ')' block { return ADSLAction.new(:lineno => val[0], :name => val[1], :arg_cardinalities => val[3][0], :arg_types => val[3][1], :arg_names => val[3][2], :block => val[5]) }
+
+  action_args: additional_args cardinality IDENT IDENT { val[0][0] << val[1]; val[0][1] << val[2]; val[0][2] << val[3]; return val[0] }
+             |                                         { return [[], [], []] }
+             
+  additional_args: additional_args cardinality IDENT IDENT ',' { val[0][0] << val[1]; val[0][1] << val[2]; val[0][2] << val[3]; return val[0] }
+                 |                                             { return [[], [], []] }
+
+  block: '{' statements '}' { return ADSLBlock.new :lineno => val[0], :statements => val[1] }
+
+  statements: statement statements { val[1].unshift val[0]; return val[1] }
+            |                      { return [] }
+
+  statement: IDENT '=' assignmentrhs         { val[2].var_name = val[0]; return val[2] }
+           | create IDENT                    { return ADSLCreateObj.new :lineno => val[0], :class_name => val[1] }
+           | delete objset                   { return ADSLDeleteObj.new :lineno => val[0], :objset => val[1] }
+           | objset '.' IDENT '+=' objset    { return ADSLCreateTup.new :lineno => val[0].lineno, :objset1 => val[0], :rel_name => val[2], :objset2 => val[4] }
+           | objset '.' IDENT '-=' objset    { return ADSLDeleteTup.new :lineno => val[0].lineno, :objset1 => val[0], :rel_name => val[2], :objset2 => val[4] }
+           | foreach IDENT ':' objset block  { return ADSLForEach.new :lineno => val[0], :var_name => val[1], :objset => val[3], :block => val[4] }
+           | either block or eitherblocks    { val[3].unshift val[1]; return ADSLEither.new :lineno => val[0], :blocks => val[3] }
+  
+  assignmentrhs: create IDENT { return ADSLCreateObj.new :lineno => val[0], :class_name => val[1] }
+               | objset       { return ADSLAssignment.new :lineno => val[0].lineno, :objset => val[0] }
+
+  eitherblocks: eitherblocks or block { val[0] << val[2]; return val[0] }
+              | block                 { return [val[0]] }
+
+  objset: IDENT                 { return ADSLVariable.new :lineno => val[0].lineno, :var_name => val[0] }
+        | subset '(' objset ')' { return ADSLSubset.new :lineno => val[0], :objset => val[2] }
+        | oneof '(' objset ')'  { return ADSLOneOf.new :lineno => val[0], :objset => val[2] }
+        | IDENT dotall          { return ADSLAllOf.new :lineno => val[0].lineno, :class_name => val[0] }
+        | objset '.' IDENT      { return ADSLDereference.new :lineno => val[0].lineno, :objset => val[0], :rel_name => val[2] }
+  
+  invariant_objset: IDENT                 { return ADSLVariable.new :lineno => val[0].lineno, :var_name => val[0] }
+                  | subset '(' objset ')' { return ADSLSubset.new :lineno => val[0], :objset => val[2] }
+                  | IDENT dotall          { return ADSLAllOf.new :lineno => val[0].lineno, :class_name => val[0] }
+                  | objset '.' IDENT      { return ADSLDereference.new :lineno => val[0].lineno, :objset => val[0], :rel_name => val[2] }
+
+  invariant_decl: invariant formula           { return ADSLInvariant.new :lineno => val[0], :name => nil, :formula => val[1] }
+                | invariant IDENT ':' formula { return ADSLInvariant.new :lineno => val[0], :name => val[1], :formula => val[3] }
+
+  formula: forall '(' quantifier_parameters_with_commas ':' formula ')'
+           { return ADSLForAll.new :lineno => val[0], :vars => val[2], :subformula => val[4] }
+         | exists '(' quantifier_parameters_with_commas optional_formula ')'
+           { return ADSLExists.new :lineno => val[0], :vars => val[2], :subformula => val[3] }
+         | not formula
+           { return ADSLNot.new :lineno => val[0], :subformula => val[1] } =NOT
+         | formula and formula
+           { return ADSLAnd.new :lineno => val[0].lineno, :subformulae => [val[0], val[2]] }
+         | formula or formula
+           { return ADSLOr.new :lineno => val[0].lineno, :subformulae => [val[0], val[2]] }
+         | formula '<=>' formula
+           { return ADSLEquiv.new :lineno => val[0].lineno, :subformulae => [val[0], val[2]] }
+         | formula '=>' formula
+           { return ADSLImplies.new :lineno => val[0].lineno, :subformula1 => val[0], :subformula2 => val[2] }
+         | formula '<=' formula
+           { return ADSLImplies.new :lineno => val[0].lineno, :subformula1 => val[2], :subformula2 => val[0] }
+         | '(' formula ')' { return val[1] }
+         | equiv '(' formula ',' formula additional_formulae ')'
+           { return ADSLEquiv.new :lineno => val[0], :subformulae => [val[2], val[4]] + val[5] }
+         | implies '(' formula ',' formula ')'
+           { return ADSLImplies.new :lineno => val[0], :subformula1 => val[2], :subformula2 => val[4] }
+         | invariant_objset '==' invariant_objset
+           { return ADSLEqual.new :lineno => val[0].lineno, :objsets => [val[0], val[2]] }
+         | invariant_objset '!=' invariant_objset
+           { return ADSLNot.new(:lineno => val[0].lineno, :subformula => ADSLEqual.new(:lineno => val[0].lineno, :objsets => [val[0], val[2]])) }
+         | equal '(' invariant_objset ',' invariant_objset additional_invariant_objsets ')'
+           { return ADSLEqual.new :lineno => val[0], :objsets => [val[2], val[4]] + val[5] }
+         | invariant_objset in invariant_objset { return ADSLIn.new :lineno => val[0].lineno, :objset1 => val[0], :objset2 => val[2] }
+         | true                                 { return ADSLBoolean.new :lineno => val[0], :bool_value => true }
+         | false                                { return ADSLBoolean.new :lineno => val[0], :bool_value => false }
+         | empty '(' invariant_objset ')'       { return ADSLEmpty.new :lineno => val[0], :objset => val[2] }
+
+  quantifier_parameters_with_commas: quantifier_parameters_with_commas ',' quantifier_parameter
+            { val[0] << val[2]; return val[0] }
+                                   | quantifier_parameter { return [val[0]] }
+
+  quantifier_parameter: IDENT IDENT { return [val[1], ADSLAllOf.new(:lineno => val[0].lineno, :class_name => val[0]), val[0].lineno] }
+                      | IDENT in objset         { return [val[0], val[2], val[0].lineno] }
+
+  optional_formula: ':' formula { return val[1] }
+                  |             { return nil }
+
+  additional_formulae: additional_formulae ',' formula { val[0] << val[2]; return val[0] }
+                     |                                 { return [] }
+
+  additional_invariant_objsets: additional_invariant_objsets ',' invariant_objset { val[0] << val[2]; return val[0] }
+                              |                                                   { return [] }
+
+end
+
+---- header
+
+require 'parser/adsl_parser.rex'
+require 'fol/first_order_logic'
+
+module ADSL
+
+---- inner
+
+# generated by racc
+  def generate_ast(str)
+    scan_evaluate str
+    do_parse
+  end
+
+  def parse(str)
+    generate_ast(str).typecheck_and_resolve
+  end
+
+---- footer
+
+end

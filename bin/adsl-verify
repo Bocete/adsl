@@ -1,0 +1,111 @@
+#!/usr/bin/env ruby
+require 'pathname'
+require 'optparse'
+require 'ostruct'
+
+options = OpenStruct.new
+options.path = :stdin
+options.language = 'spass'
+options.halt_on_error = false
+options.check_satisfiability = true
+options.timeout = 30
+options.csv_output = false
+options.actions = nil
+options.invariants = nil
+
+OptionParser.new do |opts|
+  opts.banner = "Usage: verify-adsl [options] [input_file]"
+  opts.separator ""
+  opts.separator "Specific options:"
+
+  opts.on("-l", "--language LANGUAGE",
+          "Specify the method for verifying the specification",
+          "  Only 'spass' is supported so far",
+          "  Default: #{options.language}") do |lang|
+    options.language = lang
+  end
+  
+  opts.on("-h", "--[no-]halt-on-error",
+          "Halt verification on the first error encountered. Default: #{options.halt_on_error}") do |halt|
+    options.halt_on_error = halt
+  end
+  
+  opts.on("-c", "--[no-]check-satisfiability",
+          "Before verifying actions individually, check that the data store has a valid state.",
+          "  Default: #{options.check_satisfiability}") do |check|
+    options.check_satisfiability = check
+  end
+
+  opts.on("-s", "--stats-csv",
+          "Output the results of the verification with stats in CSV form.",
+          "  Default: #{options.csv_output}") do
+    options.csv_output = true
+  end
+
+  opts.on("-t", "--timeout TIMEOUT", Integer,
+          "Timeout for verifying each individual conjecture, in seconds.",
+          "  Use -1 to allow infinite time for each conjecture. Default: #{options.timeout} sec") do |timeout|
+    raise OptionParser::InvalidArgument, "Timeout has to be a non-negative integer, or -1" if timeout < -1
+    options.timeout = timeout
+  end
+
+  opts.on("-a", "--actions ACTIONS",
+          "A colon separated list of actions to be verified.",
+          "  Only actions whose name contains any of the arguments will be vefified",
+          "  All actions are verified by default") do |actions|
+    options.actions = actions.split(':').map(&:strip)
+  end
+
+  opts.on("-i", "--invariants INVARIANTS",
+          "A colon separated list of invariants to be verified.",
+          "  Only invariants whose name contains any of the arguments will be vefified",
+          "  All invariants are verified by default") do |actions|
+    options.invariants = actions.split(':').map(&:strip)
+  end
+
+  opts.on_tail("--help", "Show this message") do
+    puts opts
+    exit
+  end
+end.parse!
+
+input = ""
+unless ARGV.empty?
+  raise OptionParser::ParseError "Invalid usage. Run verify-adsl --help for instructions" if ARGV.length != 1
+  options.path = ARGV.first
+  raise OptionParser::InvalidArgument, "File not found: #{File.expand_path options.path}" unless File.exists? options.path
+
+  file = File.new options.path
+  input = file.read
+else
+  input = STDIN.read
+end
+
+GEM_BIN_PATH = Pathname.new(File.expand_path(__FILE__)).parent
+GEM_LIB_PATH = GEM_BIN_PATH.parent + "lib"
+$LOAD_PATH.unshift GEM_LIB_PATH unless $LOAD_PATH.include? GEM_LIB_PATH
+
+case options.language
+when 'spass'
+  require 'spass/bin'
+  include Spass::Bin
+  begin
+    verify(input,
+      :halt_on_error => options.halt_on_error,
+      :check_satisfiability => options.check_satisfiability,
+      :timeout => options.timeout,
+      :csv_output => options.csv_output,
+      :actions => options.actions,
+      :invariants => options.invariants)
+  rescue Exception => e
+    $stderr.puts "Error thrown"
+    $stderr.puts e.message unless e.message.nil? or e.message.strip.length == 0
+    $stderr.puts e.backtrace
+    exit -1
+  end
+else
+  $stderr.puts "Unknown translation language #{options.language}"
+  exit -1
+end
+
+exit 0
