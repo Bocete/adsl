@@ -13,7 +13,7 @@ Gem::Specification.new do |s|
   s.summary     = "A tool for parsing ADSL and translating it into Spass"
   s.description = "ADSL parses ADSL specification, translating it into Spass for verification"
  
-  s.files        = Dir.glob("{bin,lib}/**/*") + %w(LICENSE README.md ROADMAP.md CHANGELOG.md)
+  s.files        = Dir.glob("{bin,lib}/**/*") + %w(LICENSE.txt README.txt)
   s.executables  = ['adsl-verify']
   s.require_path = 'lib'
 end
