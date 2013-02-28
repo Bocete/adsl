@@ -18,7 +18,7 @@ For options and other modes of operation, run
 The ADSL gem is currently hosted at github. The github web page is
 http://github.com/Bocete/adsl. The public git clone URL is
 
-* git@github.com:Bocete/adsl.git
+* git://github.com/Bocete/adsl.git
 
 === Issues and Bug Reports
 
