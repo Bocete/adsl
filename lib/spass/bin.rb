@@ -151,7 +151,7 @@ module Spass
       times = spass_output.scan(/(\d):(\d\d):(\d\d)\.(\d\d)/)
       raise if times.length != 6
       times = times.map{ |time| time[3].to_i*10 + time[2].to_i*1000 + time[1].to_i*60*1000 + time[0].to_i*60*60*1000 }
-      stats[:spass_preparation_time] = times[0..2].sum 
+      stats[:spass_preparation_time] = times[1..2].sum 
       stats[:spass_proof_lookup_time] = times[3..5].sum
 
       stats[:proof_clause_count] = /^SPASS derived (\d+) clauses.*$/.match(spass_output)[1].to_i
