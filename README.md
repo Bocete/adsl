@@ -53,9 +53,7 @@ You can download the source using our public git clone URL:
 
 ### Issues and Bug Reports
 
-Feature requests and bug reports can be made here
-
-    https://github.com/Bocete/adsl/issues
+Feature requests and bug reports can be made at https://github.com/Bocete/adsl/issues
 
 
 License
