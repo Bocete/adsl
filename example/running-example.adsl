@@ -1,4 +1,4 @@
-# verify this specification using 'adsl-verify <pathtofile>'
+# verify this specification by running 'adsl-verify <pathtofile>'
 
 class User {
   0+ Project projects inverseof user
