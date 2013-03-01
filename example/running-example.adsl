@@ -1,0 +1,33 @@
+# verify this specification using 'adsl-verify <pathtofile>'
+
+class User {
+  0+ Project projects inverseof user
+  0+ Todo todos inverseof user
+}
+class Project {
+  0+ Todo todos inverseof project
+  0+ Note notes inverseof project
+  0..1 User user
+}
+class Todo {
+  0..1 Project project
+  0..1 User user
+}
+class Note {
+  0..1 Project project
+}
+action create_todo(1 Project project, 1 User user) {
+  todo = create Todo
+  project.todos += todo
+  user.todos += todo
+}
+action delete_project(1 Project project) {
+  foreach n: project.notes {
+    delete n
+  }
+  delete project
+}
+invariant forall(Note n: 
+  exists(Project p: n in p.notes)
+)
+invariant forall(Todo t: not empty(t.project))

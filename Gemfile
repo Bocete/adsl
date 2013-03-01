@@ -1,9 +1,10 @@
 source "http://rubygems.org"
 
 # base
-gem "rake"
-gem "test-unit"
-gem "i18n"
+# indentation added to prevent these dependencies when building the gem
+  gem "rake"
+  gem "test-unit"
+  gem "i18n"
 
 # lexer/parser
 gem "rex"
