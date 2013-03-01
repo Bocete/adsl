@@ -12,6 +12,7 @@ This gem is developed and tested on 32 and 64 bit Linux. OS-X compatibility not 
  - [Download and install Spass](http://www.spass-prover.org/download/index.html) and make sure its executable (`bin/SPASS`) on your $PATH
  - Install the `adsl` gem by running `gem install adsl`.
    If you receive an error while generating documentation for `activesupport` run `gem install rdoc adsl` instead.
+ - Test the installating by verifying [the example specification](https://raw.github.com/Bocete/adsl/master/example/running-example.adsl)
 
 Usage
 -----
