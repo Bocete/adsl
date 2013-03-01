@@ -1,18 +1,17 @@
 ADSL - Abstract Data Store Language Parser and Translator
 =========================================================
 
-This package contains adsl, a Ruby gem for verifying ADSL specifications.
+This package contains `adsl`, a Ruby gem for verifying ADSL specifications.
 
 Installation
 ------------
 
- - Install Ruby 1.8.7. That specific version is required by the libraries we use. We suggest using the [Ruby Version Manager](https://rvm.io/rvm/install/) to manage this installation.
+This gem is developed and tested on 32 and 64 bit Linux. OS-X compatibility not tested, give it a try and tell us if it works! Windows is not supported at this moment.
+
+ - Install Ruby 1.8.7. This specific version is required by the libraries we use. We suggest using the [Ruby Version Manager](https://rvm.io/rvm/install/) to manage this installation.
  - [Download and install Spass](http://www.spass-prover.org/download/index.html) and make sure its executable (`bin/SPASS`) on your $PATH
  - Install the `adsl` gem by running `gem install adsl`.
-   You may receive an error while generating documentation for `activesupport`. You can avoid it by running `gem install rdoc adsl`.
-
-**Platform compatibility:** This gem is developed and tested on 32 and 64 bit Linux. OS-X compatibility not tested, give it a try and tell us if it works! Windows incompatible at this moment.
-
+   If you receive an error while generating documentation for `activesupport` run `gem install rdoc adsl` instead.
 
 Usage
 -----
@@ -22,6 +21,8 @@ Usage
 For options and other modes of operation, run
 
     adsl-verify --help
+
+You can download sample ADSL specifications 
 
 
 Development
