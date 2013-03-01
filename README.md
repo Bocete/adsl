@@ -1,7 +1,7 @@
 ADSL - Abstract Data Store Language Parser and Translator
 =========================================================
 
-This package contains `adsl`, a Ruby gem for verifying ADSL specifications.
+This repository contains the source for `adsl`, a Ruby gem for verifying ADSL specifications.
 
 Installation
 ------------
@@ -31,8 +31,8 @@ Development
 
 ### Source Repository
 
-The ADSL gem is currently hosted at github. The github web page is
-http://github.com/Bocete/adsl. The public git clone URL is
+The ADSL gem is currently hosted at github. The github web page is http://github.com/Bocete/adsl.
+You can download the source using our public git clone URL:
 
     git://github.com/Bocete/adsl.git
 
