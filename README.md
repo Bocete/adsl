@@ -1,7 +1,7 @@
 ADSL - Abstract Data Store Language Parser and Translator
 =========================================================
 
-This repository contains the source for `adsl`, a Ruby gem for verifying ADSL specifications.
+This repository contains the source for ADSL, a Ruby gem for verifying ADSL specifications.
 
 Installation
 ------------
@@ -10,9 +10,10 @@ This gem is developed and tested on 32 and 64 bit Linux. OS-X compatibility not 
 
  - Install Ruby 1.8.7. This specific version is required by the libraries we use. We suggest using the [Ruby Version Manager](https://rvm.io/rvm/install/) to manage this installation.
  - [Download and install Spass](http://www.spass-prover.org/download/index.html) and make sure its executable (`bin/SPASS`) on your $PATH
- - Install the `adsl` gem by running `gem install adsl`.
-   If you receive an error while generating documentation for `activesupport` run `gem install rdoc adsl` instead.
- - Test the installating by verifying [the example specification](https://raw.github.com/Bocete/adsl/master/example/running-example.adsl)
+ - Install the ADSL gem by running `gem install adsl`.
+   
+   If you receive an error while generating documentation for 'activesupport' run `gem install rdoc adsl` instead.
+ - Test the installation by verifying [the example specification](https://raw.github.com/Bocete/adsl/master/example/running-example.adsl)
 
 Usage
 -----
