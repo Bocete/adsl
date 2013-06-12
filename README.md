@@ -20,10 +20,8 @@ Installation
 This gem is tested on 32 and 64 bit Linux. OS-X compatibility not tested, give it a try
 and tell us if it works! Windows is not supported at this moment.
 
- - Install Ruby 1.8.7. This specific version is required by the libraries we use. We suggest using the
-   [Ruby Version Manager](https://rvm.io/rvm/install/) to manage this installation.
- - [Download and install Spass](http://www.spass-prover.org/download/index.html) and make sure its 
-   executable (`bin/SPASS`) on your $PATH
+ - Ruby 1.8.7 or later required. We suggest using the [Ruby Version Manager](https://rvm.io/rvm/install/) to manage this installation.
+ - [Download and install Spass](http://www.spass-prover.org/download/index.html) and make sure its executable (`bin/SPASS`) on your $PATH
  - Install the ADSL gem by running `gem install adsl`.
    
    If you receive an error while generating documentation for 'activesupport' run `gem install rdoc adsl` instead.
