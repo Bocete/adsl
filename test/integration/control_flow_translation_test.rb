@@ -248,7 +248,7 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
       }
       invariant forall(Class a, Class b: a == b)
     ADSL
-    adsl_assert :incorrect, <<-ADSL
+    adsl_assert :correct, <<-ADSL
       class Class{}
       action blah() {
         a = Class.all

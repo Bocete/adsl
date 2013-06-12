@@ -42,7 +42,7 @@ rule
   =              { [text, lineno] }
   \+             { [text, lineno] }
   [01]           { [text, lineno] }
-  \w+            { [:IDENT, ADSLIdent.new(:lineno => lineno, :text => text)] }
+  \w+            { [:IDENT, ADSL::ADSLIdent.new(:lineno => lineno, :text => text)] }
   \s              # blank, no action
   .              { [:unknown_symbol, [text, lineno]] }
 end

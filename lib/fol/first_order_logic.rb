@@ -1,4 +1,3 @@
-require 'rubygems'
 require 'active_support/all'
 require 'util/util'
 
@@ -247,12 +246,12 @@ module FOL
     end
   end
 
-  # define a function for each of the above classes, starting with underscore and underscored* afterwards
+  # define a method for each of the above classes, starting with underscore and underscored* afterwards
   # *see: http://api.rubyonrails.org/v2.3.8/classes/ActiveSupport/CoreExtensions/String/Inflections.html
   self.constants.each do |klass_name|
     instance_eval do
-      klass = FOL.const_get(klass_name)
-      self.send :define_method, "_#{klass_name.underscore}".to_sym do |*args|
+      klass = FOL.const_get klass_name
+      send :define_method, "_#{klass_name.to_s.underscore}".to_sym do |*args|
         klass.new(*args).resolve_spass
       end
     end

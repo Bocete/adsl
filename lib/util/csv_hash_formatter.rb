@@ -13,16 +13,24 @@ module Util
       "\"#{obj.to_s.gsub('"', '""')}\""
     end
    
-    def initialize
+    def initialize(*cols)
       @row_hashes = []
       @columns = []
+      cols.each do |col|
+        add_column col
+      end
     end
 
     def add_row(row)
       @row_hashes << row
       row.keys.each do |key|
-        @columns << key unless @columns.include? key
+        add_column key unless @columns.include? key
       end
+    end
+
+    def add_column(col)
+      raise "Duplicate column name #{col}" if @columns.include? col.to_sym
+      @columns << col.to_sym
     end
 
     alias_method :<<, :add_row

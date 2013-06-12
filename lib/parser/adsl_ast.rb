@@ -214,7 +214,7 @@ module ADSL
       # name => [astnode, dsobj]
       @classes = ActiveSupport::OrderedHash.new
       # classname => name => [astnode, dsobj]
-      @relations = ActiveSupport::OrderedHash.new { |hash, key| hash[key] = ActiveSupport::OrderedHash.new }
+      @relations = ActiveSupport::OrderedHash.new{ |hash, key| hash[key] = ActiveSupport::OrderedHash.new }
       # stack of name => [astnode, dsobj]
       @actions = ActiveSupport::OrderedHash.new
       @invariants = []
@@ -234,10 +234,7 @@ module ADSL
       end
       @actions = source.actions.dup
       @invariants = source.invariants.dup
-      @var_stack = []
-      source.var_stack.each do |frame|
-        @var_stack << frame.dup
-      end
+      @var_stack = source.var_stack.map{ |frame| frame.dup }
     end
     
     def on_var_write(&block)
@@ -312,10 +309,10 @@ module ADSL
     def self.context_vars_that_differ(*contexts)
       vars_per_context = []
       contexts.each do |context|
-        vars_per_context << context.var_stack.inject({}) { |so_far, frame| so_far.merge! frame }
+        vars_per_context << context.var_stack.inject(ActiveSupport::OrderedHash.new) { |so_far, frame| so_far.merge! frame }
       end
       all_vars = vars_per_context.map{ |c| c.keys }.flatten.uniq
-      packed = {}
+      packed = ActiveSupport::OrderedHash.new
       all_vars.each do |v|
         packed[v] = vars_per_context.map{ |vpc| vpc[v][1] }
       end
@@ -466,23 +463,25 @@ module ADSL
 
     def typecheck_and_resolve(context)
       context.push_frame
+
       contexts = [context]
-      (1..@blocks.length-1).each do |i|
+      (@blocks.length-1).times do
         contexts << context.dup
       end
-     
+
       blocks = []
       @blocks.length.times do |i|
         blocks << @blocks[i].typecheck_and_resolve(contexts[i])
       end
 
-      contexts.each do |context|
-        context.pop_frame
+      contexts.each do |c|
+        c.pop_frame
       end
 
       either = DS::DSEither.new :blocks => blocks
 
       lambdas = []
+
       ADSLTypecheckResolveContext::context_vars_that_differ(*contexts).each do |var_name, vars|
         var = DS::DSVariable.new :name => var_name, :type => vars.first.type
         objset = DS::DSEitherLambdaObjset.new :either => either, :vars => vars

@@ -269,13 +269,23 @@ module SpassTranslator
       pred
     end
     
-    def get_pred_name prefix
-      prefix_of_prefix = prefix
-      prefix_of_prefix = prefix.scan(/^(.+)_\d+$/).first.first if prefix =~ /^.+_\d+$/
+    def get_pred_name common_name
+      registered_names = (@functions + @predicates).map{ |a| a.name }
+      prefix = common_name
+      prefix = common_name.scan(/^(.+)_\d+$/).first.first if prefix =~ /^.+_\d+$/
+      regexp = /^#{ Regexp.escape prefix }(?:_(\d+))?$/
+
+      already_registered = registered_names.select{ |a| a =~ regexp }
+      return common_name if already_registered.empty?
       
-      already_existing = (@functions + @predicates).select{ |a| a.name =~ /^#{Regexp.escape prefix_of_prefix}(_\d+)?$/ }.max_by{ |a| a.name }
-      return prefix if already_existing.nil?
-      return already_existing.name.increment_suffix
+      rhs_numbers = already_registered.map{ |a| [a, a.scan(regexp).first.first] }
+      
+      rhs_numbers.each do |a|
+        a[1] = a[1].nil? ? -1 : a[1].to_i
+      end
+
+      max_name = rhs_numbers.max_by{ |a| a[1] }
+      return max_name[0].increment_suffix
     end
 
     def _reserve_names(*names)

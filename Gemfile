@@ -7,7 +7,7 @@ source "http://rubygems.org"
   gem "i18n"
 
 # lexer/parser
-gem "rex"
+gem "rexical"
 gem "racc"
 
 # used all over the place
@@ -15,3 +15,6 @@ gem "active_support"
 
 # terminal color output
 gem "colorize"
+
+# extraction tools
+gem "ruby_parser"

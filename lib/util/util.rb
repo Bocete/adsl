@@ -4,11 +4,12 @@ require 'thread'
 
 class String
   def increment_suffix
-    suffix = scan(/_\d+$/).first
+    suffix = scan(/_(\d+)$/).last
     if suffix.nil?
       return self + "_2"
     else
-      return self[0, self.length - suffix.length] + '_' + (suffix.to_i + 1).to_s
+      suffix = suffix.first
+      return self[0, self.length - suffix.length] + (suffix.to_i + 1).to_s
     end
   end
 end
@@ -24,12 +25,15 @@ end
 def container_for(*fields, &block)
   raise ArgumentError, 'Field list empty' if fields.empty?
 
+  all_fields_method_name = :container_for_fields
+
   all_fields = Set.new(fields)
-  if methods.include? "container_for_fields"
-    all_fields.merge send(:container_for_fields)
+  if methods.include? all_fields_method_name or methods.include? all_fields_method_name.to_s
+    prev_fields = send all_fields_method_name
+    all_fields.merge prev_fields
   end
   singleton_class = (class << self; self; end)
-  singleton_class.send :define_method, :container_for_fields, lambda{all_fields}
+  singleton_class.send :define_method, all_fields_method_name, lambda{all_fields}
 
   attr_accessor *fields
 
@@ -44,7 +48,7 @@ def container_for(*fields, &block)
     if block
       instance_eval &block
     elsif not options_trimmed.empty?
-      raise ArgumentError, "Undefined fields mentioned in initializer: #{options_trimmed.keys.map{ |key| ":#{key.to_s}"}.join(", ")}"
+      raise ArgumentError, "Undefined fields mentioned in initializer of #{self.class}: #{options_trimmed.keys.map{ |key| ":#{key.to_s}"}.join(", ")}" + "\n[#{all_fields.to_a.join ' ' }]"
     end
   end
 
@@ -54,7 +58,7 @@ def container_for(*fields, &block)
     while not to_inspect.empty?
       elem = to_inspect.pop
       inspected << elem
-      if elem.class.methods.include? 'container_for_fields'
+      if elem.class.methods.include?(all_fields_method_name) or elem.class.methods.include?(all_fields_method_name.to_s)
         elem.class.container_for_fields.each do |field|
           field_val = elem.send(field)
           next if field_val.nil?

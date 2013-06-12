@@ -3,47 +3,52 @@ require 'util/util'
 
 class UtilTest < Test::Unit::TestCase
 
+  def class_defined?(klass)
+    # both sym and string used for compitability with Ruby 1.8.7 were strings were used
+    UtilTest.constants.include?(klass.to_s) or UtilTest.constants.include?(klass.to_sym)
+  end
+
   def teardown
     ['Foo', 'Foo2'].each do |klass_name|
-      if UtilTest.constants.include?(klass_name)
-        UtilTest.send :remove_const, klass_name
-      end
+      # both sym and string used for compitability with Ruby 1.8.7 were strings were used
+      UtilTest.send :remove_const, klass_name if UtilTest.constants.include?(klass_name)
+      UtilTest.send :remove_const, klass_name.to_sym if UtilTest.constants.include?(klass_name.to_sym)
     end
   end
 
   def setup
-    [:Foo, :Foo2].each do |klass_name|
-      assert_false UtilTest.constants.include? klass_name
+    ['Foo', 'Foo2'].each do |klass_name|
+      assert_false class_defined? klass_name
     end
   end
 
   def test_teardown__classes_unload
-    assert_false UtilTest.constants.include? 'Foo'
+    assert_false class_defined? :Foo
     eval <<-ruby
       class Foo
       end
     ruby
-    assert UtilTest.constants.include?('Foo')
+    assert class_defined? :Foo
     teardown
-    assert_false UtilTest.constants.include? 'Foo'
+    assert_false class_defined? :Foo
   end
 
   def test_teardown__containers_unload
-    assert_false UtilTest.constants.include? 'Foo'
+    assert_false class_defined? :Foo
     eval <<-ruby
       class Foo
         container_for :a
       end
     ruby
-    assert UtilTest.constants.include? 'Foo'
+    assert class_defined? :Foo
     assert UtilTest::const_get('Foo').method_defined?('a')
     teardown
-    assert_false UtilTest.constants.include? 'Foo'
+    assert_false class_defined? :Foo
     eval <<-ruby
       class Foo
       end
     ruby
-    assert UtilTest.constants.include? 'Foo'
+    assert class_defined? :Foo
     assert_false UtilTest::const_get('Foo').methods.include?('a')
   end
   
@@ -222,5 +227,12 @@ class UtilTest < Test::Unit::TestCase
     stdout = process_race "echo 'blah'", "sleep 20; echo 'blah2'"
     assert (Time.now - time) < 1
     assert_equal 'blah', stdout.strip
+  end
+  
+  def test_string__increment_suffix
+    assert_equal 'asd_2', 'asd'.increment_suffix
+    assert_equal 'asd_3', 'asd_2'.increment_suffix
+    assert_equal 'asd_123', 'asd_122'.increment_suffix
+    assert_equal 'a1s2_d4_2', 'a1s2_d4'.increment_suffix
   end
 end

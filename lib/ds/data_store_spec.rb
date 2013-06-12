@@ -12,7 +12,7 @@ module DS
 
     def replace(what, with)
       to_inspect = [self]
-      inspected = Set[]
+      inspected = Set.new
       replaced = false
       while not to_inspect.empty?
         elem = to_inspect.pop
@@ -26,7 +26,7 @@ module DS
             end
             inspected << elem[i]
           end
-        elsif elem.class.methods.include? 'container_for_fields'
+        elsif elem.class.methods.include? 'container_for_fields' or elem.class.methods.include? :container_for_fields
           elem.class.container_for_fields.each do |field_name|
             field_val = elem.send field_name
             if field_val == what

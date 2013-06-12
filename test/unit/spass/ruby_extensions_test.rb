@@ -35,12 +35,5 @@ class RubyExtensionsTest < Test::Unit::TestCase
     assert_equal "a", "a".to_spass_string
     assert_equal "kme", "kme".to_spass_string
   end
-  
-  def test_string__increment_suffix
-    assert_equal 'asd_2', 'asd'.increment_suffix
-    assert_equal 'asd_3', 'asd_2'.increment_suffix
-    assert_equal 'asd_123', 'asd_122'.increment_suffix
-    assert_equal 'a1s2_d4_2', 'a1s2_d4'.increment_suffix
-  end
 end
 

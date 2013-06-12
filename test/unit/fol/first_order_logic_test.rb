@@ -15,7 +15,8 @@ class FirstOrderLogicTest < Test::Unit::TestCase
         include FOL
       end
     ruby
-    assert Foo.new.methods.include? "_and"
+    foo = Foo.new
+    assert foo.methods.include?("_and") || foo.methods.include?(:_and)
 
     eval <<-ruby
       class Foo
