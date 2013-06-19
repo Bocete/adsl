@@ -30,4 +30,20 @@ class Test::Unit::TestCase
   def spass_assert(expected_result, input, timeout = SPASS_TIMEOUT)
     adsl_assert expected_result, input, :timeout => timeout
   end
+
+  def unload_class(*classes) 
+    classes.each do |klass_name|
+      # both sym and string used for compitability with Ruby 1.8.7 were strings were used
+      self.class.send :remove_const, klass_name if self.class.constants.include?(klass_name)
+      self.class.send :remove_const, klass_name.to_sym if self.class.constants.include?(klass_name.to_sym)
+    end
+  end
+
+  def class_defined?(*classes)
+    classes.each do |klass|
+      # both sym and string used for compitability with Ruby 1.8.7 were strings were used
+      return true if self.class.constants.include?(klass.to_s) or self.class.constants.include?(klass.to_sym)
+    end
+    false
+  end
 end

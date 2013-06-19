@@ -48,9 +48,16 @@ namespace :test do
       t.test_files = FileList['test/unit/ds/*_test.rb']
       t.verbose = true
     end
+    
+    desc "Test Extract"
+    Rake::TestTask.new(name=:extract) do |t|
+      t.libs += ["lib"]
+      t.test_files = FileList['test/unit/extract/*_test.rb']
+      t.verbose = true
+    end
   end
 
-  task :unit => ["test:unit:parser", "test:unit:util", "test:unit:ds", "test:unit:fol", "test:unit:spass"]
+  task :unit => ["test:unit:parser", "test:unit:util", "test:unit:ds", "test:unit:fol", "test:unit:spass", "test:unit:extract"]
 
   Rake::TestTask.new(name=:integration) do |t|
     t.libs += ["lib"]

@@ -1,19 +1,11 @@
 require 'test/unit'
 require 'util/util'
+require 'util/test_helper'
 
 class UtilTest < Test::Unit::TestCase
 
-  def class_defined?(klass)
-    # both sym and string used for compitability with Ruby 1.8.7 were strings were used
-    UtilTest.constants.include?(klass.to_s) or UtilTest.constants.include?(klass.to_sym)
-  end
-
   def teardown
-    ['Foo', 'Foo2'].each do |klass_name|
-      # both sym and string used for compitability with Ruby 1.8.7 were strings were used
-      UtilTest.send :remove_const, klass_name if UtilTest.constants.include?(klass_name)
-      UtilTest.send :remove_const, klass_name.to_sym if UtilTest.constants.include?(klass_name.to_sym)
-    end
+    unload_class 'Foo', 'Foo2'
   end
 
   def setup
@@ -22,36 +14,6 @@ class UtilTest < Test::Unit::TestCase
     end
   end
 
-  def test_teardown__classes_unload
-    assert_false class_defined? :Foo
-    eval <<-ruby
-      class Foo
-      end
-    ruby
-    assert class_defined? :Foo
-    teardown
-    assert_false class_defined? :Foo
-  end
-
-  def test_teardown__containers_unload
-    assert_false class_defined? :Foo
-    eval <<-ruby
-      class Foo
-        container_for :a
-      end
-    ruby
-    assert class_defined? :Foo
-    assert UtilTest::const_get('Foo').method_defined?('a')
-    teardown
-    assert_false class_defined? :Foo
-    eval <<-ruby
-      class Foo
-      end
-    ruby
-    assert class_defined? :Foo
-    assert_false UtilTest::const_get('Foo').methods.include?('a')
-  end
-  
   def test_container_for__blank
     assert_raise ArgumentError do
       eval <<-ruby

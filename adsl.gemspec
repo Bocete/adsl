@@ -1,8 +1,5 @@
 # -*- encoding: utf-8 -*-
 
-lib = File.expand_path('../lib/', __FILE__)
-$:.unshift lib unless $:.include?(lib)
- 
 Gem::Specification.new do |s|
   s.name        = "adsl"
   s.version     = "0.0.3"
@@ -14,9 +11,10 @@ Gem::Specification.new do |s|
   s.summary     = "A tool for parsing ADSL and translating it into Spass"
   s.description = "ADSL parses ADSL specification, translating it into Spass for verification"
 
-  s.required_ruby_version = '~> 1.8.7'
+  s.required_ruby_version = '>= 1.8.7'
 
-  s.files        = Dir.glob("{bin,lib}/**/*") + %w(LICENSE README.md Gemfile)
+  s.files        = Dir.glob('{bin,lib}/**/*') + %w(LICENSE README.md Gemfile)
+  s.test_files   = Dir.glob('test/**/*_test.rb')
   s.executables  = ['adsl-verify']
   s.require_path = 'lib'
 
@@ -26,8 +24,11 @@ Gem::Specification.new do |s|
   s.add_dependency 'rexical'
   s.add_dependency 'racc'
   s.add_dependency 'active_support'
+  s.add_dependency 'i18n' # active_support crashes without it
   s.add_dependency 'colorize'
-  s.add_dependency 'i18n'
-
+  s.add_dependency 'method_source'
+  s.add_dependency 'ruby_parser', '~> 3.1'
+  s.add_dependency 'ruby2ruby'
+  s.add_dependency 'backports'
 end
 

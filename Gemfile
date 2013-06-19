@@ -1,5 +1,7 @@
-source "http://rubygems.org"
+source 'https://rubygems.org'
+gemspec
 
+=begin
 # base
 # indentation added to prevent these dependencies when building the gem
   gem "rake"
@@ -18,3 +20,4 @@ gem "colorize"
 
 # extraction tools
 gem "ruby_parser"
+=end
