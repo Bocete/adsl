@@ -12,58 +12,63 @@ end
 task :build => ["build:parser"]
 
 namespace :test do
-  namespace :unit do
+  namespace :units do
     desc "Test Lexer & Parser"
     task :parser => ["build:parser"]
     Rake::TestTask.new(name=:parser) do |t|
       t.libs += ["lib"]
-      t.test_files = FileList['test/unit/parser/*_test.rb']
+      t.test_files = FileList['test/unit/parser/**/*_test.rb']
       t.verbose = true
     end
 
     desc "Test Util"
     Rake::TestTask.new(name=:util) do |t|
       t.libs += ["lib"]
-      t.test_files = FileList['test/unit/util/*_test.rb']
+      t.test_files = FileList['test/unit/util/**/*_test.rb']
       t.verbose = true
     end
     
     desc "Test First Order Logic"
     Rake::TestTask.new(name=:fol) do |t|
       t.libs += ["lib"]
-      t.test_files = FileList['test/unit/fol/*_test.rb']
+      t.test_files = FileList['test/unit/fol/**/*_test.rb']
       t.verbose = true
     end
     
     desc "Test Spass Translator"
     Rake::TestTask.new(name=:spass) do |t|
       t.libs += ["lib"]
-      t.test_files = FileList['test/unit/spass/*_test.rb']
+      t.test_files = FileList['test/unit/spass/**/*_test.rb']
       t.verbose = true
     end
     
     desc "Test DataStoreSpec"
     Rake::TestTask.new(name=:ds) do |t|
       t.libs += ["lib"]
-      t.test_files = FileList['test/unit/ds/*_test.rb']
+      t.test_files = FileList['test/unit/ds/**/*_test.rb']
       t.verbose = true
     end
     
     desc "Test Extract"
     Rake::TestTask.new(name=:extract) do |t|
       t.libs += ["lib"]
-      t.test_files = FileList['test/unit/extract/*_test.rb']
+      t.test_files = FileList['test/unit/extract/**/*_test.rb']
       t.verbose = true
     end
   end
 
-  task :unit => ["test:unit:parser", "test:unit:util", "test:unit:ds", "test:unit:fol", "test:unit:spass", "test:unit:extract"]
-
-  Rake::TestTask.new(name=:integration) do |t|
+  desc "Test All Units"
+  Rake::TestTask.new(name=:units) do |t|
     t.libs += ["lib"]
-    t.test_files = FileList['test/integration/*_test.rb']
+    t.test_files = FileList['test/unit/**/*_test.rb']
+    t.verbose = true
+  end
+
+  Rake::TestTask.new(name=:integrations) do |t|
+    t.libs += ["lib"]
+    t.test_files = FileList['test/integration/**/*_test.rb']
     t.verbose = true
   end
 end
 
-task :test => ["test:unit", "test:integration"]
+task :test => ["test:units", "test:integrations"]

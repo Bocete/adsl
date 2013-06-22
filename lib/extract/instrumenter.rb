@@ -19,7 +19,7 @@ module Extract
     end
 
     def ruby_parser
-      RUBY_VERSION >= '2' ? Ruby19Parser.new : RubyParser.for_current_version
+      RUBY_VERSION >= '2' ? Ruby19Parser.new : RubyParser.for_current_ruby
     end
 
     def self.instrumented_by(*ids)
@@ -36,6 +36,7 @@ module Extract
           first_stmt[2] != :instrumented_by
         new_stmt = s(:call, Instrumenter.sexp_class_rep, :instrumented_by, s(:lit, self.object_id))
         sexp.insert 3, new_stmt
+        sexp.insert 4, s(:call, nil, :require, s(:str, 'extract/instrumenter'))
       else
         first_stmt << s(:lit, self.object_id) 
       end

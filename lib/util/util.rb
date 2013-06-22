@@ -1,6 +1,7 @@
 require 'set'
 require 'open3'
 require 'thread'
+require 'active_support'
 
 class String
   def increment_suffix
@@ -19,6 +20,27 @@ class Time
     pre = Time.now
     yield
     ((Time.now - pre)*1000).to_i
+  end
+end
+
+class Array
+  def worklist_each
+    changed = true
+    until empty? or not changed
+      changed = false
+      length.times do
+        task = self.shift
+        new_value = yield task
+        self << new_value if new_value
+        changed = true if task != new_value
+      end
+    end
+  end
+end
+
+class Module
+  def parent_module
+    name.split('::')[0..-2].join('::').constantize
   end
 end
 
@@ -112,3 +134,4 @@ ensure
     Process.kill 'HUP', pid
   end
 end
+

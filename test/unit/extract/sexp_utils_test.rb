@@ -42,4 +42,18 @@ class SexpUtilsTest < Test::Unit::TestCase
 
     assert_equal s(:blah, s(:array, s(:lit, 2), s(:lit, 4))), replacement
   end
+
+  def test_find_shallowest__plain
+    assert_equal [], s(s(:self)).find_shallowest(:lit)
+    assert_equal [s(:lit, 1), s(:lit, 2)], s(s(:lit, 1), s(:self), s(:lit, 2), s(:self)).find_shallowest(:lit)
+  end
+
+  def test_find_shallowest__goes_through_depth
+    assert_equal [s(:lit, 1), s(:lit, 2)], s(s(s(:lit, 1), s(:self), s(:lit, 2), s(:self))).find_shallowest(:lit)
+    assert_equal [s(:lit, 1), s(:lit, 2)], s(s(:lit, 1), s(s(:self), s(:lit, 2), s(:self))).find_shallowest(:lit)
+  end
+  
+  def test_find_shallowest__only_the_shallowest
+    assert_equal [s(:lit, s(:lit, 2))], s(s(:lit, s(:lit, 2)), s(:self)).find_shallowest(:lit)
+  end
 end

@@ -197,4 +197,46 @@ class UtilTest < Test::Unit::TestCase
     assert_equal 'asd_123', 'asd_122'.increment_suffix
     assert_equal 'a1s2_d4_2', 'a1s2_d4'.increment_suffix
   end
+
+  def test_array__worklist_each__plain
+    worklist = [3, 2, 1, 0]
+    looking_for = 0
+    worklist.worklist_each do |task|
+      if task == looking_for
+        looking_for += 1
+        next
+      else
+        next task
+      end
+    end
+    assert worklist.empty?
+    assert_equal 4, looking_for
+  end
+  
+  def test_array__worklist_each__stops_on_no_change
+    worklist = [3, 2, 5, 19, 1, 0]
+    looking_for = 0
+    worklist.worklist_each do |task|
+      if task == looking_for
+        looking_for += 1
+        next
+      else
+        next task
+      end
+    end
+    assert_equal 4, looking_for
+  end
+
+  def test_module__parent_module
+    eval <<-ruby
+      module Foo
+        class Foo2
+        end
+      end
+    ruby
+
+    assert_equal Object, String.parent_module
+    assert_equal UtilTest, Foo.parent_module
+    assert_equal UtilTest::Foo, Foo::Foo2.parent_module
+  end
 end

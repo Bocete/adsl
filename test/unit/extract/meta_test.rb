@@ -1,4 +1,3 @@
-
 require 'test/unit'
 require 'extract/meta'
 require 'pp'
@@ -6,15 +5,11 @@ require 'util/test_helper'
 
 class MetaTest < Test::Unit::TestCase
   def setup
-    assert_false class_defined? :Foo, :Bar
+    assert !class_defined?(:Foo, :Bar)
   end
 
   def teardown
     unload_class :Foo, :Bar
-  end
-
-  def test_class__inheritance_chain
-    assert_equal [BasicObject, Object, String], String.inheritance_chain
   end
 
   def test_object__replace_method__crashes_when_no_method_exists
