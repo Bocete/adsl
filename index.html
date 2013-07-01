@@ -1,0 +1,120 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>ADSL by Bocete</title>
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script src="javascripts/respond.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <!--[if lt IE 8]>
+    <link rel="stylesheet" href="stylesheets/ie.css">
+    <![endif]-->
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+
+  </head>
+  <body>
+      <div id="header">
+        <nav>
+          <li class="fork"><a href="https://github.com/Bocete/adsl">View On GitHub</a></li>
+          <li class="downloads"><a href="https://github.com/Bocete/adsl/zipball/master">ZIP</a></li>
+          <li class="downloads"><a href="https://github.com/Bocete/adsl/tarball/master">TAR</a></li>
+          <li class="title">DOWNLOADS</li>
+        </nav>
+      </div><!-- end header -->
+
+    <div class="wrapper">
+
+      <section>
+        <div id="title">
+          <h1>ADSL</h1>
+          <p>An Abstract Data Store Language Parser and Translator</p>
+          <hr>
+          <span class="credits left">Project maintained by <a href="https://github.com/Bocete">Bocete</a></span>
+          <span class="credits right">Hosted on GitHub Pages &mdash; Theme by <a href="https://twitter.com/michigangraham">mattgraham</a></span>
+        </div>
+
+        <h1>
+<a name="adsl---abstract-data-store-language-parser-and-translator" class="anchor" href="#adsl---abstract-data-store-language-parser-and-translator"><span class="octicon octicon-link"></span></a>ADSL - Abstract Data Store Language Parser and Translator</h1>
+
+<p>This tool an Abstract Data Store Language (ADSL) specification verification tool.</p>
+
+<p>ADSL is a language for specifying Abstract Data Stores using a syntax familiar to anyone that has experience
+with ORM tools such as Hibernate and ActiveRecord. A specification contains the model classes, actions executed
+using a RESTful interface, and a set of invariants to be verified.</p>
+
+<p>This tool verifies a specification by translating it into a first order logic theorem verifiable by <a href="http://www.spass-prover.org/" title="Spass">Spass</a>,
+a theorem prover. It provides detailed information on the actions and invariants verified in human-readable or
+CSV format.</p>
+
+<p>This tool is distributed as a Ruby gem and is uploaded to <a href="https://rubygems.org/gems/adsl" title="RubyGems.org">RubyGems.org</a>. Install it and give it a try!</p>
+
+<h2>
+<a name="installation" class="anchor" href="#installation"><span class="octicon octicon-link"></span></a>Installation</h2>
+
+<p>This gem is tested on 32 and 64 bit Linux. OS-X compatibility not tested, give it a try
+and tell us if it works! Windows is not supported at this moment.</p>
+
+<ul>
+<li>Ruby 1.8.7 or later required. We suggest using the <a href="https://rvm.io/rvm/install/">Ruby Version Manager</a> to manage this installation.</li>
+<li>
+<a href="http://www.spass-prover.org/download/index.html">Download and install Spass</a> and make sure its executable (<code>bin/SPASS</code>) on your $PATH</li>
+<li>
+<p>Install the ADSL gem by running <code>gem install adsl</code>.</p>
+
+<p>If you receive an error while generating documentation for 'activesupport' run <code>gem install rdoc adsl</code> instead.</p>
+</li>
+<li><p>Test the installation by verifying <a href="https://raw.github.com/Bocete/adsl/master/example/running-example.adsl">the example specification</a></p></li>
+</ul><h2>
+<a name="usage" class="anchor" href="#usage"><span class="octicon octicon-link"></span></a>Usage</h2>
+
+<pre><code>adsl-verify &lt;specification-file&gt;
+</code></pre>
+
+<p>For options and other modes of operation, run</p>
+
+<pre><code>adsl-verify --help
+</code></pre>
+
+<p>You can download sample ADSL specifications </p>
+
+<h2>
+<a name="development" class="anchor" href="#development"><span class="octicon octicon-link"></span></a>Development</h2>
+
+<h3>
+<a name="source-repository" class="anchor" href="#source-repository"><span class="octicon octicon-link"></span></a>Source Repository</h3>
+
+<p>The ADSL gem is currently hosted at github. The github web page is <a href="http://github.com/Bocete/adsl">http://github.com/Bocete/adsl</a>.
+You can download the source using our public git clone URL:</p>
+
+<pre><code>git://github.com/Bocete/adsl.git
+</code></pre>
+
+<h3>
+<a name="issues-and-bug-reports" class="anchor" href="#issues-and-bug-reports"><span class="octicon octicon-link"></span></a>Issues and Bug Reports</h3>
+
+<p>Feature requests and bug reports can be made at <a href="https://github.com/Bocete/adsl/issues">https://github.com/Bocete/adsl/issues</a></p>
+
+<h2>
+<a name="license" class="anchor" href="#license"><span class="octicon octicon-link"></span></a>License</h2>
+
+<p>Rake is available under a <a href="LICENSE">Lesser GPL (LGPL) license</a>.</p>
+
+<h2>
+<a name="warranty" class="anchor" href="#warranty"><span class="octicon octicon-link"></span></a>Warranty</h2>
+
+<p>This software is provided "as is" and without any express or
+implied warranties, including, without limitation, the implied
+warranties of merchantibility and fitness for a particular
+purpose.</p>
+      </section>
+
+    </div>
+    <!--[if !IE]><script>fixScale(document);</script><![endif]-->
+    
+  </body>
+</html>
