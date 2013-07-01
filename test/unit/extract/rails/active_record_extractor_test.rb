@@ -1,5 +1,5 @@
 require 'test/unit'
-require 'extract/ar/active_record_extractor'
+require 'extract/rails/active_record_extractor'
 require 'pp'
 require 'util/test_helper'
 

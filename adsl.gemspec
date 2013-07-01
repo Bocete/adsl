@@ -23,13 +23,14 @@ Gem::Specification.new do |s|
 
   s.add_dependency 'rexical'
   s.add_dependency 'racc'
-  s.add_dependency 'activesupport'
+  s.add_dependency 'activesupport', '~> 3'
   s.add_dependency 'i18n' # activesupport crashes without it
   s.add_dependency 'colorize'
   s.add_dependency 'method_source'
   s.add_dependency 'ruby_parser', '~> 3.1'
   s.add_dependency 'ruby2ruby'
   s.add_dependency 'backports'
-  s.add_dependency 'activerecord' # used for code extraction only
+  s.add_dependency 'activerecord', '~> 3' # used for code extraction only
+  s.add_dependency 'activerecord-tableless', '>= 1.0'
 end
 
