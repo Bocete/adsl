@@ -3,6 +3,7 @@ require 'parser/adsl_parser.tab'
 require 'spass/bin'
 require 'spass/spass_ds_extensions'
 require 'spass/util'
+require 'util/util'
 
 class Test::Unit::TestCase
   include Spass::Bin
@@ -31,16 +32,18 @@ class Test::Unit::TestCase
     adsl_assert expected_result, input, :timeout => timeout
   end
 
-  def unload_class(*classes) 
+  def unload_class(*classes)
     classes.each do |klass_name|
-      self.class.send :remove_const, klass_name if self.class.const_defined? klass_name
+      const = self.class.lookup_const klass_name
+      next if const.nil?
+      const.parent_module.send :remove_const, const.name.split('::').last
     end
   end
 
   def class_defined?(*classes)
-    classes.each do |klass|
-      return true if self.class.const_defined? klass
+    classes.each do |klass_name|
+      return true unless self.class.lookup_const(klass_name).nil?
     end
-    false
+    return false
   end
 end

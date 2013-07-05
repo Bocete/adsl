@@ -56,6 +56,24 @@ class TestHelperTest < Test::Unit::TestCase
     assert_false class_defined? :TestUnloadClassClassesUnload
   end
 
+  def test_unload_class__works_through_modules
+    assert_false class_defined? '::Mod::TestUnloadClassWorksThroughModules'
+    if Object.const_defined? :Mod
+      assert_false class_defined? '::Mod::TestUnloadClassWorksThroughModules'
+    end
+
+    eval <<-ruby
+      module ::Mod
+        class TestUnloadClassWorksThroughModules
+        end
+      end
+    ruby
+
+    assert class_defined? '::Mod::TestUnloadClassWorksThroughModules'
+    unload_class '::Mod::TestUnloadClassWorksThroughModules'
+    assert_false class_defined? '::Mod::TestUnloadClassWorksThroughModules'
+  end
+
   def test_unload_class__methods_get_removed
     assert_false class_defined? :TestUnloadClassMethodsGetRemoved
     eval <<-ruby

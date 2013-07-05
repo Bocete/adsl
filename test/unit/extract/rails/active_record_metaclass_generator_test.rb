@@ -1,43 +1,27 @@
 require 'test/unit'
-require 'extract/rails/active_record_metaclass_generator'
 require 'pp'
 require 'util/test_helper'
 require 'active_record'
-require 'activerecord-tableless'
 require 'parser/adsl_ast'
+require 'extract/rails/active_record_metaclass_generator'
+require 'extract/rails/rails_test_helper'
 
 class ActiveRecordMetaclassGeneratorTest < Test::Unit::TestCase
   include Extract::Rails
   
   def setup
-    assert_false class_defined? :Asd, :ADSLMetaAsd, :Kme, :ADSLMetaKme, :Blah, :ADSLMetaBlah, :Mod
-    eval <<-ruby
-      class Asd < ActiveRecord::Base
-        has_no_table
-        has_one :asd
-        has_many :kmes
-      end
-
-      class Kme < Asd
-        has_no_table
-      end
-
-      module Mod
-        class Blah < ActiveRecord::Base
-          has_no_table
-        end
-      end
-    ruby
+    assert_false class_defined? :ADSLMetaAsd, :ADSLMetaKme, 'Mod::ADSLMetaBlah'
+    initialize_test_context
   end
 
   def teardown
-    unload_class :Asd, :ADSLMetaAsd, :Kme, :ADSLMetaKme, :Blah, :ADSLMetaBlah, :Mod
+    unload_class :ADSLMetaAsd, :ADSLMetaKme, 'Mod::ADSLMetaBlah'
   end
 
   def test_target_classname
     generator = ActiveRecordMetaclassGenerator.new Asd
     assert_equal 'ADSLMetaAsd', generator.target_classname
-    assert_equal 'ADSLMetaTesting', generator.target_classname('Testing')
+    assert_equal 'ADSLMetaTesting', ActiveRecordMetaclassGenerator.target_classname('Testing')
     
     generator = ActiveRecordMetaclassGenerator.new Kme
     assert_equal 'ADSLMetaKme', generator.target_classname
@@ -79,14 +63,10 @@ class ActiveRecordMetaclassGeneratorTest < Test::Unit::TestCase
     ActiveRecordMetaclassGenerator.new(Kme).generate_class
     ActiveRecordMetaclassGenerator.new(Mod::Blah).generate_class
 
-    assert ADSLMetaAsd.new.respond_to? :asd
-    assert_equal ADSLMetaAsd, ADSLMetaAsd.new.asd.class
-    assert ADSLMetaAsd.new.respond_to? :kmes
-    assert_equal ADSLMetaKme, ADSLMetaAsd.new.kmes.class
+    assert ADSLMetaAsd.new.respond_to? :blahs
+    assert_equal Mod::ADSLMetaBlah, ADSLMetaAsd.new.blahs.class
     
-    assert ADSLMetaKme.new.respond_to? :asd
-    assert_equal ADSLMetaAsd, ADSLMetaKme.new.asd.class
-    assert ADSLMetaKme.new.respond_to? :kmes
-    assert_equal ADSLMetaKme, ADSLMetaKme.new.kmes.class
+    assert Mod::ADSLMetaBlah.new.respond_to? :asd
+    assert_equal ADSLMetaAsd, Mod::ADSLMetaBlah.new.asd.class
   end
 end

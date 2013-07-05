@@ -1,7 +1,7 @@
 require 'active_support'
 
-class Extract
-  class Rails
+module Extract
+  module Rails
 
     class MetaVariable
       attr_accessor :name, :value

@@ -3,8 +3,13 @@ require 'active_support'
 module Extract
   module Rails
     class ActionInstrumenter < Extract::Instrumenter
+
+      attr_accessor :action_block
+
       def initialize(ar_class_names, instrument_domain = Dir.pwd)
         super instrument_domain
+
+        ar_class_names = ar_class_names.map{ |n| n.split('::').last }
 
         # replace all ActiveRecord classes with their meta-variants
         replace :const do |sexp|
@@ -25,6 +30,11 @@ module Extract
           metavariable = s(:colon2, s(:colon2, s(:const, :Extract), :Rails), :MetaVariable)
           sexp[2] = s(:call, metavariable, :new, s(:hash, s(:lit, :name), s(:str, sexp[1].to_s), s(:lit, :value), sexp[2]))
           sexp
+        end
+
+        # remove respond_to
+        replace :call do |sexp|
+          sexp[0] == :call && sexp[1].nil? && sexp[2] == :respond_to ? s(:nil) : sexp
         end
       end
     end

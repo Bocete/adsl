@@ -20,6 +20,8 @@ Gem::Specification.new do |s|
 
   s.add_development_dependency 'rake'
   s.add_development_dependency 'test-unit'
+  s.add_development_dependency 'rails', '~> 3'
+  s.add_development_dependency 'sqlite3'
 
   s.add_dependency 'rexical'
   s.add_dependency 'racc'
@@ -31,6 +33,5 @@ Gem::Specification.new do |s|
   s.add_dependency 'ruby2ruby'
   s.add_dependency 'backports'
   s.add_dependency 'activerecord', '~> 3' # used for code extraction only
-  s.add_dependency 'activerecord-tableless', '>= 1.0'
 end
 

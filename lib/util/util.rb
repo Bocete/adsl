@@ -13,6 +13,11 @@ class String
       return self[0, self.length - suffix.length] + (suffix.to_i + 1).to_s
     end
   end
+
+  # for lolz
+  def dyslexicize
+    gsub(/(\w)(\w+)(\w)/) { |match| ([$1] + $2.chars.to_a.shuffle + [$3]).join('') }
+  end
 end
 
 class Time
@@ -41,6 +46,16 @@ end
 class Module
   def parent_module
     name.split('::')[0..-2].join('::').constantize
+  end
+
+  def lookup_const(const)
+    lookup_container = self
+    const.to_s.split('::').each do |portion|
+      portion = 'Object' if portion.empty?
+      return nil unless lookup_container.const_defined? portion
+      lookup_container = lookup_container.const_get portion
+    end
+    lookup_container
   end
 end
 

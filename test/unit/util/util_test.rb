@@ -4,14 +4,21 @@ require 'util/test_helper'
 
 class UtilTest < Test::Unit::TestCase
 
-  def teardown
-    unload_class 'Foo', 'Foo2'
+  def setup
+    assert_false class_defined? :Foo, :Foo2
   end
 
-  def setup
-    ['Foo', 'Foo2'].each do |klass_name|
-      assert_false class_defined? klass_name
-    end
+  def teardown
+    unload_class :Foo, :Foo2
+  end
+
+  def test_module__lookup_const
+    assert_equal Module, self.class.lookup_const('Module')
+    assert_equal Module, self.class.lookup_const(:Module)
+    assert_equal Object, self.class.lookup_const('::Object')
+    assert_equal Test::Unit, self.class.lookup_const('Test::Unit')
+    assert_equal Test::Unit::TestCase, self.class.lookup_const('Test::Unit::TestCase')
+    assert_equal Test::Unit::TestCase, Test::Unit.lookup_const('TestCase')
   end
 
   def test_container_for__blank

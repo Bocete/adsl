@@ -1,6 +1,5 @@
 require 'active_record'
 require 'active_support'
-require 'activerecord-tableless'
 
 module Extract
   module Rails
@@ -12,21 +11,21 @@ module Extract
       end
 
       def self.target_classname(classname)
-        "ADSLMeta#{classname}"
+        module_split = classname.split '::'
+        (module_split[0..-2] + ["ADSLMeta#{module_split[-1]}"]).join '::'
       end
 
-      def target_classname(classname = nil)
-        ActiveRecordMetaclassGenerator.target_classname classname || @ar_class.name.demodulize
+      def target_classname
+        ActiveRecordMetaclassGenerator.target_classname(@ar_class.name.demodulize)
       end
 
       def target_superclass
         return @ar_class if @ar_class.superclass == ActiveRecord::Base
-        @ar_class.parent_module.const_get "ADSLMeta#{@ar_class.superclass.name.demodulize}"
+        self.class.const_get ActiveRecordMetaclassGenerator.target_classname(@ar_class.superclass.name)
       end
 
       def generate_class
         new_class = Class.new(target_superclass) do
-          has_no_table
 
           attr_accessor :adsl_ast
 
