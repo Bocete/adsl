@@ -15,7 +15,7 @@ module Extract
     end
 
     def self.sexp_class_rep
-      s(:colon2, s(:const, :Extract), :Instrumenter)
+      s(:colon2, s(:colon3, :Extract), :Instrumenter)
     end
 
     def ruby_parser
@@ -24,6 +24,16 @@ module Extract
 
     def self.instrumented()
       # a dummy method injected into the AST
+    end
+
+    def exec_within
+      Instrumenter.instance_variable_set(:@instance, self) if @stack_depth == 0
+      @stack_depth += 1
+
+      return yield
+    ensure
+      @stack_depth -= 1
+      Instrumenter.instance_variable_set(:@instance, nil) if @stack_depth == 0
     end
 
     def mark_sexp_instrumented(sexp)
@@ -72,10 +82,13 @@ module Extract
 
     def should_instrument?(object, method_name)
       method = object.method method_name
+      return false if method.source_location.nil?
       return true if @instrument_domain.nil? || method.source_location =~ /^#{@instrument_domain}.*$/
       source = method.source
       sexp = ruby_parser.process source
       !sexp_instrumented? sexp
+    rescue
+      raise
     end
 
     def replace(type, &block)
@@ -87,14 +100,10 @@ module Extract
     end
 
     def execute_instrumented(object, method_name, *args, &block)
-      self.class.instance_variable_set(:@instance, self) if @stack_depth == 0
-      @stack_depth += 1
-
-      instrument object, method_name
-      object.send method_name, *args, &block
-    ensure
-      @stack_depth -= 1
-      self.class.instance_variable_set(:@instance, nil) if @stack_depth == 0
+      self.exec_within do
+        instrument object, method_name
+        return object.send method_name, *args, &block
+      end
     end
 
     def instrument(object, method_name)
@@ -110,7 +119,11 @@ module Extract
 
           new_code = Ruby2Ruby.new.process instrumented_sexp
 
+          puts new_code if method_name.to_s == 'create' && object.class.name =~ /Controller/
+
           object.replace_method method_name, new_code
+
+          return new_code
         rescue MethodSource::SourceNotFoundError
         end
       end

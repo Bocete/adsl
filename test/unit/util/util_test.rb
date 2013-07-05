@@ -21,6 +21,38 @@ class UtilTest < Test::Unit::TestCase
     assert_equal Test::Unit::TestCase, Test::Unit.lookup_const('TestCase')
   end
 
+  def test_module__lookup_or_create_module
+    assert_equal Module, self.class.lookup_or_create_module('Module')
+    assert_equal Module, self.class.lookup_or_create_module('::Module')
+    assert_equal Module, self.class.lookup_or_create_module(:Module)
+    foo = self.class.lookup_or_create_module(:Foo)
+    assert_equal Module, foo.class
+    assert_equal Foo, foo
+
+    assert_equal Test::Unit, self.class.lookup_or_create_module('Test::Unit')
+    new_deep = self.class.lookup_or_create_module('Test::Unit::NewDeep')
+    assert_equal Module, new_deep.class
+    assert_equal Test::Unit::NewDeep, new_deep
+  end
+  
+  def test_module__lookup_or_create_class
+    assert_equal Object, self.class.lookup_or_create_class('Object', nil)
+    assert_equal Object, self.class.lookup_or_create_class('::Object', nil)
+    assert_equal Object, self.class.lookup_or_create_class(:Object, nil)
+    foo = self.class.lookup_or_create_class(:Foo, Object)
+    assert_equal Class, foo.class
+    assert_equal Foo, foo
+    assert_equal Object, foo.superclass
+
+    assert_equal Test::Unit::TestCase, self.class.lookup_or_create_class('Test::Unit::TestCase', Test::Unit::TestCase.superclass)
+    new_deep = self.class.lookup_or_create_class('Test::Unit::NewDeep', String)
+    assert_equal Class, new_deep.class
+    assert_equal Test::Unit::NewDeep, new_deep
+    assert_equal String, new_deep.superclass
+  ensure
+    unload_class 'Test::Unit::NewDeep'
+  end
+
   def test_container_for__blank
     assert_raise ArgumentError do
       eval <<-ruby

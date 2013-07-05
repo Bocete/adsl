@@ -1,5 +1,6 @@
 require 'test/unit'
 require 'util/test_helper'
+require 'parser/adsl_ast'
 require 'extract/rails/rails_extractor'
 require 'extract/rails/rails_test_helper'
 require 'extract/rails/rails_instrumentation_test_case'
@@ -36,6 +37,14 @@ class RailsExtractorTest < Extract::Rails::RailsInstrumentationTestCase
     extractor = RailsExtractor.new ar_classes
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
     assert ast.block.statements.empty?
+  end
+  
+  def test_adsl_ast__create_action
+    extractor = RailsExtractor.new ar_classes
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :create)
+    assert_false ast.block.statements.empty?
+    assert_equal ADSL::ADSLCreateObj, ast.block.statements.first.class
+    assert_equal 'Asd', ast.block.statements.first.class_name.text
   end
 
 end

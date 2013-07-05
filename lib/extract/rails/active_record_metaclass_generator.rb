@@ -29,19 +29,47 @@ module Extract
 
           attr_accessor :adsl_ast
 
+          def self.instrumenter
+            Extract::Instrumenter.get_instance
+          end
+
+          def instrumenter
+            self.class.instrumenter
+          end
+
+          def self.t(string)
+            ADSL::ADSLIdent.new :text => string
+          end
+
+          def t(string)
+            self.class.t string
+          end
+
           def self.active_record_class_name
-            name[7..-1]
+            name.match(/^.*ADSLMeta(\w+)$/)[1]
           end
 
           def self.all
-            self.new :adsl_ast => ADSL::ADSLAllOf.new(:class_name => @active_record_class_name)
+            self.new :adsl_ast => ADSL::ADSLAllOf.new(:class_name => t(active_record_class_name))
           end
+
+          def initialize(attributes = {}, options = {})
+            super
+            unless attributes.include? :adsl_ast
+              @adsl_ast = ADSL::ADSLCreateObj.new(:class_name => t(self.class.active_record_class_name))
+              instrumenter.action_block << @adsl_ast
+            end
+          end
+
+          # no-ops
+          def save; end
+          def save!; end
         end
-    
+
         @ar_class.reflections.values.each do |assoc|
           new_class.send :define_method, assoc.name do
             target_class = self.class.parent_module.const_get(ActiveRecordMetaclassGenerator.target_classname assoc.class_name)
-            target_class.new :adsl_ast => ADSL::ADSLDereference.new(:objset => self.adsl_ast, :rel_name => assoc.name)
+            target_class.new :adsl_ast => ADSL::ADSLDereference.new(:objset => self.adsl_ast, :rel_name => t(assoc.name))
           end
         end
 

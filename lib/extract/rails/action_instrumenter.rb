@@ -27,7 +27,7 @@ module Extract
 
         # all assignments should assign metavariables
         replace :lasgn do |sexp|
-          metavariable = s(:colon2, s(:colon2, s(:const, :Extract), :Rails), :MetaVariable)
+          metavariable = s(:colon2, s(:colon2, s(:colon3, :Extract), :Rails), :MetaVariable)
           sexp[2] = s(:call, metavariable, :new, s(:hash, s(:lit, :name), s(:str, sexp[1].to_s), s(:lit, :value), sexp[2]))
           sexp
         end
@@ -36,6 +36,10 @@ module Extract
         replace :call do |sexp|
           sexp[0] == :call && sexp[1].nil? && sexp[2] == :respond_to ? s(:nil) : sexp
         end
+      end
+
+      def should_instrument?(object, method_name)
+        object.class.parent_module != Extract::Rails && super
       end
     end
   end

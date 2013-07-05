@@ -57,6 +57,30 @@ class Module
     end
     lookup_container
   end
+
+  def lookup_or_create_module(name)
+    lookup_container = self
+    name.to_s.split('::').each do |portion|
+      portion = 'Object' if portion.empty?
+      unless lookup_container.const_defined? portion
+        new_module = Module.new
+        lookup_container.const_set portion, new_module
+      end
+      lookup_container = lookup_container.const_get portion 
+    end
+    lookup_container
+  end
+  
+  def lookup_or_create_class(name, superclass)
+    already_defined = lookup_const name
+    return already_defined unless already_defined.nil?
+
+    container_name = name.match(/^(.*)::\w+$/) ? $1 : 'Object'
+    container = lookup_or_create_module container_name
+    new_class = Class.new(superclass)
+    container.const_set name.to_s.split('::').last, new_class
+    new_class
+  end
 end
 
 def container_for(*fields, &block)

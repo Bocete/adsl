@@ -63,10 +63,12 @@ class ActiveRecordMetaclassGeneratorTest < Test::Unit::TestCase
     ActiveRecordMetaclassGenerator.new(Kme).generate_class
     ActiveRecordMetaclassGenerator.new(Mod::Blah).generate_class
 
-    assert ADSLMetaAsd.new.respond_to? :blahs
-    assert_equal Mod::ADSLMetaBlah, ADSLMetaAsd.new.blahs.class
+    asd = ADSLMetaAsd.new :adsl_ast => nil
+    assert asd.respond_to? :blahs
+    assert_equal Mod::ADSLMetaBlah, asd.blahs.class
     
-    assert Mod::ADSLMetaBlah.new.respond_to? :asd
-    assert_equal ADSLMetaAsd, Mod::ADSLMetaBlah.new.asd.class
+    blah = Mod::ADSLMetaBlah.new :adsl_ast => nil
+    assert blah.respond_to? :asd
+    assert_equal ADSLMetaAsd, blah.asd.class
   end
 end

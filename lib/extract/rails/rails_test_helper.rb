@@ -2,42 +2,52 @@ $LOAD_PATH.unshift(File.dirname(__FILE__))
 $LOAD_PATH.unshift(File.join(File.dirname(__FILE__), '..', 'lib'))
  
 ENV["RAILS_ENV"] ||= 'test'
- 
+
+require 'util/util'
+
 def initialize_test_context
-  eval <<-ruby 
-    class ::Asd < ActiveRecord::Base
-      has_many :blahs, :class_name => 'Mod::Blah'
-    end
+  Object.lookup_or_create_class('::Asd', ActiveRecord::Base).class_exec do
+    has_many :blahs, :class_name => 'Mod::Blah'
+  end
+  
+  Object.lookup_or_create_class('::Kme', Asd)
+  
+  Object.lookup_or_create_class('::Mod::Blah', ActiveRecord::Base).class_exec do
+    belongs_to :asd
+  end
+  
+  Object.lookup_or_create_class('::Asd', ActiveRecord::Base).class_exec do
+    has_many :blahs, :class_name => 'Mod::Blah'
+  end
 
-    class ::Kme < Asd
-    end
-
-    module ::Mod
-      class Blah < ActiveRecord::Base
-        belongs_to :asd
+  Object.lookup_or_create_class('::ApplicationController', ActionController::Base).class_exec do
+    def respond_to
+      if block_given?
+        yield
+      else
+        render nothing: true
       end
     end
-    
-    class ::ApplicationController < ActionController::Base
-      def respond_to
-        if block_given?
-          yield
-        else
-          render nothing: true
-        end
-      end
+
+    # no templates exist and we do not care
+    rescue_from ActionView::MissingTemplate do; end
+  end
+
+  Object.lookup_or_create_class('::AsdsController', ApplicationController).class_exec do
+    def index;   respond_to; end
+    def show;    respond_to; end
+    def new;     respond_to; end
+
+    def create
+      a = Asd.new
+      a.save!
+      respond_to
     end
 
-    class ::AsdsController < ::ApplicationController
-      def index;   respond_to; end
-      def show;    respond_to; end
-      def new;     respond_to; end
-      def create;  respond_to; end
-      def update;  respond_to; end
-      def destroy; respond_to; end
-      def nothing; respond_to; end
-    end
-  ruby
+    def update;  respond_to; end
+    def destroy; respond_to; end
+    def nothing; respond_to; end
+  end
 end
 
 # Only the parts of rails we want to use

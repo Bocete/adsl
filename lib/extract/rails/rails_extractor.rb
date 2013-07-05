@@ -36,9 +36,13 @@ module Extract
 
       def action_to_adsl_ast(route)
         @action_instrumenter.action_block = []
-        session = ActionDispatch::Integration::Session.new(::Rails.application)
+        @action_instrumenter.instrument route[:controller].new, route[:action]
 
-        session.send route[:request_method].to_s.downcase, route[:url], Extract::Rails::MetaUnknown.new
+        session = ActionDispatch::Integration::Session.new(::Rails.application)
+        
+        @action_instrumenter.exec_within do
+          session.send route[:request_method].to_s.downcase, route[:url], Extract::Rails::MetaUnknown.new
+        end
 
         ADSLAction.new({
           :name => ADSLIdent.new(:text => "#{route[:controller]}__#{route[:action]}"),
