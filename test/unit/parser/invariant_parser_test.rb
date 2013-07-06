@@ -135,7 +135,7 @@ class InvariantParserTest < Test::Unit::TestCase
     ['forall', 'exists'].each do |formula|
       spec = parser.parse <<-ADSL
         class Class { 0+ Class relation }
-        invariant #{formula}(a in Class.all: true)
+        invariant #{formula}(a in allof(Class): true)
       ADSL
       invariant = spec.invariants.first
       assert_equal 'a', invariant.formula.vars.first.name
@@ -143,7 +143,7 @@ class InvariantParserTest < Test::Unit::TestCase
       
       spec = parser.parse <<-ADSL
         class Class { 0+ Class relation }
-        invariant #{formula}(a in Class.all.relation: true)
+        invariant #{formula}(a in allof(Class).relation: true)
       ADSL
       invariant = spec.invariants.first
       assert_equal 'a', invariant.formula.vars.first.name
@@ -280,14 +280,14 @@ class InvariantParserTest < Test::Unit::TestCase
       parser.parse <<-ADSL
         class Class {}
         class Child extends Class {}
-        invariant Class.all == Child.all
+        invariant allof(Class) == allof(Child)
       ADSL
     end
     assert_raise ADSL::ADSLError do
       parser.parse <<-ADSL
         class Class1 {}
         class Class2 {}
-        invariant Class1.all == Child2.all
+        invariant allof(Class1) == allof(Child2)
       ADSL
     end
     assert_raise ADSL::ADSLError do
@@ -295,7 +295,7 @@ class InvariantParserTest < Test::Unit::TestCase
         class Parent {}
         class Class1 extends Parent {}
         class Class2 extends Parent {}
-        invariant equal(Parent.all, Class1.all, Child2.all)
+        invariant equal(allof(Parent), allof(Class1), allof(Child2))
       ADSL
     end
   end
@@ -373,7 +373,7 @@ class InvariantParserTest < Test::Unit::TestCase
     parser = ADSL::ADSLParser.new
     spec = parser.parse <<-ADSL
       class Class {}
-      invariant empty(Class.all)
+      invariant empty(allof(Class))
     ADSL
     invariant = spec.invariants.first
     assert_equal DS::DSEmpty, invariant.formula.class
@@ -384,7 +384,7 @@ class InvariantParserTest < Test::Unit::TestCase
     parser = ADSL::ADSLParser.new
     spec = parser.parse <<-ADSL
       class Class {}
-      invariant Class.all in Class.all
+      invariant allof(Class) in allof(Class)
     ADSL
     invariant = spec.invariants.first
     assert_equal DS::DSIn, invariant.formula.class
@@ -395,21 +395,21 @@ class InvariantParserTest < Test::Unit::TestCase
       parser.parse <<-ADSL
         class Class1 {}
         class Class2 {}
-        invariant Class1.all in Class2.all
+        invariant allof(Class1) in allof(Class2)
       ADSL
     end
     assert_raise ADSL::ADSLError do
       parser.parse <<-ADSL
         class Super {}
         class Sub extends Super {}
-        invariant Super.all in Sub.all
+        invariant allof(Super) in allof(Sub)
       ADSL
     end
     assert_nothing_raised ADSL::ADSLError do
       parser.parse <<-ADSL
         class Super {}
         class Sub extends Super {}
-        invariant Sub.all in Super.all
+        invariant allof(Sub) in allof(Super)
       ADSL
     end
   end

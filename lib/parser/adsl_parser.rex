@@ -17,7 +17,7 @@ rule
   or\b           { [:or, lineno] }
   subset\b       { [:subset, lineno] }
   oneof\b        { [:oneof, lineno] }
-  \.\s*all\b     { [:dotall, lineno] }
+  allof\b        { [:allof, lineno] }
   forall\b       { [:forall, lineno] }
   exists\b       { [:exists, lineno] }
   in\b           { [:in, lineno] }

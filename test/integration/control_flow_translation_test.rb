@@ -23,7 +23,7 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
     adsl_assert :correct, <<-ADSL
       class Class{}
       action blah() {
-        create Class
+        create(Class)
         either {} or {}
       }
       invariant exists(Class o)
@@ -32,7 +32,7 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
       class Class{}
       action blah() {
         either {} or {}
-        create Class
+        create(Class)
       }
       invariant exists(Class o)
     ADSL
@@ -40,7 +40,7 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
       class Class{}
       action blah() {
         either {} or {}
-        create Class
+        create(Class)
       }
       invariant not exists(Class o)
     ADSL
@@ -51,7 +51,7 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
       class Class{}
       action blah() {
         either {
-          delete Class.all
+          delete allof(Class)
         } or {}
       }
       invariant exists(Class o)
@@ -62,7 +62,7 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
     adsl_assert :incorrect, <<-ADSL
       class Class{}
       action blah() {
-        create Class
+        create(Class)
         either {} or {} or {} or {}
       }
       invariant not exists(Class c)
@@ -74,8 +74,8 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
       class Class{}
       action blah() {
         either {
-          delete Class.all
-          create Class
+          delete allof(Class)
+          create(Class)
         } or {}
       }
       invariant not exists(Class o)
@@ -87,8 +87,8 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
       class Class{}
       action blah() {
         either {
-          delete Class.all
-          create Class
+          delete allof(Class)
+          create(Class)
         } or {}
       }
       invariant not exists(Class o)
@@ -97,8 +97,8 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
       class Class{}
       action blah() {
         either {} or {
-          delete Class.all
-          create Class
+          delete allof(Class)
+          create(Class)
         }
       }
       invariant not exists(Class o)
@@ -110,9 +110,9 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
       class Class{}
       action blah() {
         either {
-          create Class
+          create(Class)
         } or {
-          create Class
+          create(Class)
         }
       }
       invariant not exists(Class o)
@@ -121,9 +121,9 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
       class Class{}
       action blah() {
         either {
-          create Class
+          create(Class)
         } or {
-          create Class
+          create(Class)
         }
       }
       invariant exists(Class o)
@@ -135,10 +135,10 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
       class Class {}
       action blah() {
         either {} or {
-          delete Class.all
-          create Class
+          delete allof(Class)
+          create(Class)
         } or {
-          create Class
+          create(Class)
         }
       }
       invariant exists(Class o)
@@ -147,12 +147,12 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
       class Class {}
       action blah() {
         either {
-          create Class
+          create(Class)
         } or {
-          delete Class.all
-          create Class
+          delete allof(Class)
+          create(Class)
         } or {
-          delete Class.all
+          delete allof(Class)
         }
       }
       invariant exists(Class o)
@@ -164,11 +164,11 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
       class Class{}
       action blah() {
         either {
-          delete Class.all
-          create Class
+          delete allof(Class)
+          create(Class)
         } or {
-          delete Class.all
-          create Class
+          delete allof(Class)
+          create(Class)
         }
       }
       invariant forall(Class a, Class b: a == b)
@@ -180,10 +180,10 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
       class Class{}
       action blah() {
         either {
-          a = create Class
+          a = create(Class)
           delete a
         } or {
-          create Class
+          create(Class)
         }
       }
       invariant forall(Class a, Class b: a == b)
@@ -191,7 +191,7 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
     adsl_assert :incorrect, <<-ADSL
       class Class{}
       action blah() {
-        a = create Class
+        a = create(Class)
         either {
           delete a
         } or {
@@ -205,7 +205,7 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
     adsl_assert :incorrect, <<-ADSL
       class Class{}
       action blah() {
-        a = create Class
+        a = create(Class)
         either {
         } or {
           delete a
@@ -216,7 +216,7 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
     adsl_assert :incorrect, <<-ADSL
       class Class{}
       action blah() {
-        a = create Class
+        a = create(Class)
         either {
           delete a
         } or {
@@ -227,7 +227,7 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
     adsl_assert :correct, <<-ADSL
       class Class{}
       action blah() {
-        a = create Class
+        a = create(Class)
         either {
           delete a
         } or {
@@ -239,7 +239,7 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
     adsl_assert :correct, <<-ADSL
       class Class{}
       action blah() {
-        a = create Class
+        a = create(Class)
         either {
           delete a
         } or {
@@ -251,14 +251,14 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
     adsl_assert :correct, <<-ADSL
       class Class{}
       action blah() {
-        a = Class.all
+        a = allof(Class)
         either {
-          a = create Class
+          a = create(Class)
         } or {
-          a = create Class
-          a = oneof(Class.all)
+          a = create(Class)
+          a = oneof(allof(Class))
         } or {
-          a = create Class
+          a = create(Class)
         }
         delete a
       }
@@ -270,7 +270,7 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
     adsl_assert :incorrect, <<-ADSL, :conjecture => false
       class Class{}
       action blah() {
-        foreach c: Class.all {
+        foreach c: allof(Class) {
         }
       }
     ADSL
@@ -280,8 +280,8 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
     adsl_assert :incorrect, <<-ADSL, :conjecture => false
       class Class{}
       action blah() {
-        create Class
-        foreach c: Class.all {
+        create(Class)
+        foreach c: allof(Class) {
         }
       }
     ADSL
@@ -292,10 +292,10 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
       class Class1{}
       class Class2{}
       action blah() {
-        create Class1
-        delete Class2.all
-        foreach i: Class2.all {
-          delete Class1.all
+        create(Class1)
+        delete allof(Class2)
+        foreach i: allof(Class2) {
+          delete allof(Class1)
         }
       }
       invariant exists(Class1 o)
@@ -304,9 +304,9 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
       class Class1{}
       class Class2{}
       action blah() {
-        delete Class2.all
-        foreach i: Class2.all {
-          create Class1
+        delete allof(Class2)
+        foreach i: allof(Class2) {
+          create(Class1)
         }
       }
       invariant not exists(Class1 o)
@@ -315,11 +315,11 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
       class Class1{}
       class Class2{}
       action blah() {
-        delete Class1.all
-        create Class1
-        delete Class2.all
-        foreach i: Class2.all {
-          delete Class1.all
+        delete allof(Class1)
+        create(Class1)
+        delete allof(Class2)
+        foreach i: allof(Class2) {
+          delete allof(Class1)
         }
       }
       invariant !exists(Class1 o)
@@ -331,12 +331,12 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
       class Class1{}
       class Class2{}
       action blah() {
-        delete Class1.all
-        delete Class2.all
+        delete allof(Class1)
+        delete allof(Class2)
         
-        create Class1
-        foreach c: Class1.all {
-          create Class2
+        create(Class1)
+        foreach c: allof(Class1) {
+          create(Class2)
         }
       }
       invariant exists(Class1 a)
@@ -347,12 +347,12 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
       class Class1 {}
       class Class2 {}
       action blah() {
-        delete Class1.all
-        delete Class2.all
+        delete allof(Class1)
+        delete allof(Class2)
         
-        create Class1
-        foreach c: Class1.all {
-          create Class2
+        create(Class1)
+        foreach c: allof(Class1) {
+          create(Class2)
         }
       }
       invariant exists(Class2 a, Class2 b: not a == b)
@@ -364,13 +364,13 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
       class Class1{}
       class Class2{}
       action blah() {
-        delete Class1.all
-        delete Class2.all
+        delete allof(Class1)
+        delete allof(Class2)
         
-        create Class1
-        create Class1
-        foreach c: Class1.all {
-          create Class2
+        create(Class1)
+        create(Class1)
+        foreach c: allof(Class1) {
+          create(Class2)
         }
       }
       invariant exists(Class1 a)
@@ -381,13 +381,13 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
       class Class1{}
       class Class2{}
       action blah() {
-        delete Class1.all
-        delete Class2.all
+        delete allof(Class1)
+        delete allof(Class2)
         
-        create Class1
-        create Class1
-        foreach c: Class1.all {
-          create Class2
+        create(Class1)
+        create(Class1)
+        foreach c: allof(Class1) {
+          create(Class2)
         }
       }
       invariant exists(Class2 a, Class2 b, Class2 c: !a == b and !b == c and !a == c)
@@ -398,9 +398,9 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
     adsl_assert :correct, <<-ADSL
       class Class { 0+ Class rel }
       action blah() {
-        Class.all.rel -= Class.all
-        foreach c: Class.all {
-          c2 = oneof(Class.all)
+        allof(Class).rel -= allof(Class)
+        foreach c: allof(Class) {
+          c2 = oneof(allof(Class))
           c.rel += c2
         }
       }
@@ -409,9 +409,9 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
     adsl_assert :correct, <<-ADSL
       class Class { 0+ Class rel }
       action blah() {
-        Class.all.rel -= Class.all
-        foreach c: Class.all {
-          c2 = oneof(Class.all)
+        allof(Class).rel -= allof(Class)
+        foreach c: allof(Class) {
+          c2 = oneof(allof(Class))
           c.rel += c2
         }
       }

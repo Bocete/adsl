@@ -159,7 +159,7 @@ module ADSL
   end
 
   class ADSLTypecheckResolveContext
-    attr_accessor :classes, :relations, :actions, :invariants, :var_stack 
+    attr_accessor :classes, :relations, :actions, :invariants, :var_stack, :pre_stmts 
 
     class ADSLStackFrame < ActiveSupport::OrderedHash
       attr_accessor :var_write_listeners
@@ -213,12 +213,16 @@ module ADSL
     def initialize
       # name => [astnode, dsobj]
       @classes = ActiveSupport::OrderedHash.new
+
       # classname => name => [astnode, dsobj]
       @relations = ActiveSupport::OrderedHash.new{ |hash, key| hash[key] = ActiveSupport::OrderedHash.new }
+
       # stack of name => [astnode, dsobj]
       @actions = ActiveSupport::OrderedHash.new
+
       @invariants = []
       @var_stack = []
+      @pre_stmts = []
     end
 
     def initialize_copy(source)
@@ -235,6 +239,7 @@ module ADSL
       @actions = source.actions.dup
       @invariants = source.invariants.dup
       @var_stack = source.var_stack.map{ |frame| frame.dup }
+      @pre_stmts = source.pre_stmts.map{ |stmt| stmt.dup }
     end
     
     def on_var_write(&block)
@@ -361,8 +366,14 @@ module ADSL
 
     def typecheck_and_resolve(context, open_subcontext=true)
       context.push_frame if open_subcontext
-      stmts = @statements.map{ |node| node.typecheck_and_resolve context }.flatten
-      return DS::DSBlock.new :statements => stmts
+      stmts = []
+      @statements.each do |node|
+        main_stmt = node.typecheck_and_resolve context
+        stmts += context.pre_stmts
+        stmts << main_stmt
+        context.pre_stmts = []
+      end
+      return DS::DSBlock.new :statements => stmts.flatten
     ensure
       context.pop_frame if open_subcontext
     end
@@ -379,6 +390,14 @@ module ADSL
     end
   end
 
+  class ADSLObjsetStmt < ADSLNode
+    node_type :objset
+
+    def typecheck_and_resolve(context)
+      DS::DSObjsetStmt.new :objset => @objset.typecheck_and_resolve(context)
+    end
+  end
+
   class ADSLCreateObj < ADSLNode
     node_type :var_name, :class_name
 
@@ -386,15 +405,9 @@ module ADSL
       klass_node, klass = context.classes[@class_name.text]
       raise ADSLError, "Undefined class #{@class_name.text} referred to at line #{@class_name.lineno}" if klass.nil?
       create_obj = DS::DSCreateObj.new :klass => klass
-      if @var_name
-        var = DS::DSVariable.new :name => @var_name.text, :type => klass
-        objset = DS::DSCreateObjset.new :createobj => create_obj
-        assignment = DS::DSAssignment.new :var => var, :objset => objset
-        context.redefine_var var, @var_name
-        return [create_obj, assignment]
-      end
-      return create_obj
-    end  
+      context.pre_stmts << create_obj
+      DS::DSCreateObjset.new :createobj => create_obj
+    end
   end
 
   class ADSLForEach < ADSLNode
@@ -552,6 +565,10 @@ module ADSL
       klass_node, klass = context.classes[@class_name.text]
       raise ADSLError, "Unknown class name #{@class_name.text} on line #{@class_name.lineno}" if klass.nil?
       return DS::DSAllOf.new :klass => klass
+    end
+
+    def list_entity_classes_read
+      Set[context.classes[@class_name.text]]
     end
   end
 

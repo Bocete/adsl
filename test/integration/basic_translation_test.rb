@@ -28,7 +28,7 @@ class BasicTranslationTest < Test::Unit::TestCase
     adsl_assert :correct, <<-ADSL
       class Class {}
       action blah() {
-        create Class
+        create(Class)
       }
       invariant exists(Class o)
     ADSL
@@ -38,7 +38,7 @@ class BasicTranslationTest < Test::Unit::TestCase
     adsl_assert :incorrect, <<-ADSL
       class Class {}
       action blah() {
-        create Class
+        create(Class)
       }
       invariant not exists(Class o)
     ADSL
@@ -49,7 +49,7 @@ class BasicTranslationTest < Test::Unit::TestCase
       class Parent {}
       class Child extends Parent {}
       action blah() {
-        create Parent
+        create(Parent)
       }
       invariant not exists(Child o)
     ADSL
@@ -115,7 +115,7 @@ class BasicTranslationTest < Test::Unit::TestCase
     adsl_assert :correct, <<-ADSL
       class Class {}
       action blah() {
-        create Class
+        create(Class)
       }
       invariant true
       invariant true
@@ -124,7 +124,7 @@ class BasicTranslationTest < Test::Unit::TestCase
     adsl_assert :incorrect, <<-ADSL
       class Class {}
       action blah() {
-        create Class
+        create(Class)
       }
       invariant true
       invariant not exists(Class o)
@@ -153,7 +153,7 @@ class BasicTranslationTest < Test::Unit::TestCase
     adsl_assert :correct, <<-ADSL
       class Class {}
       action blah(0..1 Class var) {
-        create Class
+        create(Class)
         delete var
       }
       invariant exists(Class o)
@@ -161,7 +161,7 @@ class BasicTranslationTest < Test::Unit::TestCase
     adsl_assert :correct, <<-ADSL
       class Class {}
       action blah(1 Class var) {
-        create Class
+        create(Class)
         delete var
       }
       invariant exists(Class o)
@@ -182,7 +182,27 @@ class BasicTranslationTest < Test::Unit::TestCase
     adsl_assert :incorrect, <<-ADSL
       class Class {}
       action blah() {
-        create Class
+        create(Class)
+      }
+      invariant forall(Class o1, Class o2: o1 == o2)
+    ADSL
+  end
+  
+  def test_creation__add_two_objects_adds_two_objects
+    adsl_assert :incorrect, <<-ADSL
+      class Class { 0+ Class relation }
+      action blah() {
+        create(Class).relation += create(Class)
+        delete oneof(allof(Class))
+      }
+      invariant forall(Class o1, Class o2: o1 == o2)
+    ADSL
+    adsl_assert :correct, <<-ADSL
+      class Class { 0+ Class relation }
+      action blah() {
+        create(Class).relation += create(Class)
+        delete oneof(allof(Class))
+        delete oneof(allof(Class))
       }
       invariant forall(Class o1, Class o2: o1 == o2)
     ADSL
@@ -193,7 +213,7 @@ class BasicTranslationTest < Test::Unit::TestCase
       class Class {}
       class Class2 {}
       action blah() {
-        create Class2
+        create(Class2)
       }
       invariant forall(Class o1, Class o2: o1 == o2)
     ADSL
@@ -203,14 +223,14 @@ class BasicTranslationTest < Test::Unit::TestCase
     adsl_assert :correct, <<-ADSL
       class Class {}
       action blah() {
-        delete Class.all
+        delete allof(Class)
       }
       invariant not exists(Class c)
     ADSL
     adsl_assert :incorrect, <<-ADSL
       class Class {}
       action blah() {
-        delete Class.all
+        delete allof(Class)
       }
       invariant exists(Class c)
     ADSL
@@ -220,32 +240,32 @@ class BasicTranslationTest < Test::Unit::TestCase
     adsl_assert :correct, <<-ADSL
       class Class {}
       action blah() {
-        create Class
-        delete Class.all
+        create(Class)
+        delete allof(Class)
       }
       invariant not exists(Class c)
     ADSL
     adsl_assert :incorrect, <<-ADSL
       class Class {}
       action blah() {
-        create Class
-        delete Class.all
+        create(Class)
+        delete allof(Class)
       }
       invariant exists(Class c)
     ADSL
     adsl_assert :incorrect, <<-ADSL
       class Class {}
       action blah() {
-        delete Class.all
-        create Class
+        delete allof(Class)
+        create(Class)
       }
       invariant not exists(Class c)
     ADSL
     adsl_assert :correct, <<-ADSL
       class Class {}
       action blah() {
-        delete Class.all
-        create Class
+        delete allof(Class)
+        create(Class)
       }
       invariant exists(Class c)
     ADSL
@@ -255,12 +275,12 @@ class BasicTranslationTest < Test::Unit::TestCase
     adsl_assert :correct, <<-ADSL
       class Class {}
       action blah() {}
-      invariant subset(Class.all) in Class.all
+      invariant subset(allof(Class)) in allof(Class)
     ADSL
     adsl_assert :incorrect, <<-ADSL
       class Class {}
       action blah() {}
-      invariant subset(Class.all) in subset(Class.all)
+      invariant subset(allof(Class)) in subset(allof(Class))
     ADSL
   end
 
@@ -268,7 +288,7 @@ class BasicTranslationTest < Test::Unit::TestCase
     adsl_assert :incorrect, <<-ADSL
       class Class {}
       action blah() {
-        a = Class.all
+        a = allof(Class)
         delete a
       }
       invariant exists(Class c)
@@ -276,7 +296,7 @@ class BasicTranslationTest < Test::Unit::TestCase
     adsl_assert :correct, <<-ADSL
       class Class {}
       action blah() {
-        a = Class.all
+        a = allof(Class)
         delete a
       }
       invariant not exists(Class c)
@@ -284,7 +304,7 @@ class BasicTranslationTest < Test::Unit::TestCase
     adsl_assert :incorrect, <<-ADSL
       class Class {}
       action blah() {
-        a = subset(Class.all)
+        a = subset(allof(Class))
         delete a
       }
       invariant exists(Class c)
@@ -295,7 +315,7 @@ class BasicTranslationTest < Test::Unit::TestCase
     adsl_assert :correct, <<-ADSL
       class Class {}
       action blah() {
-        a = create Class
+        a = create(Class)
         delete a
       }
       invariant not exists(Class c)
@@ -303,8 +323,8 @@ class BasicTranslationTest < Test::Unit::TestCase
     adsl_assert :incorrect, <<-ADSL
       class Class {}
       action blah() {
-        a = create Class
-        b = create Class
+        a = create(Class)
+        b = create(Class)
         delete a
       }
       invariant not exists(Class c)
@@ -315,8 +335,8 @@ class BasicTranslationTest < Test::Unit::TestCase
     adsl_assert :correct, <<-ADSL
       class Class {}
       action blah() {
-        create Class
-        delete oneof(Class.all)
+        create(Class)
+        delete oneof(allof(Class))
       }
       invariant exists(Class c)
     ADSL
@@ -326,21 +346,21 @@ class BasicTranslationTest < Test::Unit::TestCase
     adsl_assert :correct, <<-ADSL
       class Class {}
       action blah() {
-        delete Class.all
+        delete allof(Class)
       }
-      invariant empty(Class.all)
+      invariant empty(allof(Class))
     ADSL
     adsl_assert :correct, <<-ADSL
       class Class {}
       action blah() {}
-      invariant empty(Class.all)
+      invariant empty(allof(Class))
     ADSL
     adsl_assert :incorrect, <<-ADSL
       class Class {}
       action blah() {
-        create Class
+        create(Class)
       }
-      invariant empty(Class.all)
+      invariant empty(allof(Class))
     ADSL
   end
 
@@ -349,7 +369,7 @@ class BasicTranslationTest < Test::Unit::TestCase
       class Class { 0+ Class2 rel }
       class Class2 {}
       action blah() {
-        delete Class.all.rel
+        delete allof(Class).rel
       }
       invariant forall(Class o: empty(o.rel))
     ADSL
@@ -357,7 +377,7 @@ class BasicTranslationTest < Test::Unit::TestCase
       class Class { 0+ Class2 rel }
       class Class2 {}
       action blah() {
-        delete Class.all.rel
+        delete allof(Class).rel
       }
       invariant not forall(Class o: empty(o.rel))
     ADSL
@@ -368,7 +388,7 @@ class BasicTranslationTest < Test::Unit::TestCase
       class Parent { 0+ Parent rel }
       class Child extends Parent {}
       action blah() {
-        delete Parent.all.rel
+        delete allof(Parent).rel
       }
       invariant exists(Child o: not empty(o.rel))
     ADSL
@@ -376,7 +396,7 @@ class BasicTranslationTest < Test::Unit::TestCase
       class Parent { 0+ Parent rel }
       class Child extends Parent {}
       action blah() {
-        delete Child.all.rel
+        delete allof(Child).rel
       }
       invariant exists(Child o: not empty(o.rel))
     ADSL
@@ -384,7 +404,7 @@ class BasicTranslationTest < Test::Unit::TestCase
       class Parent { 0+ Parent rel }
       class Child extends Parent {}
       action blah() {
-        delete Child.all.rel
+        delete allof(Child).rel
       }
       invariant exists(Parent o: not empty(o.rel)) and not exists(Child o: not empty(o.rel))
     ADSL
@@ -394,8 +414,8 @@ class BasicTranslationTest < Test::Unit::TestCase
     adsl_assert :correct, <<-ADSL
       class Class{ 0+ Class rel }
       action blah() {
-        v1 = oneof (Class.all)
-        v2 = oneof (Class.all)
+        v1 = oneof (allof(Class))
+        v2 = oneof (allof(Class))
         v1.rel += v2
       }
       invariant exists(Class o: not empty(o.rel))
@@ -403,8 +423,8 @@ class BasicTranslationTest < Test::Unit::TestCase
     adsl_assert :incorrect, <<-ADSL
       class Class{ 0+ Class rel }
       action blah() {
-        v1 = oneof (Class.all)
-        v2 = oneof (Class.all)
+        v1 = oneof (allof(Class))
+        v2 = oneof (allof(Class))
         v1.rel += v2
       }
       invariant forall(Class o: empty(o.rel))
@@ -415,9 +435,9 @@ class BasicTranslationTest < Test::Unit::TestCase
     adsl_assert :correct, <<-adsl
       class Class{ 0+ Class rel }
       action blah() {
-        Class.all.rel += Class.all
+        allof(Class).rel += allof(Class)
       }
-      invariant forall(Class v: v.rel == Class.all)
+      invariant forall(Class v: v.rel == allof(Class))
     adsl
 
     conjecture = <<-SPASS
@@ -429,17 +449,17 @@ class BasicTranslationTest < Test::Unit::TestCase
     adsl_assert(:correct, <<-adsl, :conjecture => conjecture)
       class Class{ 0+ Class rel }
       action blah() {
-        Class.all.rel += Class.all
+        allof(Class).rel += allof(Class)
       }
-      invariant forall(Class v: v.rel == Class.all)
+      invariant forall(Class v: v.rel == allof(Class))
     adsl
     
     adsl_assert :incorrect, <<-ADSL
       class Class{ 0+ Class rel }
       action blah() {
-        Class.all.rel += Class.all
+        allof(Class).rel += allof(Class)
       }
-      invariant !forall(Class v: v.rel == Class.all)
+      invariant !forall(Class v: v.rel == allof(Class))
     ADSL
   end
 
@@ -447,14 +467,14 @@ class BasicTranslationTest < Test::Unit::TestCase
     adsl_assert :correct, <<-ADSL
       class Class { 0+ Class rel }
       action blah() {
-        create Class
+        create(Class)
       }
       invariant exists(Class o: empty(o.rel))
     ADSL
     adsl_assert :incorrect, <<-ADSL
       class Class { 0+ Class rel }
       action blah() {
-        create Class
+        create(Class)
       }
       invariant forall(Class o: not empty(o.rel))
     ADSL
@@ -464,9 +484,9 @@ class BasicTranslationTest < Test::Unit::TestCase
     adsl_assert :correct, <<-ADSL
       class Class { 0+ Class rel }
       action blah() {
-        delete Class.all
-        a = create Class
-        b = create Class
+        delete allof(Class)
+        a = create(Class)
+        b = create(Class)
         a.rel += b
         delete a
       }
@@ -475,9 +495,9 @@ class BasicTranslationTest < Test::Unit::TestCase
     adsl_assert :incorrect, <<-ADSL
       class Class { 0+ Class rel }
       action blah() {
-        delete Class.all
-        a = create Class
-        b = create Class
+        delete allof(Class)
+        a = create(Class)
+        b = create(Class)
         a.rel += b
         delete a
       }
@@ -489,14 +509,14 @@ class BasicTranslationTest < Test::Unit::TestCase
     adsl_assert :correct, <<-ADSL
       class Class { 0+ Class rel }
       action blah() {
-        Class.all.rel -= Class.all
+        allof(Class).rel -= allof(Class)
       }
       invariant forall(Class a: empty(a.rel))
     ADSL
     adsl_assert :incorrect, <<-ADSL
       class Class { 0+ Class rel }
       action blah() {
-        Class.all.rel -= Class.all
+        allof(Class).rel -= allof(Class)
       }
       invariant exists(Class a: not empty(a.rel))
     ADSL

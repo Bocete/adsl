@@ -33,7 +33,7 @@ class ActionParserTest < Test::Unit::TestCase
       spec = parser.parse <<-adsl
         class Class {}
         action do_something() {
-          var = Class.all
+          var = allof(Class)
           var = var
         }
       adsl
@@ -69,7 +69,6 @@ class ActionParserTest < Test::Unit::TestCase
 
     context3.redefine_var b2, false
     assert_equal({"a" => [a1, a2, a2], "b" => [b, b, b2]}, ADSL::ADSLTypecheckResolveContext.context_vars_that_differ(context1, context2, context3))
-
   end
 
   def test_action__all_stmts_no_subblocks
@@ -79,8 +78,8 @@ class ActionParserTest < Test::Unit::TestCase
       spec = parser.parse <<-adsl
         class Class { 0+ Class relation }
         action do_something() {
-          var = create Class
-          create Class
+          var = create(Class)
+          create(Class)
           delete var
           var.relation += var
           var.relation -= var
@@ -90,7 +89,7 @@ class ActionParserTest < Test::Unit::TestCase
     assert_equal 1, spec.actions.length
     assert_equal 'do_something', spec.actions.first.name
     statements = spec.actions.first.block.statements
-    assert_equal 6, statements.length
+    assert_equal 7, statements.length
     relation = spec.classes.first.relations.first
     
     assert_equal spec.classes.first, statements[0].klass
@@ -101,15 +100,32 @@ class ActionParserTest < Test::Unit::TestCase
     
     assert_equal spec.classes.first, statements[2].klass
     
-    assert_equal var, statements[3].objset
+    assert_equal var, statements[4].objset
 
-    assert_equal var, statements[4].objset1
-    assert_equal var, statements[4].objset2
-    assert_equal relation, statements[4].relation
- 
     assert_equal var, statements[5].objset1
     assert_equal var, statements[5].objset2
     assert_equal relation, statements[5].relation
+ 
+    assert_equal var, statements[6].objset1
+    assert_equal var, statements[6].objset2
+    assert_equal relation, statements[6].relation
+  end
+
+  def test_action__multiple_creates_in_single_stmt
+    parser = ADSL::ADSLParser.new
+    spec = nil
+    assert_nothing_raised ADSL::ADSLError do
+      spec = parser.parse <<-adsl
+        class Class { 0+ Class relation}
+        action do_something() {
+          create(Class).relation += create(Class)
+        }
+      adsl
+    end
+    statements = spec.actions.first.block.statements
+    assert_equal 3, statements.length
+    assert_equal spec.classes.first, statements[0].klass
+    assert_equal spec.classes.first, statements[1].klass
   end
 
   def test_action__args_typecheck
@@ -157,7 +173,7 @@ class ActionParserTest < Test::Unit::TestCase
         spec = parser.parse <<-adsl
           class Class { 1 Class rel }
           action blah() {
-            Class.all.rel #{operator} Class.all
+            allof(Class).rel #{operator} allof(Class)
           }
         adsl
       end
@@ -171,7 +187,7 @@ class ActionParserTest < Test::Unit::TestCase
           class Class1 { 1 Class1 rel }
           class Class2 {}
           action blah() {
-            Class2.all.rel #{operator} Class1.all
+            allof(Class2).rel #{operator} allof(Class1)
           }
         adsl
       end
@@ -181,7 +197,7 @@ class ActionParserTest < Test::Unit::TestCase
           class Class1 { 1 Class1 rel }
           class Class2 {}
           action blah() {
-            Class1.all.rel #{operator} Class2.all
+            allof(Class1).rel #{operator} allof(Class2)
           }
         adsl
       end
@@ -197,7 +213,7 @@ class ActionParserTest < Test::Unit::TestCase
           class Super { 1 Super rel }
           class Sub extends Super {}
           action blah() {
-            Super.all.rel #{operator} Sub.all
+            allof(Super).rel #{operator} allof(Sub)
           }
         adsl
       end
@@ -211,7 +227,7 @@ class ActionParserTest < Test::Unit::TestCase
           class Super { 1 Super rel }
           class Sub extends Super {}
           action blah() {
-            Sub.all.rel #{operator} Sub.all
+            allof(Sub).rel #{operator} allof(Sub)
           }
         adsl
       end
@@ -225,7 +241,7 @@ class ActionParserTest < Test::Unit::TestCase
           class Super {}
           class Sub extends Super { 1 Super rel }
           action blah() {
-            Sub.all.rel #{operator} Sub.all
+            allof(Sub).rel #{operator} allof(Sub)
           }
         adsl
       end
@@ -239,7 +255,7 @@ class ActionParserTest < Test::Unit::TestCase
           class Super {}
           class Sub extends Super { 1 Sub rel }
           action blah() {
-            Super.all.rel #{operator} Super.all
+            allof(Super).rel #{operator} allof(Super)
           }
         adsl
       end
@@ -249,7 +265,7 @@ class ActionParserTest < Test::Unit::TestCase
           class Super {}
           class Sub extends Super { 1 Sub rel }
           action blah() {
-            Sub.all.rel #{operator} Super.all
+            allof(Sub).rel #{operator} allof(Super)
           }
         adsl
       end
@@ -333,7 +349,7 @@ class ActionParserTest < Test::Unit::TestCase
       spec = parser.parse <<-adsl
         class Class { 0+ Class relation }
         action do_something() {
-          var = Class.all
+          var = allof(Class)
           var.relation -= var
         }
       adsl
@@ -350,8 +366,8 @@ class ActionParserTest < Test::Unit::TestCase
         class Class { 0+ Class relation }
         class Class2 {}
         action do_something() {
-          var1 = Class.all
-          var2 = Class2.all
+          var1 = allof(Class)
+          var2 = allof(Class2)
           var1.relation -= var2
         }
       adsl
@@ -365,7 +381,7 @@ class ActionParserTest < Test::Unit::TestCase
       spec = parser.parse <<-adsl
         class Class { 0+ Class relation }
         action do_something() {
-          var = subset(Class.all)
+          var = subset(allof(Class))
           var.relation -= var
         }
       adsl
@@ -382,8 +398,8 @@ class ActionParserTest < Test::Unit::TestCase
         class Class { 0+ Class relation }
         class Class2 {}
         action do_something() {
-          var1 = Class.all
-          var2 = subset(Class2.all)
+          var1 = allof(Class)
+          var2 = subset(allof(Class2))
           var1.relation -= var2
         }
       adsl
@@ -397,7 +413,7 @@ class ActionParserTest < Test::Unit::TestCase
       spec = parser.parse <<-adsl
         class Class { 0+ Class relation }
         action do_something() {
-          var = oneof(Class.all)
+          var = oneof(allof(Class))
           var.relation -= var
         }
       adsl
@@ -414,8 +430,8 @@ class ActionParserTest < Test::Unit::TestCase
         class Class { 0+ Class relation }
         class Class2 {}
         action do_something() {
-          var1 = Class.all
-          var2 = oneof(Class2.all)
+          var1 = allof(Class)
+          var2 = oneof(allof(Class2))
           var1.relation -= var2
         }
       adsl
@@ -430,7 +446,7 @@ class ActionParserTest < Test::Unit::TestCase
         class Class1 { 0+ Class2 relation }
         class Class2 { 0+ Class2 other_relation }
         action do_something() {
-          Class1.all.relation.other_relation -= Class2.all
+          allof(Class1).relation.other_relation -= allof(Class2)
         }
       adsl
     end
@@ -448,7 +464,7 @@ class ActionParserTest < Test::Unit::TestCase
         class Class1 { 0+ Class2 relation }
         class Class2 { 0+ Class2 other_relation }
         action do_something() {
-          Class1.all.relation.relation -= Class2.all
+          allof(Class1).relation.relation -= allof(Class2)
         }
       adsl
     end
@@ -463,7 +479,7 @@ class ActionParserTest < Test::Unit::TestCase
         class Class1 { 0+ Class2 relation }
         class Class2 extends Class1 { 0+ Class2 other_relation }
         action do_something() {
-          Class1.all.relation.other_relation -= Class2.all
+          allof(Class1).relation.other_relation -= allof(Class2)
         }
       adsl
     end
@@ -478,7 +494,7 @@ class ActionParserTest < Test::Unit::TestCase
         class Class1 { 0+ Class2 relation }
         class Class2 extends Class1 { 0+ Class2 other_relation }
         action do_something() {
-          Class2.all.relation.other_relation -= Class2.all
+          allof(Class2).relation.other_relation -= allof(Class2)
         }
       adsl
     end
@@ -494,14 +510,14 @@ class ActionParserTest < Test::Unit::TestCase
     spec = parser.parse <<-adsl
       class Class { 0+ Class relation }
       action do_something() {
-        var = Class.all
+        var = allof(Class)
         foreach subvar: var {
           var.relation -= subvar
         }
         either {
           delete var
         } or {
-          create Class
+          create(Class)
         }
         foreach subvar: var {}
       }
@@ -525,9 +541,9 @@ class ActionParserTest < Test::Unit::TestCase
       parser.parse <<-adsl
         class Class {}
         action do_something() {
-          var = Class.all
+          var = allof(Class)
           either {
-            var = Class.all
+            var = allof(Class)
           } or {
           }
           var = var
@@ -543,8 +559,8 @@ class ActionParserTest < Test::Unit::TestCase
         class Class {}
         class Class2 {}
         action do_something() {
-          var = Class.all
-          var = Class2.all
+          var = allof(Class)
+          var = allof(Class2)
         }
       adsl
     end 
@@ -565,32 +581,32 @@ class ActionParserTest < Test::Unit::TestCase
       action do_something() {
         either {
         } or {
-          create Class
+          create(Class)
         }
       }
     adsl
     either = spec.actions.first.block.statements.first
     assert_equal 2, either.blocks.length
     assert_equal 0, either.blocks[0].statements.length
-    assert_equal 1, either.blocks[1].statements.length
+    assert_equal 2, either.blocks[1].statements.length
 
     spec = parser.parse <<-adsl
       class Class {}
       action do_something() {
         either {
         } or {
-          create Class
+          create(Class)
         } or {
-          create Class
-          create Class
+          create(Class)
+          create(Class)
         }
       }
     adsl
     either = spec.actions.first.block.statements.first
     assert_equal 3, either.blocks.length
     assert_equal 0, either.blocks[0].statements.length
-    assert_equal 1, either.blocks[1].statements.length
-    assert_equal 2, either.blocks[2].statements.length
+    assert_equal 2, either.blocks[1].statements.length
+    assert_equal 4, either.blocks[2].statements.length
   end
 
   def test_action__unmatching_types_in_either
@@ -600,11 +616,11 @@ class ActionParserTest < Test::Unit::TestCase
         class Class {}
         class Class2 {}
         action do_something() {
-          var = Class.all
+          var = allof(Class)
           either {
-            var = Class.all
+            var = allof(Class)
           } or {
-            var = Class2.all
+            var = allof(Class2)
           }
         }
       adsl
@@ -619,9 +635,9 @@ class ActionParserTest < Test::Unit::TestCase
         class Class2 {}
         action do_something() {
           either {
-            var = Class2.all
+            var = allof(Class2)
           } or {
-            var = Class.all
+            var = allof(Class)
           }
         }
       adsl
@@ -634,8 +650,8 @@ class ActionParserTest < Test::Unit::TestCase
       parser.parse <<-adsl
         class Class { 0+ Class relation }
         action do_something() {
-          foreach var: Class.all {
-            var.relation -= Class.all
+          foreach var: allof(Class) {
+            var.relation -= allof(Class)
           }
         }
       adsl
@@ -645,8 +661,8 @@ class ActionParserTest < Test::Unit::TestCase
         class Class {}
         class Class2 { 0+ Class2 relation }
         action do_something() {
-          foreach var: Class.all {
-            var.relation -= Class.all
+          foreach var: allof(Class) {
+            var.relation -= allof(Class)
           }
         }
       adsl
@@ -671,7 +687,7 @@ class ActionParserTest < Test::Unit::TestCase
     spec = parser.parse <<-adsl
       class Class { 0+ Class relation }
       action do_something() {
-        foreach o: Class.all {
+        foreach o: allof(Class) {
         }
       }
     adsl
@@ -685,7 +701,7 @@ class ActionParserTest < Test::Unit::TestCase
       spec = parser.parse <<-adsl
         class Class { 0+ Class relation }
         action do_something() {
-          var = Class.all
+          var = allof(Class)
           either {
             var = subset(var)
           } or {
@@ -723,7 +739,7 @@ class ActionParserTest < Test::Unit::TestCase
     spec = parser.parse <<-adsl
       class Class {}
       action do_something() {
-        foreach var: Class.all {}
+        foreach var: allof(Class) {}
       }
     adsl
     assert_equal 0, get_pre_lambdas.call(spec.actions.first.block.statements[0]).length
@@ -731,8 +747,8 @@ class ActionParserTest < Test::Unit::TestCase
     spec = parser.parse <<-adsl
       class Class {}
       action do_something() {
-        foreach var: Class.all {
-          var = Class.all
+        foreach var: allof(Class) {
+          var = allof(Class)
         }
       }
     adsl
@@ -741,8 +757,8 @@ class ActionParserTest < Test::Unit::TestCase
     spec = parser.parse <<-adsl
       class Class {}
       action do_something() {
-        var = Class.all
-        foreach a: Class.all {
+        var = allof(Class)
+        foreach a: allof(Class) {
           var = subset(var)
           var = subset(var)
         }
@@ -757,9 +773,9 @@ class ActionParserTest < Test::Unit::TestCase
     spec = parser.parse <<-adsl
       class Class {}
       action do_something() {
-        var = Class.all
-        foreach var: Class.all {
-          var = Class.all
+        var = allof(Class)
+        foreach var: allof(Class) {
+          var = allof(Class)
         }
       }
     adsl
@@ -774,7 +790,7 @@ class ActionParserTest < Test::Unit::TestCase
         class Class {}
         class Class2 {}
         action do_something() {
-          create Class
+          create(Class)
         }
       adsl
     end
@@ -785,10 +801,10 @@ class ActionParserTest < Test::Unit::TestCase
         class Class {}
         class Class2 {}
         action do_something() {
-          create Class
+          create(Class)
           either {
-            foreach a: Class.all {
-              delete Class2.all
+            foreach a: allof(Class) {
+              delete allof(Class2)
             }
           } or {}
         }
@@ -796,7 +812,7 @@ class ActionParserTest < Test::Unit::TestCase
     end
     assert_equal Set[*spec.classes], spec.actions.first.block.list_entity_classes_written_to
     assert_equal Set[spec.classes.first], spec.actions.first.block.statements.first.list_entity_classes_written_to
-    assert_equal Set[spec.classes.second], spec.actions.first.block.statements.second.list_entity_classes_written_to
+    assert_equal Set[spec.classes.second], spec.actions.first.block.statements.last.list_entity_classes_written_to
   end
 
   def test_action__entity_class_reads
@@ -807,7 +823,7 @@ class ActionParserTest < Test::Unit::TestCase
         class Class {}
         class Class2 {}
         action do_something() {
-          delete Class.all
+          delete allof(Class)
         }
       adsl
     end
@@ -818,10 +834,10 @@ class ActionParserTest < Test::Unit::TestCase
         class Class {}
         class Class2 {}
         action do_something() {
-          create Class
+          create(Class)
           either {
-            foreach a: Class.all {
-              delete Class2.all
+            foreach a: allof(Class) {
+              delete allof(Class2)
             }
           } or {}
         }
@@ -829,6 +845,7 @@ class ActionParserTest < Test::Unit::TestCase
     end
     assert_equal Set[*spec.classes], spec.actions.first.block.list_entity_classes_read
     assert_equal Set[], spec.actions.first.block.statements.first.list_entity_classes_read
-    assert_equal Set[*spec.classes], spec.actions.first.block.statements.second.list_entity_classes_read
+    assert_equal Set[*spec.classes], spec.actions.first.block.statements.last.list_entity_classes_read
   end
 end
+

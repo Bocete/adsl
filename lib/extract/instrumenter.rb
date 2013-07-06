@@ -119,8 +119,6 @@ module Extract
 
           new_code = Ruby2Ruby.new.process instrumented_sexp
 
-          puts new_code if method_name.to_s == 'create' && object.class.name =~ /Controller/
-
           object.replace_method method_name, new_code
 
           return new_code
