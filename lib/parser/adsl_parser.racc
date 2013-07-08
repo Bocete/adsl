@@ -54,6 +54,7 @@ rule
            | delete objset                   { return ADSLDeleteObj.new :lineno => val[0], :objset => val[1] }
            | objset '.' IDENT '+=' objset    { return ADSLCreateTup.new :lineno => val[0].lineno, :objset1 => val[0], :rel_name => val[2], :objset2 => val[4] }
            | objset '.' IDENT '-=' objset    { return ADSLDeleteTup.new :lineno => val[0].lineno, :objset1 => val[0], :rel_name => val[2], :objset2 => val[4] }
+           | objset '.' IDENT '=' objset     { return ADSLSetTup.new :lineno => val[0].lineno, :objset1 => val[0], :rel_name => val[2], :objset2 => val[4] }
            | foreach IDENT ':' objset block  { return ADSLForEach.new :lineno => val[0], :var_name => val[1], :objset => val[3], :block => val[4] }
            | either block or eitherblocks    { val[3].unshift val[1]; return ADSLEither.new :lineno => val[0], :blocks => val[3] }
   

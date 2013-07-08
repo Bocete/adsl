@@ -62,6 +62,7 @@ if ENV["RAILS_ENV"] == 'test'
     config.assets.enabled = false
     config.active_support.deprecation = :stderr
     config.secret_token = 'RandomTextRequiredByARecentVersionOfRakeOrWhateverWhoCaresThisIsUsedForGemTestingOnly'
+    config.action_dispatch.show_exceptions = false
   end
 
   logger = Logger.new(STDOUT)
@@ -77,7 +78,6 @@ if ENV["RAILS_ENV"] == 'test'
   end
 
   Rails.logger = logger
-
 
   ActiveRecord::Base.establish_connection(
     :adapter => 'sqlite3',

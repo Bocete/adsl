@@ -6,6 +6,12 @@ require 'ruby_parser'
 require 'method_source'
 require 'ruby2ruby'
 
+module Kernel
+  def ins_call(object, method_name, *args, &block)
+    ::Extract::Instrumenter.get_instance.execute_instrumented object, method_name, *args, &block
+  end
+end
+
 module Extract
   class Instrumenter
     @instance = nil
@@ -76,7 +82,7 @@ module Extract
         original_object = sexp.sexp_body[0] || s(:self)
         original_method_name = sexp.sexp_body[1]
         original_args = sexp.sexp_body[2..-1]
-        s(:call, Instrumenter.sexp_class_rep, :e, original_object, s(:lit, original_method_name), *original_args)
+        s(:call, nil, :ins_call, original_object, s(:lit, original_method_name), *original_args)
       end
     end
 
@@ -87,16 +93,13 @@ module Extract
       source = method.source
       sexp = ruby_parser.process source
       !sexp_instrumented? sexp
-    rescue
-      raise
+    rescue MethodSource::SourceNotFoundError
+      # sometimes this happens because the method_source gem bugs out with evals etc
+      return false
     end
 
     def replace(type, &block)
       @replacers << [type, block]
-    end
-
-    def self.e(object, method_name, *args, &block)
-      Instrumenter.get_instance.execute_instrumented object, method_name, *args, &block
     end
 
     def execute_instrumented(object, method_name, *args, &block)

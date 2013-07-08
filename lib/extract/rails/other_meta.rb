@@ -1,4 +1,5 @@
 require 'active_support'
+require 'parser/adsl_ast'
 
 module Extract
   module Rails
@@ -9,10 +10,14 @@ module Extract
       def initialize(attributes = {})
         @name = attributes[:name]
         @value = attributes[:value]
+        ::Extract::Instrumenter.get_instance.action_block.push(ADSL::ADSLAssignment.new(
+          :var_name => ADSL::ADSLIdent.new(:text => @name),
+          :objset => @value.adsl_ast
+        )) if @value.respond_to? :adsl_ast
       end
 
       def adsl_ast
-        ADSLVariable :var_name => @name
+        ::ADSL::ADSLVariable.new :var_name => @name
       end
 
       def method_missing(method, *args, &block)

@@ -27,10 +27,16 @@ class RailsExtractorTest < Extract::Rails::RailsInstrumentationTestCase
     assert session.response.body.strip.empty?
 
     session = ActionDispatch::Integration::Session.new(Rails.application)
-    Rails.logger.adsl_silence do
+    assert_raise ActionController::RoutingError do
       session.get('thisdoesntexist')
     end
-    assert_equal 404, session.response.status
+  end
+
+  def test_setup__rails_crashes_actually_crash_tests
+    assert_raise do
+      session = ActionDispatch::Integration::Session.new(Rails.application)
+      session.get('no_route')
+    end
   end
 
   def test_adsl_ast__empty_action
@@ -40,11 +46,51 @@ class RailsExtractorTest < Extract::Rails::RailsInstrumentationTestCase
   end
   
   def test_adsl_ast__create_action
+    AsdsController.class_exec do
+      def create
+        Asd.new
+        respond_to
+      end
+    end
+    
     extractor = RailsExtractor.new ar_classes
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :create)
     assert_false ast.block.statements.empty?
     assert_equal ADSL::ADSLCreateObj, ast.block.statements.first.class
     assert_equal 'Asd', ast.block.statements.first.class_name.text
+  end
+
+  def test_adsl_ast__create_within_expression_action
+    AsdsController.class_exec do
+      def create
+        Asd.build
+        respond_to
+      end
+    end
+    
+    extractor = RailsExtractor.new ar_classes
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :create)
+    assert_false ast.block.statements.empty?
+    assert_equal ADSL::ADSLCreateObj, ast.block.statements.first.class
+    assert_equal 'Asd', ast.block.statements.first.class_name.text
+  end
+
+  def test_adsl_ast__variable_assignment
+    AsdsController.class_exec do
+      def create
+        a = Asd.new
+        a.save!
+        respond_to
+      end
+    end
+    
+    extractor = RailsExtractor.new ar_classes
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :create)
+    assert_false ast.block.statements.empty?
+    assert_equal ADSL::ADSLAssignment, ast.block.statements.first.class
+    assert_equal 'a', ast.block.statements.first.var_name.text
+    assert_equal ADSL::ADSLCreateObj, ast.block.statements.first.objset.class
+    assert_equal 'Asd', ast.block.statements.first.objset.class_name.text
   end
 
 end

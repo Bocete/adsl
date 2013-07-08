@@ -89,7 +89,7 @@ class ActionParserTest < Test::Unit::TestCase
     assert_equal 1, spec.actions.length
     assert_equal 'do_something', spec.actions.first.name
     statements = spec.actions.first.block.statements
-    assert_equal 7, statements.length
+    assert_equal 6, statements.length
     relation = spec.classes.first.relations.first
     
     assert_equal spec.classes.first, statements[0].klass
@@ -100,15 +100,15 @@ class ActionParserTest < Test::Unit::TestCase
     
     assert_equal spec.classes.first, statements[2].klass
     
-    assert_equal var, statements[4].objset
+    assert_equal var, statements[3].objset
 
+    assert_equal var, statements[4].objset1
+    assert_equal var, statements[4].objset2
+    assert_equal relation, statements[4].relation
+ 
     assert_equal var, statements[5].objset1
     assert_equal var, statements[5].objset2
     assert_equal relation, statements[5].relation
- 
-    assert_equal var, statements[6].objset1
-    assert_equal var, statements[6].objset2
-    assert_equal relation, statements[6].relation
   end
 
   def test_action__multiple_creates_in_single_stmt
@@ -205,8 +205,8 @@ class ActionParserTest < Test::Unit::TestCase
   end
   
   def test_action__superclass_createtup_deletetup_typecheck
+    parser = ADSL::ADSLParser.new
     ['+=', '-='].each do |operator|
-      parser = ADSL::ADSLParser.new
       spec = nil
       assert_nothing_raised ADSL::ADSLError do
         spec = parser.parse <<-adsl
@@ -272,6 +272,84 @@ class ActionParserTest < Test::Unit::TestCase
     end
   end
 
+  def test_action__superclass_settup_typecheck
+    parser = ADSL::ADSLParser.new
+      
+    spec = nil
+    assert_nothing_raised ADSL::ADSLError do
+      spec = parser.parse <<-adsl
+        class Super { 1 Super rel }
+        class Sub extends Super {}
+        action blah() {
+          allof(Super).rel = allof(Sub)
+        }
+      adsl
+    end
+    stmt1 = spec.actions.first.block.statements.first
+    stmt2 = spec.actions.first.block.statements.last
+    assert_equal spec.classes[0], stmt1.objset1.klass
+    assert_equal spec.classes[0], stmt1.objset2.klass
+    assert_equal spec.classes[0].relations.first, stmt1.relation
+    assert_equal spec.classes[0], stmt2.objset1.klass
+    assert_equal spec.classes[1], stmt2.objset2.klass
+    assert_equal spec.classes[0].relations.first, stmt2.relation
+    
+    assert_nothing_raised ADSL::ADSLError do
+      spec = parser.parse <<-adsl
+        class Super { 1 Super rel }
+        class Sub extends Super {}
+        action blah() {
+          allof(Sub).rel = allof(Sub)
+        }
+      adsl
+    end
+    stmt1 = spec.actions.first.block.statements.first
+    stmt2 = spec.actions.first.block.statements.last
+    assert_equal spec.classes[1], stmt1.objset1.klass
+    assert_equal spec.classes[0], stmt1.objset2.klass
+    assert_equal spec.classes[0].relations.first, stmt1.relation
+    assert_equal spec.classes[1], stmt2.objset1.klass
+    assert_equal spec.classes[1], stmt2.objset2.klass
+    assert_equal spec.classes[0].relations.first, stmt2.relation
+    
+    assert_nothing_raised ADSL::ADSLError do
+      spec = parser.parse <<-adsl
+        class Super {}
+        class Sub extends Super { 1 Super rel }
+        action blah() {
+          allof(Sub).rel = allof(Sub)
+        }
+      adsl
+    end
+    stmt1 = spec.actions.first.block.statements.first
+    stmt2 = spec.actions.first.block.statements.last
+    assert_equal spec.classes[1], stmt1.objset1.klass
+    assert_equal spec.classes[0], stmt1.objset2.klass
+    assert_equal spec.classes[1].relations.first, stmt1.relation
+    assert_equal spec.classes[1], stmt2.objset1.klass
+    assert_equal spec.classes[1], stmt2.objset2.klass
+    assert_equal spec.classes[1].relations.first, stmt2.relation
+
+    assert_raise ADSL::ADSLError do
+      parser.parse <<-adsl
+        class Super {}
+        class Sub extends Super { 1 Sub rel }
+        action blah() {
+          allof(Super).rel = allof(Super)
+        }
+      adsl
+    end
+    
+    assert_raise ADSL::ADSLError do
+      parser.parse <<-adsl
+        class Super {}
+        class Sub extends Super { 1 Sub rel }
+        action blah() {
+          allof(Sub).rel = allof(Super)
+        }
+      adsl
+    end
+  end
 
   def test_action__args_cardinality
     parser = ADSL::ADSLParser.new
@@ -588,7 +666,7 @@ class ActionParserTest < Test::Unit::TestCase
     either = spec.actions.first.block.statements.first
     assert_equal 2, either.blocks.length
     assert_equal 0, either.blocks[0].statements.length
-    assert_equal 2, either.blocks[1].statements.length
+    assert_equal 1, either.blocks[1].statements.length
 
     spec = parser.parse <<-adsl
       class Class {}
@@ -605,8 +683,8 @@ class ActionParserTest < Test::Unit::TestCase
     either = spec.actions.first.block.statements.first
     assert_equal 3, either.blocks.length
     assert_equal 0, either.blocks[0].statements.length
-    assert_equal 2, either.blocks[1].statements.length
-    assert_equal 4, either.blocks[2].statements.length
+    assert_equal 1, either.blocks[1].statements.length
+    assert_equal 2, either.blocks[2].statements.length
   end
 
   def test_action__unmatching_types_in_either

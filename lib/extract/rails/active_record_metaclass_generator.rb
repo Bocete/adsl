@@ -53,11 +53,14 @@ module Extract
             self.new :adsl_ast => ADSL::ADSLAllOf.new(:class_name => t(active_record_class_name))
           end
 
+          def self.build(*args)
+            self.new(*args)
+          end
+
           def initialize(attributes = {}, options = {})
             super
             unless attributes.include? :adsl_ast
               @adsl_ast = ADSL::ADSLCreateObj.new(:class_name => t(self.class.active_record_class_name))
-              instrumenter.action_block << @adsl_ast
             end
           end
 

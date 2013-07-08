@@ -90,10 +90,6 @@ module DS
     container_for :var, :objset
   end
 
-  class DSObjsetStmt < DSNode
-    container_for :objset
-  end
-
   class DSCreateObj < DSNode
     container_for :klass
     

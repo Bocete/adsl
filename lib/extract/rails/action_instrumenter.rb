@@ -1,5 +1,12 @@
 require 'active_support'
 
+module Kernel
+  def ins_stmt(expr)
+    ::Extract::Instrumenter.get_instance.action_block.push(expr.adsl_ast) if expr.respond_to?(:adsl_ast)
+    expr
+  end
+end
+
 module Extract
   module Rails
     class ActionInstrumenter < Extract::Instrumenter
@@ -27,8 +34,8 @@ module Extract
 
         # all assignments should assign metavariables
         replace :lasgn do |sexp|
-          metavariable = s(:colon2, s(:colon2, s(:colon3, :Extract), :Rails), :MetaVariable)
-          sexp[2] = s(:call, metavariable, :new, s(:hash, s(:lit, :name), s(:str, sexp[1].to_s), s(:lit, :value), sexp[2]))
+          metavariable_class = s(:colon2, s(:colon2, s(:colon3, :Extract), :Rails), :MetaVariable)
+          sexp[2] = s(:call, metavariable_class, :new, s(:hash, s(:lit, :name), s(:str, sexp[1].to_s), s(:lit, :value), sexp[2]))
           sexp
         end
 
@@ -36,10 +43,27 @@ module Extract
         replace :call do |sexp|
           sexp[0] == :call && sexp[1].nil? && sexp[2] == :respond_to ? s(:nil) : sexp
         end
+        
+        # prepend ins_stmt to every statement
+        replace :defn do |sexp|
+          (3..sexp.length-1).each do |index|
+            sexp[index] = s(:call, nil, :ins_stmt, sexp[index])
+          end
+          sexp
+        end
+        replace :block do |sexp|
+          (1..sexp.length-1).each do |index|
+            sexp[index] = s(:call, nil, :ins_stmt, sexp[index])
+          end
+          sexp
+        end
       end
 
       def should_instrument?(object, method_name)
-        object.class.parent_module != Extract::Rails && super
+        object.class.parent_module != Extract::Rails && 
+          !(method_name.to_sym == :ins_stmt && object.method(method_name).owner == Kernel) && 
+          !(method_name.to_sym == :ins_call && object.method(method_name).owner == Kernel) && 
+          super
       end
     end
   end

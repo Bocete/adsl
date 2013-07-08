@@ -370,7 +370,7 @@ module ADSL
       @statements.each do |node|
         main_stmt = node.typecheck_and_resolve context
         stmts += context.pre_stmts
-        stmts << main_stmt
+        stmts << main_stmt unless main_stmt.nil?
         context.pre_stmts = []
       end
       return DS::DSBlock.new :statements => stmts.flatten
@@ -394,7 +394,8 @@ module ADSL
     node_type :objset
 
     def typecheck_and_resolve(context)
-      DS::DSObjsetStmt.new :objset => @objset.typecheck_and_resolve(context)
+      @objset.typecheck_and_resolve(context)
+      return nil
     end
   end
 
@@ -555,6 +556,20 @@ module ADSL
       objset2 = @objset2.typecheck_and_resolve context
       relation = ADSL::find_relation context, objset1.type, @rel_name.text, @rel_name.lineno, objset2.type 
       return DS::DSDeleteTup.new :objset1 => objset1, :relation => relation, :objset2 => objset2
+    end
+  end
+
+  class ADSLSetTup < ADSLNode
+    node_type :objset1, :rel_name, :objset2
+
+    def typecheck_and_resolve(context)
+      objset1 = @objset1.typecheck_and_resolve context
+      objset2 = @objset2.typecheck_and_resolve context
+      relation = ADSL::find_relation context, objset1.type, @rel_name.text, @rel_name.lineno, objset2.type
+      return [
+        DS::DSDeleteTup.new(:objset1 => objset1, :relation => relation, :objset2 => DS::DSAllOf.new(:klass => relation.to_class)),
+        DS::DSCreateTup.new(:objset1 => objset1, :relation => relation, :objset2 => objset2)
+      ]
     end
   end
 

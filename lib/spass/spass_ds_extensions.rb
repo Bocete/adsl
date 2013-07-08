@@ -275,14 +275,6 @@ module DS
     end
   end
 
-  class DSObjsetStmt < DSNode
-    def prepare(translation)
-      @objset.prepare_action translation
-    end
-
-    def migrate_state_spass(translation); end
-  end
-
   class DSDeleteObj < DSNode
     include FOL
     attr_accessor :context_deletion_link
