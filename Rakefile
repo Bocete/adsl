@@ -1,6 +1,6 @@
 require 'rake/testtask'
 
-parser_dir = "./lib/parser"
+parser_dir = "./lib/adsl/parser"
 
 namespace :build do
   desc "Generate Lexer & Parser"
@@ -17,42 +17,49 @@ namespace :test do
     task :parser => ["build:parser"]
     Rake::TestTask.new(name=:parser) do |t|
       t.libs += ["lib"]
-      t.test_files = FileList['test/unit/parser/**/*_test.rb']
+      t.test_files = FileList['test/unit/adsl/parser/**/*_test.rb']
       t.verbose = true
     end
 
     desc "Test Util"
     Rake::TestTask.new(name=:util) do |t|
       t.libs += ["lib"]
-      t.test_files = FileList['test/unit/util/**/*_test.rb']
+      t.test_files = FileList['test/unit/adsl/util/**/*_test.rb']
       t.verbose = true
     end
     
     desc "Test First Order Logic"
     Rake::TestTask.new(name=:fol) do |t|
       t.libs += ["lib"]
-      t.test_files = FileList['test/unit/fol/**/*_test.rb']
+      t.test_files = FileList['test/unit/adsl/fol/**/*_test.rb']
       t.verbose = true
     end
     
     desc "Test Spass Translator"
     Rake::TestTask.new(name=:spass) do |t|
       t.libs += ["lib"]
-      t.test_files = FileList['test/unit/spass/**/*_test.rb']
+      t.test_files = FileList['test/unit/adsl/spass/**/*_test.rb']
       t.verbose = true
     end
     
     desc "Test DataStoreSpec"
     Rake::TestTask.new(name=:ds) do |t|
       t.libs += ["lib"]
-      t.test_files = FileList['test/unit/ds/**/*_test.rb']
+      t.test_files = FileList['test/unit/adsl/ds/**/*_test.rb']
       t.verbose = true
     end
     
     desc "Test Extract"
     Rake::TestTask.new(name=:extract) do |t|
       t.libs += ["lib"]
-      t.test_files = FileList['test/unit/extract/**/*_test.rb']
+      t.test_files = FileList['test/unit/adsl/extract/**/*_test.rb']
+      t.verbose = true
+    end
+    
+    desc "Test Verification"
+    Rake::TestTask.new(name=:verification) do |t|
+      t.libs += ["lib"]
+      t.test_files = FileList['test/unit/adsl/verification/**/*_test.rb']
       t.verbose = true
     end
   end
@@ -60,7 +67,7 @@ namespace :test do
   desc "Test All Units"
   Rake::TestTask.new(name=:units) do |t|
     t.libs += ["lib"]
-    t.test_files = FileList['test/unit/**/*_test.rb']
+    t.test_files = FileList['test/unit/adsl/**/*_test.rb']
     t.verbose = true
   end
 
