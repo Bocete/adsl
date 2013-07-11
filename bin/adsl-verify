@@ -88,7 +88,7 @@ $LOAD_PATH.unshift GEM_LIB_PATH unless $LOAD_PATH.include? GEM_LIB_PATH
 case options.language
 when 'spass'
   require 'spass/bin'
-  include Spass::Bin
+  include ADSL::Spass::Bin
   begin
     verify(input,
       :halt_on_error => options.halt_on_error,
