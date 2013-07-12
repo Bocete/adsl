@@ -46,4 +46,13 @@ class Test::Unit::TestCase
     end
     return false
   end
+
+  def in_temp_file(content)
+    file = Tempfile.new('test_util')
+    file.write content
+    file.close
+    yield file.path
+  ensure
+    file.unlink unless file.nil?
+  end
 end

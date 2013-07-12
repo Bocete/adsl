@@ -14,14 +14,21 @@ module ADSL
       include ADSL::Parser
 
       def in_formula_builder
-        formula_builder = self.is_a?(FormulaBuilder) ? self : FormulaBuilder.new
+        formula_builder = nil
+        if self.is_a?(FormulaBuilder)
+          formula_builder = self
+        else
+          formula_builder = FormulaBuilder.new
+          formula_builder.adsl_stack << self.adsl_ast if self.respond_to? :adsl_ast
+        end
         yield formula_builder
         formula_builder
       end
 
       def handle_quantifier(quantifier, klass, arg_types, block)
+        raise "A block needs to be passed to quantifiers" if block.nil?
+        raise "At least some variables need to be given to the block" if block.parameters.empty?
         in_formula_builder do |fb|
-          raise "At least some variables need to be given to the block" if block.parameters.empty?
           
           param_types = {}
           block.parameters.each do |param|
@@ -41,7 +48,7 @@ module ADSL
               Objset.allof(param_types[param[1]]).adsl_ast
             ]
           }
-          subformula = block.(*block.parameters.map{ |param| ASTVariable.new(:var_name => t(param[1])) })
+          subformula = block.(*block.parameters.map{ |param| Objset.new :adsl_ast => ASTVariable.new(:var_name => t(param[1])) })
           raise "Invalid formula returned by block in `#{quantifier}'" unless subformula.respond_to? :adsl_ast 
           fb.adsl_stack << klass.new(:vars => vars_and_objsets, :subformula => subformula.adsl_ast)
         end
@@ -59,10 +66,6 @@ module ADSL
         handle_quantifier :exists, ASTExists, arg_types, block
       end
 
-      def neg(param = nil)
-        self.not(param)
-      end
-
       def not(param = nil)
         in_formula_builder do |fb|
           if param.nil?
@@ -72,16 +75,17 @@ module ADSL
           end
         end
       end
+      alias_method :neg, :not
 
       def true
         in_formula_builder do |fb|
-          fb.adsl_stack << ASTBoolean.new(:bool_value => true)
+          fb.adsl_stack << true.adsl_ast
         end
       end
 
       def false
         in_formula_builder do |fb|
-          fb.adsl_stack << ASTBoolean.new(:bool_value => false)
+          fb.adsl_stack << false.adsl_ast
         end
       end
 
@@ -164,7 +168,7 @@ module ADSL
         end
       end
 
-      def adsl_ast
+      def gather_adsl_asts
         elements = @adsl_stack.clone
         handle_unary_operator elements, :not do |formula|
           ASTNot.new(:subformula => formula)
@@ -181,9 +185,30 @@ module ADSL
         handle_binary_operator elements, :equiv do |formula1, formula2|
           ASTEquiv.new(:subformula1 => formula1, :subformula2 => formula2)
         end
+        elements 
+      end
+
+      def adsl_ast
+        elements = gather_adsl_asts
         raise "Unknown operators #{elements.select{ |a| a.is_a? Symbol}.map(&:to_s).join(", ")}" if elements.length > 1
         elements.first
       end
     end
+  end
+end
+
+class TrueClass
+  include ADSL::Verification::FormulaGenerators
+
+  def adsl_ast
+    ASTBoolean.new(:bool_value => self)
+  end
+end
+
+class FalseClass
+  include ADSL::Verification::FormulaGenerators
+  
+  def adsl_ast
+    ASTBoolean.new(:bool_value => self)
   end
 end

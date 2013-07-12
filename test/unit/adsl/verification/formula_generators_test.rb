@@ -3,10 +3,12 @@ require 'pp'
 require 'adsl/extract/meta'
 require 'adsl/util/test_helper'
 require 'adsl/verification/formula_generators'
+require 'adsl/verification/objset'
 
 class ADSL::Verification::FormulaGeneratorsTest < Test::Unit::TestCase
   include ADSL::Verification::FormulaGenerators
   include ADSL::Parser
+  include ADSL::Verification
   
   def setup
     eval <<-ruby
@@ -39,19 +41,22 @@ class ADSL::Verification::FormulaGeneratorsTest < Test::Unit::TestCase
   end
 
   def test_constants
-    formula = self.true
-    assert_equal true, formula.adsl_ast.bool_value
-    
-    formula = self.false
-    assert_equal false, formula.adsl_ast.bool_value
+    [true, self.true].each do |t|
+      assert_equal true, t.adsl_ast.bool_value
+      assert t.respond_to? :and
+    end
+    [false, self.false].each do |t|
+      assert_equal false, t.adsl_ast.bool_value
+      assert t.respond_to? :and
+    end
   end
 
   def test_negation
-    formula = self.not(self.true).adsl_ast
+    formula = self.not(true).adsl_ast
     assert_equal ASTNot, formula.class
     assert_equal true, formula.subformula.bool_value
     
-    formula = neg(self.true).adsl_ast
+    formula = neg(true).adsl_ast
     assert_equal ASTNot, formula.class
     assert_equal true, formula.subformula.bool_value
     
@@ -63,18 +68,21 @@ class ADSL::Verification::FormulaGeneratorsTest < Test::Unit::TestCase
   def test_quantification__explicit_types_from_block_params
     {:forall => ASTForAll, :exists => ASTExists}.each do |quantifier, klass|
       formula = send(quantifier, {:a => User}, &lambda do |a|
-        assert_equal ASTVariable, a.class
-        assert_equal 'a', a.var_name.text
+        assert_equal Objset, a.class
+        assert_equal ASTVariable, a.adsl_ast.class
+        assert_equal 'a', a.adsl_ast.var_name.text
         anything_with_adsl_ast
       end)
       assert_equal klass, formula.adsl_ast.class
       assert_equal 'User', formula.adsl_ast.vars[0][1].class_name
 
       formula = send(quantifier, {:a => User, :b => UserAddress}, &lambda do |a, b|
-        assert_equal ASTVariable, a.class
-        assert_equal 'a', a.var_name.text
-        assert_equal ASTVariable, b.class
-        assert_equal 'b', b.var_name.text
+        assert_equal Objset, a.class
+        assert_equal ASTVariable, a.adsl_ast.class
+        assert_equal 'a', a.adsl_ast.var_name.text
+        assert_equal Objset, b.class
+        assert_equal ASTVariable, b.adsl_ast.class
+        assert_equal 'b', b.adsl_ast.var_name.text
         anything_with_adsl_ast
       end)
       assert_equal klass, formula.adsl_ast.class
@@ -86,18 +94,21 @@ class ADSL::Verification::FormulaGeneratorsTest < Test::Unit::TestCase
   def test_quantifiers__infer_types_from_block_params
     {:forall => ASTForAll, :exists => ASTExists}.each do |quantifier, klass|
       formula = send(quantifier, &lambda do |user|
-        assert_equal ASTVariable, user.class
-        assert_equal 'user', user.var_name.text
+        assert_equal Objset, user.class
+        assert_equal ASTVariable, user.adsl_ast.class
+        assert_equal 'user', user.adsl_ast.var_name.text
         anything_with_adsl_ast
       end)
       assert_equal klass, formula.adsl_ast.class
       assert_equal 'User', formula.adsl_ast.vars[0][1].class_name
 
       formula = send(quantifier, &lambda do |user, user_address|
-        assert_equal ASTVariable, user.class
-        assert_equal 'user', user.var_name.text
-        assert_equal ASTVariable, user_address.class
-        assert_equal 'user_address', user_address.var_name.text
+        assert_equal Objset, user.class
+        assert_equal ASTVariable, user.adsl_ast.class
+        assert_equal 'user', user.adsl_ast.var_name.text
+        assert_equal Objset, user_address.class
+        assert_equal ASTVariable, user_address.adsl_ast.class
+        assert_equal 'user_address', user_address.adsl_ast.var_name.text
         anything_with_adsl_ast
       end)
       assert_equal klass, formula.adsl_ast.class
@@ -109,8 +120,9 @@ class ADSL::Verification::FormulaGeneratorsTest < Test::Unit::TestCase
   def test_quantifier__precedence_of_type_inferment_lesser_than_explicit_declaration
     {:forall => ASTForAll, :exists => ASTExists}.each do |quantifier, klass|
       formula = send(quantifier, {:user => UserAddress}, &lambda do |user|
-        assert_equal ASTVariable, user.class
-        assert_equal 'user', user.var_name.text
+        assert_equal Objset, user.class
+        assert_equal ASTVariable, user.adsl_ast.class
+        assert_equal 'user', user.adsl_ast.var_name.text
         anything_with_adsl_ast
       end)
       assert_equal klass, formula.adsl_ast.class
@@ -131,7 +143,7 @@ class ADSL::Verification::FormulaGeneratorsTest < Test::Unit::TestCase
   def test_quantifier__contains_the_subformula
     {:forall => ASTForAll, :exists => ASTExists}.each do |quantifier, klass|
       formula = send(quantifier, &lambda do |user|
-        self.true
+        true
       end)
       assert_equal klass, formula.adsl_ast.class
       assert_equal true, formula.adsl_ast.subformula.bool_value
@@ -140,7 +152,7 @@ class ADSL::Verification::FormulaGeneratorsTest < Test::Unit::TestCase
 
   def test_binary_operators__prefix
     {:implies => ASTImplies}.each do |operator, klass|
-      formula = send(operator, self.true, self.false)
+      formula = send(operator, true, self.false)
       assert_equal klass, formula.adsl_ast.class
       assert_equal true,  formula.adsl_ast.subformula1.bool_value
       assert_equal false, formula.adsl_ast.subformula2.bool_value
@@ -149,12 +161,12 @@ class ADSL::Verification::FormulaGeneratorsTest < Test::Unit::TestCase
   
   def test_and_or__prefix_any_number_of_params
     {:and => ASTAnd, :or => ASTOr, :equiv => ASTEquiv}.each do |operator, klass|
-      formula = send(operator, self.true, self.false)
+      formula = send(operator, true, false)
       assert_equal klass, formula.adsl_ast.class
       assert_equal true,  formula.adsl_ast.subformulae.first.bool_value
       assert_equal false, formula.adsl_ast.subformulae.second.bool_value
 
-      formula = send(operator, self.true, self.false, self.true, self.false)
+      formula = send(operator, true, false, true, false)
       assert_equal klass, formula.adsl_ast.class
       assert_equal true,  formula.adsl_ast.subformulae[0].bool_value
       assert_equal false, formula.adsl_ast.subformulae[1].bool_value
@@ -165,7 +177,7 @@ class ADSL::Verification::FormulaGeneratorsTest < Test::Unit::TestCase
 
   def test_and_or__infix
     {:and => ASTAnd, :or => ASTOr}.each do |operator, klass|
-      formula = self.true.send(operator).false
+      formula = true.send(operator).false
       assert_equal klass, formula.adsl_ast.class
       assert_equal true,  formula.adsl_ast.subformulae[0].bool_value
       assert_equal false, formula.adsl_ast.subformulae[1].bool_value
@@ -174,12 +186,12 @@ class ADSL::Verification::FormulaGeneratorsTest < Test::Unit::TestCase
   
   def test_and_or__not_precedence
     {:and => ASTAnd, :or => ASTOr}.each do |operator, klass|
-      formula = self.true.send(operator).not.false
+      formula = true.send(operator).not.false
       assert_equal klass, formula.adsl_ast.class
       assert_equal true,  formula.adsl_ast.subformulae[0].bool_value
       assert_equal ASTNot, formula.adsl_ast.subformulae[1].class
       
-      formula = self.not.true.send(operator).false
+      formula = neg.true.send(operator).false
       assert_equal klass, formula.adsl_ast.class
       assert_equal ASTNot, formula.adsl_ast.subformulae[0].class
       assert_equal false, formula.adsl_ast.subformulae[1].bool_value

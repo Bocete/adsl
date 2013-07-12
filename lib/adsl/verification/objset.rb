@@ -34,6 +34,10 @@ module ADSL
         params_for_block = block.parameters.map{ |a| ASTVariable.new :var_name => t(a[1]) }
         Objset.new :adsl_ast => ASTExists.new(:vars => iters, :formula => block.(params_for_block))
       end
+
+      def empty?
+        Objset.new :adsl_ast => ASTEmpty.new(:objset => self)
+      end
     end
   end
 end

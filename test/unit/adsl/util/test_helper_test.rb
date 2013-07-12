@@ -92,5 +92,29 @@ class ADSL::Util::TestHelperTest < Test::Unit::TestCase
     assert class_defined? :TestUnloadClassMethodsGetRemoved
     assert_false self.class.const_get(:TestUnloadClassMethodsGetRemoved).methods.include?('a')
   end
-  
+
+  def test_in_temp_file__block_called
+    called = false
+    in_temp_file "" do |path|
+      called = true
+    end
+    assert called
+  end
+ 
+  def test_in_temp_file__content_there
+    expected_content = "blah\nasd\n\n"
+    in_temp_file expected_content do |path|
+      file = File.open path, 'r'
+      assert_equal expected_content, file.read
+      file.close
+    end
+  end
+
+  def test_in_temp_file__file_gone_after_call
+    stored_path = nil
+    in_temp_file "" do |path|
+      stored_path = path
+    end
+    assert_false File.exists? stored_path
+  end
 end
