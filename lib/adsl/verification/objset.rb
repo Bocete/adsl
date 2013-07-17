@@ -9,7 +9,7 @@ module ADSL
 
       def self.allof(klass)
         klass_name = classname_for_classname(klass)
-        Objset.new :adsl_ast => ASTAllOf.new(:class_name => klass_name), :objset_type => klass_name
+        Objset.new :adsl_ast => ASTAllOf.new(:class_name => t(klass_name)), :objset_type => klass_name
       end
 
       attr_accessor :adsl_ast, :objset_type

@@ -9,7 +9,23 @@ module ADSL
   module Parser
    
     class ASTNode
+      class << self
+        attr_reader :is_statement
+      end
+
+      def self.is_statement?
+        self.is_statement
+      end
+
       def self.node_type(*fields)
+        options = {
+          :is_statement => false
+        }
+        if fields.last.is_a? Hash
+          options.merge! fields.pop
+        end
+        @is_statement = options[:is_statement]
+
         container_for *fields
         container_for :lineno
       end
@@ -379,7 +395,7 @@ module ADSL
     end
 
     class ASTBlock < ASTNode
-      node_type :statements
+      node_type :statements, :is_statement => true
 
       def typecheck_and_resolve(context, open_subcontext=true)
         context.push_frame if open_subcontext
@@ -397,7 +413,7 @@ module ADSL
     end
 
     class ASTAssignment < ASTNode
-      node_type :var_name, :objset
+      node_type :var_name, :objset, :is_statement => true
 
       def typecheck_and_resolve(context)
         objset = @objset.typecheck_and_resolve context
@@ -408,7 +424,7 @@ module ADSL
     end
 
     class ASTObjsetStmt < ASTNode
-      node_type :objset
+      node_type :objset, :is_statement => true
 
       def typecheck_and_resolve(context)
         @objset.typecheck_and_resolve(context)
@@ -416,7 +432,7 @@ module ADSL
       end
     end
 
-    class ASTCreateObj < ASTNode
+    class ASTCreateObjset < ASTNode
       node_type :var_name, :class_name
 
       def typecheck_and_resolve(context)
@@ -429,7 +445,7 @@ module ADSL
     end
 
     class ASTForEach < ASTNode
-      node_type :var_name, :objset, :block
+      node_type :var_name, :objset, :block, :is_statement => true
 
       def typecheck_and_resolve(context)
         before_context = context.dup
@@ -490,7 +506,7 @@ module ADSL
     end
 
     class ASTEither < ASTNode
-      node_type :blocks
+      node_type :blocks, :is_statement => true
 
       def typecheck_and_resolve(context)
         context.push_frame
@@ -530,7 +546,7 @@ module ADSL
     end
 
     class ASTDeleteObj < ASTNode
-      node_type :objset
+      node_type :objset, :is_statement => true
 
       def typecheck_and_resolve(context)
         objset = @objset.typecheck_and_resolve context
@@ -539,7 +555,7 @@ module ADSL
     end
 
     class ASTCreateTup < ASTNode
-      node_type :objset1, :rel_name, :objset2
+      node_type :objset1, :rel_name, :objset2, :is_statement => true
 
       def typecheck_and_resolve(context)
         objset1 = @objset1.typecheck_and_resolve context
@@ -550,7 +566,7 @@ module ADSL
     end
 
     class ASTDeleteTup < ASTNode
-      node_type :objset1, :rel_name, :objset2
+      node_type :objset1, :rel_name, :objset2, :is_statement => true
       
       def typecheck_and_resolve(context)
         objset1 = @objset1.typecheck_and_resolve context
@@ -561,7 +577,7 @@ module ADSL
     end
 
     class ASTSetTup < ASTNode
-      node_type :objset1, :rel_name, :objset2
+      node_type :objset1, :rel_name, :objset2, :is_statement => true
 
       def typecheck_and_resolve(context)
         objset1 = @objset1.typecheck_and_resolve context

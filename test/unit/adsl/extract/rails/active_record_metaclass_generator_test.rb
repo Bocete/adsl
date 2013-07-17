@@ -29,15 +29,27 @@ module ADSL::Extract::Rails
       assert_equal 'ADSLMetaKme', generator.target_classname
       
       generator = ActiveRecordMetaclassGenerator.new Mod::Blah
-      assert_equal 'ADSLMetaBlah', generator.target_classname
+      assert_equal 'Mod::ADSLMetaBlah', generator.target_classname
+    end
+
+    def test_adsl_ast_class_name
+      ActiveRecordMetaclassGenerator.new(Asd).generate_class
+      ActiveRecordMetaclassGenerator.new(Kme).generate_class
+      ActiveRecordMetaclassGenerator.new(Mod::Blah).generate_class
+      
+      assert_equal 'Asd',      ADSLMetaAsd.adsl_ast_class_name
+      assert_equal 'Kme',      ADSLMetaKme.adsl_ast_class_name
+      assert_equal 'Mod_Blah', Mod::ADSLMetaBlah.adsl_ast_class_name
     end
 
     def test_generate__links_superclasses_properly
       ActiveRecordMetaclassGenerator.new(Asd).generate_class
-
-      assert_equal Asd, ActiveRecordMetaclassGenerator.new(Asd).target_superclass
-      assert_equal ADSLMetaAsd, ActiveRecordMetaclassGenerator.new(Kme).target_superclass
-      assert_equal Mod::Blah, ActiveRecordMetaclassGenerator.new(Mod::Blah).target_superclass
+      ActiveRecordMetaclassGenerator.new(Kme).generate_class
+      ActiveRecordMetaclassGenerator.new(Mod::Blah).generate_class
+      
+      assert_equal Asd, ADSLMetaAsd.superclass
+      assert_equal Kme, ADSLMetaKme.superclass
+      assert_equal Mod::Blah, Mod::ADSLMetaBlah.superclass
     end
 
     def test_generate__creates_the_correct_classes_in_correct_modules

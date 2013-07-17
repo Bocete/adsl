@@ -710,7 +710,7 @@ module_eval(<<'.,.,', 'adsl_parser.racc', 61)
 
 module_eval(<<'.,.,', 'adsl_parser.racc', 63)
   def _reduce_36(val, _values, result)
-     return ASTCreateObj.new :lineno => val[0], :class_name => val[2] 
+     return ASTCreateObjset.new :lineno => val[0], :class_name => val[2] 
     result
   end
 .,.,

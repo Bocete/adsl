@@ -74,7 +74,7 @@ class ADSL::Verification::FormulaGeneratorsTest < Test::Unit::TestCase
         anything_with_adsl_ast
       end)
       assert_equal klass, formula.adsl_ast.class
-      assert_equal 'User', formula.adsl_ast.vars[0][1].class_name
+      assert_equal 'User', formula.adsl_ast.vars[0][1].class_name.text
 
       formula = send(quantifier, {:a => User, :b => UserAddress}, &lambda do |a, b|
         assert_equal Objset, a.class
@@ -86,8 +86,8 @@ class ADSL::Verification::FormulaGeneratorsTest < Test::Unit::TestCase
         anything_with_adsl_ast
       end)
       assert_equal klass, formula.adsl_ast.class
-      assert_equal 'User', formula.adsl_ast.vars[0][1].class_name
-      assert_equal 'UserAddress', formula.adsl_ast.vars[1][1].class_name
+      assert_equal 'User', formula.adsl_ast.vars[0][1].class_name.text
+      assert_equal 'UserAddress', formula.adsl_ast.vars[1][1].class_name.text
     end
   end
 
@@ -100,7 +100,7 @@ class ADSL::Verification::FormulaGeneratorsTest < Test::Unit::TestCase
         anything_with_adsl_ast
       end)
       assert_equal klass, formula.adsl_ast.class
-      assert_equal 'User', formula.adsl_ast.vars[0][1].class_name
+      assert_equal 'User', formula.adsl_ast.vars[0][1].class_name.text
 
       formula = send(quantifier, &lambda do |user, user_address|
         assert_equal Objset, user.class
@@ -112,8 +112,8 @@ class ADSL::Verification::FormulaGeneratorsTest < Test::Unit::TestCase
         anything_with_adsl_ast
       end)
       assert_equal klass, formula.adsl_ast.class
-      assert_equal 'User', formula.adsl_ast.vars[0][1].class_name
-      assert_equal 'UserAddress', formula.adsl_ast.vars[1][1].class_name
+      assert_equal 'User', formula.adsl_ast.vars[0][1].class_name.text
+      assert_equal 'UserAddress', formula.adsl_ast.vars[1][1].class_name.text
     end
   end
   
@@ -126,7 +126,7 @@ class ADSL::Verification::FormulaGeneratorsTest < Test::Unit::TestCase
         anything_with_adsl_ast
       end)
       assert_equal klass, formula.adsl_ast.class
-      assert_equal 'UserAddress', formula.adsl_ast.vars[0][1].class_name
+      assert_equal 'UserAddress', formula.adsl_ast.vars[0][1].class_name.text
     end
   end
 

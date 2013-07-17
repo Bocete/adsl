@@ -83,6 +83,12 @@ class Module
   end
 end
 
+class Symbol
+  def dup
+    self
+  end
+end
+
 def container_for(*fields, &block)
   raise ArgumentError, 'Field list empty' if fields.empty?
 

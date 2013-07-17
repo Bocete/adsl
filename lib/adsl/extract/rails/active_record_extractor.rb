@@ -16,12 +16,7 @@ module ADSL
           @ruby2ruby = Ruby2Ruby.new
         end
 
-        def extract_static(models_dir)
-          classes = Dir["#{models_dir}/**/*.rb"].map{ |path| /^#{Regexp.escape models_dir}\/(.*)\.rb$/.match(path)[1].camelize.constantize }
-          extract_static_from_classes classes 
-        end
-
-        def extract_static_from_classes(classes)
+        def extract_static(classes)
           defined_classes = Set[ActiveRecord::Base]
           mapping = {}
           classes.dup.worklist_each do |ar_klass|

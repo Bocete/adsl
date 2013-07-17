@@ -1,6 +1,7 @@
 require 'tempfile'
 require 'colorize'
 require 'adsl/parser/adsl_parser.tab'
+require 'adsl/ds/data_store_spec'
 require 'adsl/spass/spass_ds_extensions'
 require 'adsl/spass/util'
 require 'adsl/util/general'
@@ -19,6 +20,7 @@ module ADSL
           end
         elsif @verification_output == :csv
           @csv_output << csv if csv
+        elsif @verification_output == :silent
         else
           raise "Unknown verification output #{@verification_output}"
         end
@@ -30,20 +32,27 @@ module ADSL
       end
 
       def verify(input, options={})
-        parser = ADSL::ADSLParser.new
-        ds_spec = parser.parse input
+        ds_spec = if input.is_a? String
+          ADSL::Parser::ADSLParser.new.parse input
+        elsif input.is_a? ADSL::Parser::ASTNode
+          input.typecheck_and_resolve
+        elsif input.is_a? ADSL::DS::DSSpec
+          input
+        end
 
         stop_on_incorrect = options[:halt_on_error]
         check_satisfiability = options[:check_satisfiability]
-        timeout = options[:timeout]
+        timeout = options[:timeout] || -1
         actions = filter_by_name ds_spec.actions, options[:actions]
         invariants = filter_by_name ds_spec.invariants, options[:invariants]
 
-        @csv_output = ::Util::CSVHashFormatter.new
+        @csv_output = ::ADSL::Util::CSVHashFormatter.new
 
-        @verification_output = options[:csv_output] ? :csv : :terminal
+        options[:output] = options[:output].to_sym unless options[:output].nil?
+        raise "Unknown verification format `#{options[:output]}'" unless [nil, :terminal, :csv, :silent].include? options[:output]
+        @verification_output = options[:output] || :terminal
         do_stats = @verification_output == :csv
-
+        
         if check_satisfiability
           begin
             output "Checking for satisfiability...", nil
@@ -61,18 +70,19 @@ module ADSL
             end
 
             if result == :correct
-              output "\rSatisfiability check #{ 'failed!'.red }", stats
-              return
+              output "\rSatisfiability check #{ 'failed!'.red }                ", stats
+              return false
             elsif result == :inconclusive
-              output "\rSatisfiability check #{ 'unconclusive'.yellow }        ", stats
+              output "\rSatisfiability check #{ 'inconclusive'.yellow }        ", stats
             else
-              output "\rSatisfiability check #{ 'passed'.green }.         ", stats
+              output "\rSatisfiability check #{ 'passed'.green }.              ", stats
             end
           ensure
             output "\n", nil
           end
         end
 
+        all_correct = true
         actions.each do |action|
           invariants.each do |invariant|
             output "Verifying action '#{action.name}' with invariant '#{invariant.name}'...", nil
@@ -94,9 +104,11 @@ module ADSL
                 output "\rAction '#{action.name}' with invariant '#{invariant.name}': #{ 'correct'.green }     ", stats
               when :incorrect
                 output "\rAction '#{action.name}' with invariant '#{invariant.name}': #{ 'incorrect'.red }     ", stats
-                return if stop_on_incorrect
+                all_correct = false
+                return false if stop_on_incorrect
               when :inconclusive
                 output "\rAction '#{action.name}' with invariant '#{invariant.name}': #{ 'inconclusive'.yellow } ", stats
+                all_correct = false
               else
                 raise "Unknown exec_spass result: #{result}"
               end
@@ -108,6 +120,7 @@ module ADSL
             end
           end
         end
+        return all_correct
       ensure
         puts @csv_output.to_s if @verification_output == :csv
         @csv_output = nil
@@ -118,7 +131,8 @@ module ADSL
         tmp_file.write spass_code
         tmp_file.close
         arg_combos = ["", "-Sorts=0"]
-        output = process_race(*arg_combos.map{ |a| "SPASS #{a} -TimeLimit=#{timeout} #{tmp_file.path}" })
+        commands = arg_combos.map{ |a| "SPASS #{a} -TimeLimit=#{timeout} #{tmp_file.path}" }
+        output = process_race(*commands)
         result = /^SPASS beiseite: (.+)\.$/.match(output)[1]
 
         stats = include_stats ? pack_stats(spass_code, output) : nil

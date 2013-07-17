@@ -1,7 +1,9 @@
-require 'util/test_helper'
+require 'adsl/util/test_helper'
 require 'test/unit'
 
 class BasicTranslationTest < Test::Unit::TestCase
+  include ADSL::FOL
+  
   def test_blank_data_store
     adsl_assert :correct, <<-ADSL
       action blah() {}
@@ -56,7 +58,7 @@ class BasicTranslationTest < Test::Unit::TestCase
   end
 
   def test_classtypes
-    conjecture = FOL::ForAll.new(:o, FOL::Not.new(FOL::And.new('of_Class1_type(o)', 'of_Class2_type(o)')))
+    conjecture = ForAll.new(:o, Not.new(And.new('of_Class1_type(o)', 'of_Class2_type(o)')))
     adsl_assert :correct, <<-ADSL, :conjecture => conjecture
       class Class1 {}
       class Class2 {}
@@ -65,12 +67,12 @@ class BasicTranslationTest < Test::Unit::TestCase
   end
 
   def test_classtypes_polymorphism__no_contradictions
-    conjecture = FOL::Or.new(
-      FOL::Not.new(FOL::Exists.new(:o, 'of_Parent_type(o)')),
-      FOL::Not.new(FOL::Exists.new(:o, 'of_Child1_type(o)')),
-      FOL::Not.new(FOL::Exists.new(:o, 'of_Child2_type(o)')),
-      FOL::Not.new(FOL::Exists.new(:o, 'of_SubChild_type(o)')),
-      FOL::Not.new(FOL::Exists.new(:o, 'of_Parent2_type(o)'))
+    conjecture = Or.new(
+      Not.new(Exists.new(:o, 'of_Parent_type(o)')),
+      Not.new(Exists.new(:o, 'of_Child1_type(o)')),
+      Not.new(Exists.new(:o, 'of_Child2_type(o)')),
+      Not.new(Exists.new(:o, 'of_SubChild_type(o)')),
+      Not.new(Exists.new(:o, 'of_Parent2_type(o)'))
     )
     adsl_assert :incorrect, <<-ADSL, :conjecture => conjecture
       class Parent {}
@@ -92,22 +94,22 @@ class BasicTranslationTest < Test::Unit::TestCase
       action blah() {}
     ADSL
 
-    conjecture = FOL::ForAll.new(:o, FOL::Implies.new('of_Child1_type(o)', 'of_Parent_type(o)'))
+    conjecture = ForAll.new(:o, Implies.new('of_Child1_type(o)', 'of_Parent_type(o)'))
     adsl_assert :correct, type_spec, :conjecture => conjecture
 
-    conjecture = FOL::ForAll.new(:o, FOL::Implies.new(FOL::Not.new('of_Child1_type(o)'), 'of_Parent_type(o)'))
+    conjecture = ForAll.new(:o, Implies.new(Not.new('of_Child1_type(o)'), 'of_Parent_type(o)'))
     adsl_assert :incorrect, type_spec, :conjecture => conjecture
     
-    conjecture = FOL::ForAll.new(:o, FOL::Implies.new(FOL::Not.new('of_Parent_type(o)'), FOL::And.new(
-      FOL::Not.new('of_Child1_type(o)'),
-      FOL::Not.new('of_Child2_type(o)')
+    conjecture = ForAll.new(:o, Implies.new(Not.new('of_Parent_type(o)'), And.new(
+      Not.new('of_Child1_type(o)'),
+      Not.new('of_Child2_type(o)')
     )))
     adsl_assert :correct, type_spec, :conjecture => conjecture
 
-    conjecture = FOL::ForAll.new(:o, FOL::Not.new(FOL::And.new('of_Child1_type(o)', 'of_Parent2_type(o)')))
+    conjecture = ForAll.new(:o, Not.new(And.new('of_Child1_type(o)', 'of_Parent2_type(o)')))
     adsl_assert :correct, type_spec, :conjecture => conjecture
     
-    conjecture = FOL::ForAll.new(:o, FOL::Implies.new('of_SubChild_type(o)', 'of_Child1_type(o)'))
+    conjecture = ForAll.new(:o, Implies.new('of_SubChild_type(o)', 'of_Child1_type(o)'))
     adsl_assert :correct, type_spec, :conjecture => conjecture
   end
 

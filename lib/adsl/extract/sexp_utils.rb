@@ -1,16 +1,18 @@
 require 'sexp_processor'
 
 class Sexp
-  def block_replace(search_type, &block)
+  def block_replace(*search_types, &block)
     new = self.map do |element|
       if element.is_a? Sexp
-        element.block_replace search_type, &block
+        result = element.block_replace *search_types, &block
+        result = [result] unless result.class == Array
+        result
       else
-        element
+        [element]
       end
     end
-    result = Sexp.from_array new
-    result = block[result] if result.sexp_type == search_type
+    result = Sexp.from_array new.flatten(1)
+    result = block[result] if search_types.include? result.sexp_type
     return result
   end
 

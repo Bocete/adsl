@@ -8,7 +8,9 @@ require 'adsl/extract/meta'
 
 module Kernel
   def ins_call(object, method_name, *args, &block)
-    ::ADSL::Extract::Instrumenter.get_instance.execute_instrumented object, method_name, *args, &block
+    ::ADSL::Extract::Instrumenter.get_instance.exec_within do |instrumenter|
+      instrumenter.execute_instrumented object, method_name, *args, &block
+    end
   end
 end
 
@@ -33,7 +35,7 @@ module ADSL
         Instrumenter.instance_variable_set(:@instance, self) if @stack_depth == 0
         @stack_depth += 1
 
-        return yield
+        return yield(self)
       ensure
         @stack_depth -= 1
         Instrumenter.instance_variable_set(:@instance, nil) if @stack_depth == 0
@@ -68,7 +70,7 @@ module ADSL
         @stack_depth = 0
 
         # mark the instrumentation
-        replace :defn do |sexp|
+        replace :defn, :defs do |sexp|
           mark_sexp_instrumented sexp
         end
 
@@ -79,6 +81,9 @@ module ADSL
           original_object = sexp.sexp_body[0] || s(:self)
           original_method_name = sexp.sexp_body[1]
           original_args = sexp.sexp_body[2..-1]
+
+          next sexp if original_object == s(:self) and Kernel.respond_to? original_method_name
+
           s(:call, nil, :ins_call, original_object, s(:lit, original_method_name), *original_args)
         end
       end
@@ -95,8 +100,8 @@ module ADSL
         return false
       end
 
-      def replace(type, &block)
-        @replacers << [type, block]
+      def replace(*types, &block)
+        @replacers << [types, block]
       end
 
       def execute_instrumented(object, method_name, *args, &block)
@@ -104,6 +109,10 @@ module ADSL
           instrument object, method_name
           return object.send method_name, *args, &block
         end
+      end
+
+      def convert_root_defs_into_defn(sexp)
+        sexp.sexp_type == :defs ? s(:defn, *sexp[2..-1]) : sexp
       end
 
       def instrument(object, method_name)
@@ -114,6 +123,8 @@ module ADSL
 
             # Ruby 2.0.0 support is in development as of writing this
             sexp = ruby_parser.process source
+
+            sexp = convert_root_defs_into_defn sexp
 
             instrumented_sexp = instrument_sexp sexp
 
@@ -128,8 +139,8 @@ module ADSL
       end
 
       def instrument_sexp(sexp)
-        @replacers.reverse_each do |type, block|
-          sexp = sexp.block_replace type, &block
+        @replacers.reverse_each do |types, block|
+          sexp = sexp.block_replace *types, &block
         end
         sexp
       end

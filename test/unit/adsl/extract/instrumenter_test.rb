@@ -22,8 +22,21 @@ class ADSL::Extract::InstrumenterTest < Test::Unit::TestCase
     def empty_method
     end
 
-    Foo.instance_methods(false).each do |method_name|
+    def self.blah
+      [3, 2, 1]
+    end
+
+    def self.call_blah
+      self.blah
+    end
+
+    instance_methods(false).each do |method_name|
       alias_method "old_#{method_name}", method_name unless method_name =~ /^old_.*$/
+    end
+    class << self
+      instance_methods(false).each do |method_name|
+        alias_method "old_#{method_name}", method_name unless method_name =~ /^old_.*$/
+      end
     end
   end
 
@@ -36,8 +49,13 @@ class ADSL::Extract::InstrumenterTest < Test::Unit::TestCase
 
   def teardown
     Foo.class_eval do
-      Foo.instance_methods(false).each do |method_name|
+      instance_methods(false).each do |method_name|
         alias_method method_name, "old_#{method_name}" unless method_name =~ /^old_.*$/
+      end
+      class << self
+        instance_methods(false).each do |method_name|
+          alias_method method_name, "old_#{method_name}" unless method_name =~ /^old_.*$/
+        end
       end
     end
   end
@@ -87,5 +105,15 @@ class ADSL::Extract::InstrumenterTest < Test::Unit::TestCase
     assert_equal [[2, 4, 6]], instrumenter.execute_instrumented(Foo.new, :repeat_blah, 1)
     assert_equal [[2, 4, 6], [2, 4, 6]], instrumenter.execute_instrumented(Foo.new, :repeat_blah, 2)
     assert_equal [2, 4, 6], instrumenter.execute_instrumented(Foo.new, :blah)
+  end
+  
+  def test_execute_instrumented__instrumentation_propagates_through_class_level_calls
+    instrumenter = ADSL::Extract::Instrumenter.new
+
+    instrumenter.replace :lit do |sexp|
+      s(:lit, sexp[1]*2)
+    end
+
+    assert_equal [6, 4, 2], instrumenter.execute_instrumented(Foo, :call_blah) 
   end
 end

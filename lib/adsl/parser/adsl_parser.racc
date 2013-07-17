@@ -61,7 +61,7 @@ rule
   eitherblocks: eitherblocks or block { val[0] << val[2]; return val[0] }
               | block                 { return [val[0]] }
 
-  create_objset: create '(' IDENT ')'   { return ASTCreateObj.new :lineno => val[0], :class_name => val[2] }
+  create_objset: create '(' IDENT ')'   { return ASTCreateObjset.new :lineno => val[0], :class_name => val[2] }
 
   objset: IDENT                  { return ASTVariable.new :lineno => val[0].lineno, :var_name => val[0] }
         | subset '(' objset ')'  { return ASTSubset.new :lineno => val[0], :objset => val[2] }

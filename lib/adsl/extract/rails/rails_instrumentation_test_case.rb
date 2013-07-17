@@ -1,6 +1,7 @@
 require 'test/unit'
 require 'adsl/util/test_helper'
 require 'adsl/extract/rails/active_record_metaclass_generator'
+require 'adsl/extract/rails/rails_test_helper'
 
 class ADSL::Extract::Rails::RailsInstrumentationTestCase < Test::Unit::TestCase
   def setup
@@ -18,6 +19,10 @@ class ADSL::Extract::Rails::RailsInstrumentationTestCase < Test::Unit::TestCase
     Asd.delete_all
     Kme.delete_all
     Mod::Blah.delete_all
+  end
+
+  def create_rails_extractor(invariant_string = '')
+    ADSL::Extract::Rails::RailsExtractor.new :ar_classes => ar_classes, :invariants => invariant_string
   end
   
   def ar_class_names

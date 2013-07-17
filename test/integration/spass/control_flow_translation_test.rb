@@ -1,4 +1,4 @@
-require 'util/test_helper'
+require 'adsl/util/test_helper'
 require 'test/unit'
 
 class ControlFlowTranslationTest < Test::Unit::TestCase

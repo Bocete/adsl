@@ -38,13 +38,13 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     end
   end
 
-  def test_adsl_ast__empty_action
-    extractor = ADSL::Extract::Rails::RailsExtractor.new ar_classes
+  def test_action_extraction__empty_action
+    extractor = create_rails_extractor
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
     assert ast.block.statements.empty?
   end
   
-  def test_adsl_ast__create_action
+  def test_action_extraction__create_action
     AsdsController.class_exec do
       def create
         Asd.new
@@ -52,14 +52,17 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
       end
     end
     
-    extractor = ADSL::Extract::Rails::RailsExtractor.new ar_classes
-    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :create)
-    assert_false ast.block.statements.empty?
-    assert_equal ADSL::Parser::ASTCreateObj, ast.block.statements.first.class
-    assert_equal 'Asd', ast.block.statements.first.class_name.text
+    extractor = create_rails_extractor
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :create) 
+    statements = ast.block.statements
+
+    assert_equal 1, statements.length
+    assert_equal ADSL::Parser::ASTObjsetStmt, statements.first.class
+    assert_equal ADSL::Parser::ASTCreateObjset, statements.first.objset.class
+    assert_equal 'Asd', statements.first.objset.class_name.text
   end
 
-  def test_adsl_ast__create_within_expression_action
+  def test_action_extraction__create_within_expression_action
     AsdsController.class_exec do
       def create
         Asd.build
@@ -67,14 +70,17 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
       end
     end
     
-    extractor = ADSL::Extract::Rails::RailsExtractor.new ar_classes
-    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :create)
-    assert_false ast.block.statements.empty?
-    assert_equal ADSL::Parser::ASTCreateObj, ast.block.statements.first.class
-    assert_equal 'Asd', ast.block.statements.first.class_name.text
+    extractor = create_rails_extractor
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :create) 
+    statements = ast.block.statements
+
+    assert_equal 1, statements.length
+    assert_equal ADSL::Parser::ASTObjsetStmt, statements.first.class
+    assert_equal ADSL::Parser::ASTCreateObjset, statements.first.objset.class
+    assert_equal 'Asd', statements.first.objset.class_name.text
   end
 
-  def test_adsl_ast__variable_assignment
+  def test_action_extraction__variable_assignment
     AsdsController.class_exec do
       def create
         a = Asd.new
@@ -83,13 +89,26 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
       end
     end
     
-    extractor = ADSL::Extract::Rails::RailsExtractor.new ar_classes
+    extractor = create_rails_extractor
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :create)
-    assert_false ast.block.statements.empty?
-    assert_equal ADSL::Parser::ASTAssignment, ast.block.statements.first.class
-    assert_equal 'a', ast.block.statements.first.var_name.text
-    assert_equal ADSL::Parser::ASTCreateObj, ast.block.statements.first.objset.class
-    assert_equal 'Asd', ast.block.statements.first.objset.class_name.text
+    statements = ast.block.statements
+
+    assert_false statements.empty?
+    assert_equal 1, statements.length
+    assert_equal ADSL::Parser::ASTAssignment, statements.first.class
+    assert_equal 'a', statements.first.var_name.text
+    assert_equal ADSL::Parser::ASTCreateObjset, statements.first.objset.class
+    assert_equal 'Asd', statements.first.objset.class_name.text
   end
 
+  def test_invariant_extraction__works
+    extractor = create_rails_extractor <<-invariants
+      invariant 'what', true
+    invariants
+
+    invariants = extractor.invariants
+    assert_equal 1, invariants.length
+    assert_equal 'what', invariants.first.name.text
+    assert_equal true, invariants.first.formula.bool_value
+  end
 end

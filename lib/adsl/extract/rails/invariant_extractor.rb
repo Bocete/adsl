@@ -7,28 +7,18 @@ module ADSL
       class InvariantExtractor
 
         include ADSL::Verification
+        include FormulaGenerators
 
         attr_reader :invariants
 
         def initialize
           @invariants = []
+          @builder = nil
+          @stack_level = 0
         end
 
-        def description(string)
-          @description = string
-        end
-        alias_method :invariant, :description
-
-        def method_missing(method, *args, &block)
-          if FormulaBuilder.method_defined? :method
-            fb = FormulaBuilder.new
-            fb.send method, *args, &block
-            invariant = Invariant.new :description => @description, :adsl_ast => fb.adsl_ast
-            invariants << invariant
-            @description = nil
-          else
-            super
-          end
+        def invariant(name = nil, builder)
+          @invariants << Invariant.new(:description => name, :formula => builder.adsl_ast)
         end
 
         def load_in_context(path)
@@ -36,6 +26,17 @@ module ADSL
           self.instance_eval file.read
         ensure
           file.close
+        end
+
+        def extract(param)
+          if param.is_a? Array
+            param.each do |path|
+              load_in_context path
+            end
+          else
+            self.instance_eval param
+          end
+          @invariants
         end
       end
     end

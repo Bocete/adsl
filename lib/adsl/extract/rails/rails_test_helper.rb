@@ -44,6 +44,7 @@ def initialize_test_context
       respond_to
     end
 
+    def edit;    respond_to; end
     def update;  respond_to; end
     def destroy; respond_to; end
     def nothing; respond_to; end

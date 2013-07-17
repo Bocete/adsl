@@ -49,6 +49,7 @@ module ADSL
             ]
           }
           subformula = block.(*block.parameters.map{ |param| Objset.new :adsl_ast => ASTVariable.new(:var_name => t(param[1])) })
+          subformula = true if subformula.nil?
           raise "Invalid formula returned by block in `#{quantifier}'" unless subformula.respond_to? :adsl_ast 
           fb.adsl_stack << klass.new(:vars => vars_and_objsets, :subformula => subformula.adsl_ast)
         end

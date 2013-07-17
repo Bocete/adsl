@@ -71,6 +71,22 @@ namespace :test do
     t.verbose = true
   end
 
+  
+  namespace :integrations do
+    Rake::TestTask.new(name=:spass) do |t|
+      t.libs += ["lib"]
+      t.test_files = FileList['test/integration/spass/**/*_test.rb']
+      t.verbose = true
+    end
+    
+    Rake::TestTask.new(name=:rails) do |t|
+      t.libs += ["lib"]
+      t.test_files = FileList['test/integration/rails/**/*_test.rb']
+      t.verbose = true
+    end
+  end
+  
+  desc "Test All Integrations"
   Rake::TestTask.new(name=:integrations) do |t|
     t.libs += ["lib"]
     t.test_files = FileList['test/integration/**/*_test.rb']
