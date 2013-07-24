@@ -23,6 +23,10 @@ class Sexp
       collection
     end.flatten(1)
   end
+
+  def may_return?
+    not find_nodes(:return).empty?
+  end
 end
 
 class Module

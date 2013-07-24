@@ -38,6 +38,10 @@ module ADSL
       def empty?
         Objset.new :adsl_ast => ASTEmpty.new(:objset => self)
       end
+
+      def method_missing(method, *args, &block)
+        Object.new :adsl_ast => ASTDereference.new(:objset => self, :rel_name => method)
+      end
     end
   end
 end

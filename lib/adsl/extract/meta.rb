@@ -10,5 +10,7 @@ class Object
     owner.class_eval source
 
     true
+  rescue Exception
+    raise
   end
 end

@@ -29,6 +29,13 @@ module ADSL
         container_for *fields
         container_for :lineno
       end
+
+      def optimize!
+        self.class.container_for_fields.each do |field_name|
+          field = send field_name
+          field.optimize! if field.respond_to? :optimize!
+        end
+      end
     end
 
     class ADSLError < StandardError; end
@@ -392,6 +399,19 @@ module ADSL
         context.actions[action.name] = [self, action]
         return action
       end
+
+      def optimize!
+        super
+        if @block.statements.length == 1 and @block.statements.first.class == ASTEither
+          either = @block.statements.first
+          either.blocks.reject!{ |subblock| subblock.statements.empty? }
+          if either.blocks.length == 0
+            @block.statements = []
+          elsif either.blocks.length == 1
+            @block = either.blocks.first
+          end
+        end
+      end
     end
 
     class ASTBlock < ASTNode
@@ -409,6 +429,22 @@ module ADSL
         return ADSL::DS::DSBlock.new :statements => stmts.flatten
       ensure
         context.pop_frame if open_subcontext
+      end
+
+      def optimize!
+        super
+        change = true
+        while change
+          change = false
+          @statements.map! do |stmt|
+            if stmt.is_a?(ASTBlock)
+              change = true
+              stmt.statements
+            else
+              [stmt]
+            end
+          end.flatten! 1
+        end
       end
     end
 
@@ -542,6 +578,22 @@ module ADSL
 
       def list_entity_classes_written_to
         @blocks.map{ block.list_entity_classes_written_to }.flatten
+      end
+
+      def optimize!
+        super
+        changed = true
+        while changed
+          changed = false
+          @blocks.map! do |block|
+            if block.statements.length == 1 && block.statements.first.is_a?(ASTEither)
+              changed = true
+              block.statements.first.blocks
+            else
+              [block]
+            end
+          end.flatten! 1
+        end
       end
     end
 

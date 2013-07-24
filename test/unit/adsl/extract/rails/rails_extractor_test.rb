@@ -111,4 +111,159 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 'what', invariants.first.name.text
     assert_equal true, invariants.first.formula.bool_value
   end
+
+  def test_action_extraction__nonreturning_branches
+    AsdsController.class_exec do
+      def nothing
+        if something
+          Asd.new
+        else
+          Asd.find.destroy!
+        end
+      end
+    end
+
+    extractor = create_rails_extractor
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    statements = ast.block.statements
+
+    assert_equal 1, statements.length
+    assert_equal ADSL::Parser::ASTEither, statements.first.class
+
+    either = statements.first
+
+    assert_equal 2, either.blocks.length
+    assert_equal 1, either.blocks.first.statements.length
+    assert_equal ADSL::Parser::ASTCreateObjset, either.blocks.first.statements.first.objset.class
+    assert_equal 1, either.blocks.second.statements.length
+    assert_equal ADSL::Parser::ASTDeleteObj, either.blocks.second.statements.first.class
+  end
+
+  def test_action_extraction__one_returning_branch
+    AsdsController.class_exec do
+      def nothing
+        if something
+          return Asd.new
+        else
+          Asd.build
+        end
+        Asd.find.destroy!
+      end
+    end
+
+    extractor = create_rails_extractor
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    statements = ast.block.statements
+
+    assert_equal 1, statements.length
+    assert_equal ADSL::Parser::ASTEither, statements.first.class
+
+    either = statements.first
+
+    assert_equal 2, either.blocks.length
+    assert_equal 2, either.blocks.first.statements.length
+    assert_equal ADSL::Parser::ASTCreateObjset, either.blocks.first.statements.first.objset.class
+    assert_equal ADSL::Parser::ASTDeleteObj, either.blocks.first.statements.second.class
+    assert_equal 1, either.blocks.second.statements.length
+    assert_equal ADSL::Parser::ASTCreateObjset, either.blocks.second.statements.first.objset.class
+  end
+  
+  def test_action_extraction__one_returning_branch_other_empty
+    AsdsController.class_exec do
+      def nothing
+        if something
+          return Asd.new
+        else
+        end
+      end
+    end
+
+    extractor = create_rails_extractor
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    statements = ast.block.statements
+
+    assert_equal 1, statements.length
+    assert_equal ADSL::Parser::ASTObjsetStmt, statements.first.class
+    assert_equal ADSL::Parser::ASTCreateObjset, statements.first.objset.class
+  end
+  
+  def test_action_extraction__statements_after_return_are_ignored
+    AsdsController.class_exec do
+      def nothing
+        Asd.new
+        return
+        Asd.new
+      end
+    end
+
+    extractor = create_rails_extractor
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    statements = ast.block.statements
+
+    assert_equal 1, statements.length
+    assert_equal ADSL::Parser::ASTObjsetStmt, statements.first.class
+    assert_equal ADSL::Parser::ASTCreateObjset, statements.first.objset.class
+  end
+
+  def test_action_extraction__statements_after_return_in_branches_are_ignored
+    AsdsController.class_exec do
+      def nothing
+        if anything
+          return Asd.new
+        else
+          return Asd.new
+        end
+        Asd.new
+      end
+    end
+
+    extractor = create_rails_extractor
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    statements = ast.block.statements
+
+    assert_equal 1, statements.length
+    assert_equal ADSL::Parser::ASTEither, statements.first.class
+
+    either = statements.first
+
+    assert_equal 2, either.blocks.length
+    assert_equal 1, either.blocks.first.statements.length
+    assert_equal ADSL::Parser::ASTCreateObjset, either.blocks.first.statements.first.objset.class
+    assert_equal 1, either.blocks.second.statements.length
+    assert_equal ADSL::Parser::ASTCreateObjset, either.blocks.second.statements.first.objset.class
+  end
+  
+  def test_action_extraction__calls_of_method_with_multiple_paths
+    AsdsController.class_exec do
+      def something
+        if whatever
+          return Asd.new
+        else
+          Asd.find.destroy!
+        end
+      end
+
+      def nothing
+        something
+        return Asd.new
+      end
+    end
+
+    extractor = create_rails_extractor
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    statements = ast.block.statements
+
+    assert_equal 2, statements.length
+    assert_equal ADSL::Parser::ASTEither, statements.first.class
+    assert_equal ADSL::Parser::ASTCreateObjset, statements.second.objset.class
+
+    either = statements.first
+
+    assert_equal 2, either.blocks.length
+    assert_equal 1, either.blocks.first.statements.length
+    assert_equal ADSL::Parser::ASTDeleteObj, either.blocks.first.statements.first.class
+    assert_equal 1, either.blocks.second.statements.length
+    assert_equal ADSL::Parser::ASTCreateObjset, either.blocks.second.statements.first.objset.class
+  end
+  
 end

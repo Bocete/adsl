@@ -8,16 +8,18 @@ require 'adsl/extract/meta'
 
 module Kernel
   def ins_call(object, method_name, *args, &block)
-    ::ADSL::Extract::Instrumenter.get_instance.exec_within do |instrumenter|
-      instrumenter.execute_instrumented object, method_name, *args, &block
-    end
+    ::ADSL::Extract::Instrumenter.get_instance.execute_instrumented object, method_name, *args, &block
   end
 end
 
 module ADSL
   module Extract
     class Instrumenter
+      
+      attr_reader :stack_depth
+      
       @instance = nil
+      @method_locals_stack = []
 
       def self.get_instance()
         @instance
@@ -31,13 +33,27 @@ module ADSL
         # a dummy method injected into the AST
       end
 
+      def method_locals
+        @method_locals_stack.last
+      end
+
+      def previous_locals
+        @method_locals_stack[-2]
+      end
+
+      def root_locals
+        @method_locals_stack.first
+      end
+
       def exec_within
         Instrumenter.instance_variable_set(:@instance, self) if @stack_depth == 0
         @stack_depth += 1
+        @method_locals_stack << create_locals if respond_to? :create_locals
 
         return yield(self)
       ensure
         @stack_depth -= 1
+        @method_locals_stack.pop
         Instrumenter.instance_variable_set(:@instance, nil) if @stack_depth == 0
       end
 
@@ -68,6 +84,7 @@ module ADSL
         @instrument_domain = instrument_domain
         @replacers = []
         @stack_depth = 0
+        @method_locals_stack = []
 
         # mark the instrumentation
         replace :defn, :defs do |sexp|
@@ -82,7 +99,7 @@ module ADSL
           original_method_name = sexp.sexp_body[1]
           original_args = sexp.sexp_body[2..-1]
 
-          next sexp if original_object == s(:self) and Kernel.respond_to? original_method_name
+          next sexp if [s(:self), nil].include? original_object and Kernel.respond_to? original_method_name
 
           s(:call, nil, :ins_call, original_object, s(:lit, original_method_name), *original_args)
         end
@@ -120,7 +137,7 @@ module ADSL
           begin
             method = object.method method_name
             source = method.source
-
+            
             # Ruby 2.0.0 support is in development as of writing this
             sexp = ruby_parser.process source
 

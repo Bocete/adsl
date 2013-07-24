@@ -39,7 +39,8 @@ module ADSL
             !route[:action].nil? &&
             !route[:controller].nil? &&
             !route[:url].nil? &&
-            !route[:request_method].nil?
+            !route[:request_method].nil? &&
+            route[:controller].action_methods.include?(route[:action].to_s)
           }.uniq{ |a| [a[:controller], a[:action]] }
         end
 
@@ -48,24 +49,29 @@ module ADSL
         end
 
         def action_to_adsl_ast(route)
-          @action_instrumenter.action_block = []
           @action_instrumenter.instrument route[:controller].new, route[:action]
 
           session = ActionDispatch::Integration::Session.new(::Rails.application)
-          
-          @action_instrumenter.exec_within do
-            session.send(route[:request_method].to_s.downcase, route[:url], ADSL::Extract::Rails::MetaUnknown.new)
+
+          block = @action_instrumenter.exec_within do
+            # this block behaves like the original method caller
+            @action_instrumenter.abb.explore_all_choices do
+              @action_instrumenter.exec_within do
+                session.send(route[:request_method].to_s.downcase, route[:url], ADSL::Extract::Rails::MetaUnknown.new)
+              end
+            end
+            @action_instrumenter.abb.adsl_ast
           end
 
-          ADSL::Parser::ASTAction.new({
+          action = ADSL::Parser::ASTAction.new({
             :name => ADSL::Parser::ASTIdent.new(:text => "#{route[:controller]}__#{route[:action]}"),
             :arg_cardinalities => [],
             :arg_names => [],
             :arg_types => [],
-            :block => ADSL::Parser::ASTBlock.new(:statements => @action_instrumenter.action_block)
+            :block => block
           })
-        ensure
-          @action_instrumenter.action_block = []
+          action.optimize!
+          action
         end
 
         def default_activerecord_models

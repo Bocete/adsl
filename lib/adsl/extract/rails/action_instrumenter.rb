@@ -3,14 +3,13 @@ require 'active_record'
 require 'adsl/extract/instrumenter'
 require 'adsl/extract/sexp_utils'
 require 'adsl/parser/ast_nodes'
+require 'adsl/extract/rails/action_block_builder'
 
 module Kernel
-  def ins_stmt(expr)
-    adsl_ast = expr
-    adsl_ast = expr.adsl_ast if adsl_ast.respond_to? :adsl_ast
-    if adsl_ast.is_a? ::ADSL::Parser::ASTNode
-      adsl_ast = ADSL::Parser::ASTObjsetStmt.new :objset => adsl_ast unless adsl_ast.class.is_statement?
-      ::ADSL::Extract::Instrumenter.get_instance.action_block.push adsl_ast
+  def ins_stmt(expr = nil, options = {})
+    stmt = ::ADSL::Extract::Rails::ActionInstrumenter.extract_stmt_from_expr expr
+    if stmt.is_a? ::ADSL::Parser::ASTNode
+      ::ADSL::Extract::Instrumenter.get_instance.abb.append_stmt stmt, options
     end
     expr
   end
@@ -31,17 +30,85 @@ module Kernel
       value
     end
   end
+
+  def ins_do_return(return_value = nil)
+    ::ADSL::Extract::Instrumenter.get_instance.abb.do_return return_value
+  end
+
+  def ins_branch_choice(branch_id)
+    ::ADSL::Extract::Instrumenter.get_instance.abb.branch_choice branch_id
+  end
+
+  def ins_explore_all(&block)
+    instrumenter = ::ADSL::Extract::Instrumenter.get_instance
+    return_value = instrumenter.abb.explore_all_choices &block
+    
+    instrumenter.prev_abb << instrumenter.abb.adsl_ast
+    
+    return_value
+  end
+
+  def ins_if(lambda1, lambda2)
+    instrumenter = ::ADSL::Extract::Instrumenter.get_instance
+
+    stmts = instrumenter.abb.in_stmt_frame &lambda1
+    block1 = ::ADSL::Parser::ASTBlock.new :statements => stmts
+
+    stmts = instrumenter.abb.in_stmt_frame &lambda2
+    block2 = ::ADSL::Parser::ASTBlock.new :statements => stmts
+
+    ::ADSL::Parser::ASTEither.new :blocks => [block1, block2]
+  end
+
+  def ins_root_lvl_push_expr(expr = nil)
+    adsl_ast = ::ADSL::Extract::Rails::ActionInstrumenter.extract_stmt_from_expr expr
+    unless adsl_ast.nil?
+      instrumenter = ::ADSL::Extract::Instrumenter.get_instance
+      instrumenter.abb.root_paths.each do |root_path|
+        root_path << adsl_ast
+      end
+    end
+    expr
+  end
 end
+
 
 module ADSL
   module Extract
     module Rails
+
       class ActionInstrumenter < ::ADSL::Extract::Instrumenter
+        def self.extract_stmt_from_expr(expr)
+          adsl_ast = expr
+          adsl_ast = expr.adsl_ast if adsl_ast.respond_to? :adsl_ast
+          if adsl_ast.is_a? ::ADSL::Parser::ASTNode
+            adsl_ast = ::ADSL::Parser::ASTObjsetStmt.new :objset => adsl_ast unless adsl_ast.class.is_statement?
+            adsl_ast
+          else
+            nil
+          end
+        end
 
         attr_accessor :action_block
 
+        def abb
+          method_locals[:abb]
+        end
+
+        def prev_abb
+          previous_locals[:abb]
+        end
+
+        def create_locals
+          {
+            :abb => ActionBlockBuilder.new 
+          }
+        end
+
         def initialize(ar_class_names, instrument_domain = Dir.pwd)
           super instrument_domain
+
+          @branch_index = 0
 
           ar_class_names = ar_class_names.map{ |n| n.split('::').last }
 
@@ -59,32 +126,55 @@ module ADSL
             sexp
           end
 
-          # remove respond_to
-          replace :call do |sexp|
-            sexp == s(:call, nil, :respond_to) ? s(:nil) : sexp
+          # remove respond_to and render
+          [:respond_to, :render].each do |stmt|
+            replace :call do |sexp|
+              sexp == s(:call, nil, stmt) ? s(:nil) : sexp
+            end
+            replace :iter do |sexp|
+              sexp[1] == s(:call, nil, stmt) ? s(:nil) : sexp
+            end
           end
-          replace :iter do |sexp|
-            sexp[1] == s(:call, nil, :respond_to) ? s(:nil) : sexp
+
+          # surround the entire method with a call to abb.explore_all_choices
+          replace :defn, :defs do |sexp|
+            header_elem_count = sexp.sexp_type == :defn ? 3 : 4
+            stmts = sexp.pop(sexp.length - header_elem_count)
+            single_stmt = stmts.length > 1 ? s(:block, *stmts) : stmts.first
+            explore_all = s(:iter, s(:call, nil, :ins_explore_all), s(:args), single_stmt)
+            # ins_stmt explore_all on root call, since the caller will not handle it
+            explore_all = s(:call, nil, :ins_root_lvl_push_expr, explore_all) if @stack_depth == 0
+            sexp.push explore_all
+            sexp
           end
-          
-          # prepend ins_stmt to every non-return statement
-          # include return on the root block (where @stack_depth is 1)
+
+          # replace returns with ins_do_return
+          replace :return do |sexp|
+            s(:call, nil, :ins_do_return, *sexp.sexp_body)
+          end
+
+          # prepend ins_stmt to every non-return or non-if statement
           replace :defn, :defs, :block do |sexp|
             first_stmt_index = case sexp.sexp_type
-            when :defn; 3
-            when :defs; 4
-            when :block; 1
+              when :defn; 3
+              when :defs; 4
+              when :block; 1
             end
-            last_stmt_to_instrument = sexp.length + (@stack_depth == 0 ? -1 : -2)
-            (first_stmt_index..last_stmt_to_instrument).each do |index|
-              sexp[index] = s(:call, nil, :ins_stmt, sexp[index])
+            (first_stmt_index..sexp.length-1).each do |index|
+              unless [:if, :return].include? sexp[index].sexp_type
+                sexp[index] = s(:call, nil, :ins_stmt, sexp[index])
+              end
             end
             sexp
           end
 
-          # add explicit returns to the method definition
+          # make the implicit return explicit
           replace :defn, :defs do |sexp|
-            sexp.last = s(:return, sexp) unless sexp.sexp_type == :return
+            container = sexp
+            while [:ensure, :rescue, :block].include? container.last.sexp_type
+              container = container.last.sexp_type == :block ? container.last : container[1]
+            end
+            container[-1] = s(:return, container.last) unless container.last.sexp_type == :return
             sexp
           end
           
@@ -94,6 +184,23 @@ module ADSL
               s(:lasgn, sexp[1], s(:nil)),
               s(:call, nil, :ins_assignment, s(:call, nil, :binding), s(:str, sexp[1].to_s), sexp[2])
             ]
+          end
+          
+          # instrument branches
+          replace :if do |sexp|
+            if sexp.may_return?
+              sexp[1] = s(:call, nil, :ins_branch_choice, s(:lit, @branch_index += 1))
+              sexp[2] = s(:block, sexp[2]) unless sexp[2].nil? or sexp[2].sexp_type == :block
+              sexp[3] = s(:block, sexp[3]) unless sexp[3].nil? or sexp[3].sexp_type == :block
+              sexp
+            else
+              block1 = sexp[2].nil? || sexp[2].sexp_type == :block ? sexp[2] : s(:block, sexp[2])
+              block2 = sexp[3].nil? || sexp[3].sexp_type == :block ? sexp[3] : s(:block, sexp[3])
+              s(:call, nil, :ins_if, 
+                s(:iter, s(:call, nil, :lambda), s(:args), block1),
+                s(:iter, s(:call, nil, :lambda), s(:args), block2)
+              )
+            end
           end
         end
 
@@ -108,6 +215,7 @@ module ADSL
             super
         end
       end
+
     end
   end
 end
