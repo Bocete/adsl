@@ -3,6 +3,7 @@ require 'active_record'
 require 'adsl/extract/instrumenter'
 require 'adsl/extract/sexp_utils'
 require 'adsl/parser/ast_nodes'
+require 'adsl/extract/rails/other_meta'
 require 'adsl/extract/rails/action_block_builder'
 
 module Kernel
@@ -15,7 +16,14 @@ module Kernel
   end
 
   def ins_assignment(outer_binding, name, value)
-    if value.is_a? ActiveRecord::Base
+    if value.nil?
+      assignment = ::ADSL::Parser::ASTAssignment.new(
+        :var_name => ::ADSL::Parser::ASTIdent.new(:text => name),
+        :objset => ::ADSL::Parser::ASTEmptyObjset.new
+      )
+      outer_binding.eval "#{name} = nil"
+      assignment
+    elsif value.is_a? ActiveRecord::Base
       assignment = ::ADSL::Parser::ASTAssignment.new(
         :var_name => ::ADSL::Parser::ASTIdent.new(:text => name),
         :objset => value.adsl_ast

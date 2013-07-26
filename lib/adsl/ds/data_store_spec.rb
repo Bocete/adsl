@@ -200,6 +200,14 @@ module ADSL
       end
     end
 
+    class DSEmptyObjset < DSNode
+      container_for
+
+      def type
+        nil
+      end
+    end
+
     class DSInvariant < DSNode
       container_for :name, :formula
     end

@@ -311,6 +311,8 @@ module ADSL
       end
 
       def migrate_state_spass(translation)
+        return if @objset1.type.nil? or @objset2.type.nil?
+
         state = translation.create_state "post_create_#{@relation.from_class.name}_#{@relation.name}"
         prev_state = translation.prev_state
         context = translation.context
@@ -350,6 +352,8 @@ module ADSL
       end
 
       def migrate_state_spass(translation)
+        return if @objset1.type.nil? or @objset2.type.nil?
+
         state = translation.create_state "post_deleteref_#{@relation.from_class.name}_#{@relation.name}"
         prev_state = translation.prev_state
         context = translation.context
@@ -478,6 +482,8 @@ module ADSL
       end
 
       def migrate_state_spass(translation)
+        return if @objset.type.nil?
+
         @pre_state = translation.prev_state
         @post_state = translation.create_state :post_for_each
         
@@ -737,6 +743,20 @@ module ADSL
           FOL::Implies.new(pred[:o], @objset.resolve_invariant_objset(translation, :o))
         )
         return pred[var]
+      end
+    end
+
+    class DSEmptyObjset < DSNode
+      def prepare_action(translation)
+      end
+
+      def resolve_action_objset(translation, ps, var)
+        # nothing is in the objset
+        return false
+      end
+      
+      def resolve_invariant_objset(translation, var)
+        return false
       end
     end
 

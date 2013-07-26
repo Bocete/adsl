@@ -91,8 +91,6 @@ end
 
 class Module
   def container_for(*fields, &block)
-    raise ArgumentError, 'Field list empty' if fields.empty?
-
     all_fields = Set.new(fields)
     if respond_to? :container_for_fields
       prev_fields = send :container_for_fields

@@ -21,7 +21,10 @@ module ADSL
           @class_map = @active_record_instrumenter.extract_static options[:ar_classes]
           
           @action_instrumenter = ADSL::Extract::Rails::ActionInstrumenter.new(@class_map.keys.map{ |n| n.name.split('::').last })
-          @actions = all_routes.map{ |route| action_to_adsl_ast route }
+          @actions = []
+          all_routes.each do |route|
+            @actions << action_to_adsl_ast(route)
+          end
           
           @invariant_extractor = ADSL::Extract::Rails::InvariantExtractor.new
           @invariants = @invariant_extractor.extract(options[:invariants]).map{ |inv| inv.adsl_ast }
@@ -48,7 +51,16 @@ module ADSL
           all_routes.select{ |a| a[:controller] == controller && a[:action] == action.to_sym}.first
         end
 
+        def action_name_for(route)
+          "#{route[:controller]}__#{route[:action]}"
+        end
+
         def action_to_adsl_ast(route)
+          action_name = action_name_for route
+          potential_adsl_asts = @actions.select{ |action| action.name.text == action_name }
+          raise "Multiple actions with identical names" if potential_adsl_asts.length > 1
+          return potential_adsl_asts.first if potential_adsl_asts.length == 1
+
           @action_instrumenter.instrument route[:controller].new, route[:action]
 
           session = ActionDispatch::Integration::Session.new(::Rails.application)
@@ -64,7 +76,7 @@ module ADSL
           end
 
           action = ADSL::Parser::ASTAction.new({
-            :name => ADSL::Parser::ASTIdent.new(:text => "#{route[:controller]}__#{route[:action]}"),
+            :name => ADSL::Parser::ASTIdent.new(:text => action_name),
             :arg_cardinalities => [],
             :arg_names => [],
             :arg_types => [],

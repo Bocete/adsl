@@ -50,7 +50,7 @@ class ADSL::Verification::RailsVerificationTest < ADSL::Extract::Rails::RailsIns
       invariant(self.not.exists{ |asd| })
     ruby
 
-    assert verify_spass :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing)
+    assert_false verify_spass :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing)
   end
   
   def test_verify_spass__branch_with_return__may_create_but_will_delete
@@ -68,7 +68,7 @@ class ADSL::Verification::RailsVerificationTest < ADSL::Extract::Rails::RailsIns
       invariant(self.not.exists{ |asd| })
     ruby
 
-    assert verify_spass :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing1)
+    assert verify_spass :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing)
   end
   
   def test_verify_spass__branch_with_return__may_create_or_delete
@@ -86,7 +86,7 @@ class ADSL::Verification::RailsVerificationTest < ADSL::Extract::Rails::RailsIns
       invariant(self.not.exists{ |asd| })
     ruby
     
-    assert_false verify_spass :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing2)
+    assert_false verify_spass :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing)
   end
   
   

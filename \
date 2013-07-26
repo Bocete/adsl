@@ -33,15 +33,18 @@ module ADSL
       end
 
       def optimize!
+        puts "Optimizing #{self.class}\##{self.object_id}"
         children = self.class.container_for_fields.map{ |field_name| send field_name }
         until children.empty?
           child = children.pop
+          puts child
           if child.is_a? Array
             children += child
           else
             child.optimize! if child.respond_to? :optimize!
           end
         end
+        puts "Super.optimize! done for #{self.class}\##{self.object_id}"
       end
     end
 
@@ -424,9 +427,16 @@ module ADSL
       def optimize!
         super
 
+        puts "STARTING" if !@name.nil? and @name.text == 'AsdsController__nothing'
+        
         prev_root_stmts = nil
         while prev_root_stmts != @block.statements
           prev_root_stmts = @block.statements.dup
+
+          if !@name.nil? and @name.text == 'AsdsController__nothing'
+            puts "STEP"
+            pp @block
+          end
 
           return unless @block.statements.length == 1
 
@@ -442,6 +452,8 @@ module ADSL
             @block.optimize!
           end
         end
+        
+        puts "ENDING" if !@name.nil? and @name.text == 'AsdsController__nothing'
       end
     end
 
@@ -477,6 +489,7 @@ module ADSL
           end.flatten! 1
         end
         @statements.reject! do |stmt|
+          puts "#{stmt}: #{stmt.is_a? ASTObjsetStmt} #{stmt.is_a?(ASTObjsetStmt) and !stmt.objset.class.objset_has_side_effects?}"
           stmt.is_a?(ASTObjsetStmt) and !stmt.objset.class.objset_has_side_effects?
         end
       end

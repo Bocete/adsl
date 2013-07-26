@@ -864,6 +864,113 @@ module ADSL::Parser
       assert_equal 0, get_pre_lambdas.call(spec.actions.first.block.statements[1]).length
     end
 
+    def test_action__empty_set__typecheck
+      parser = ADSLParser.new
+      
+      assert_nothing_raised ADSLError do
+        parser.parse <<-adsl
+          class Class {
+            1 Class klass
+          }
+          class Class2 {
+            1 Class2 klass2
+          }
+          action do_something() {
+            allof(Class).klass += empty
+            allof(Class2).klass2 += empty
+          }
+        adsl
+      end
+
+      assert_raise ADSLError do
+        parser.parse <<-adsl
+          action do_something() {
+            empty.some_relation += empty
+          }
+        adsl
+      end
+      
+      assert_nothing_raised ADSLError do
+        parser.parse <<-adsl
+          class Class {
+            1 Class klass
+          }
+          action do_something() {
+            foreach c: empty {
+              allof(Class).klass += c
+            }
+          }
+        adsl
+      end
+      
+      assert_raise ADSLError do
+        parser.parse <<-adsl
+          class Class {
+            1 Class klass
+          }
+          action do_something() {
+            foreach c: empty {
+              c.klass += allof(Class)
+            }
+          }
+        adsl
+      end
+    end
+
+    def test_action__empty_set_and_var_types
+      parser = ADSLParser.new
+
+      assert_nothing_raised ADSLError do
+        parser.parse <<-adsl
+          class Class {
+            1 Class klass
+          }
+          action do_something() {
+            a = empty
+            a = allof(Class)
+            a.klass += a
+          }
+        adsl
+      end
+      assert_nothing_raised ADSLError do
+        parser.parse <<-adsl
+          class Class {
+            1 Class klass
+          }
+          action do_something() {
+            a = empty
+            a = allof(Class)
+            a.klass += a
+          }
+        adsl
+      end
+      assert_nothing_raised ADSLError do
+        parser.parse <<-adsl
+          class Class {
+            1 Class klass
+          }
+          action do_something() {
+            a = allof(Class)
+            a = empty
+            a.klass += a
+          }
+        adsl
+      end
+      assert_nothing_raised ADSLError do
+        parser.parse <<-adsl
+          class Class {
+            1 Class klass
+          }
+          action do_something() {
+            a = allof(Class)
+            a = empty
+            b = a
+            b.klass += a
+          }
+        adsl
+      end
+    end
+
     def test_action__entity_class_writes
       parser = ADSLParser.new
       spec = nil

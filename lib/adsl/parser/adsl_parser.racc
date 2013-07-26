@@ -69,11 +69,13 @@ rule
         | allof '(' IDENT ')'    { return ASTAllOf.new :lineno => val[0], :class_name => val[2] }
         | create_objset          { return val[0] } 
         | objset '.' IDENT       { return ASTDereference.new :lineno => val[0].lineno, :objset => val[0], :rel_name => val[2] }
+        | empty                  { return ASTEmptyObjset.new :lineno => val[0] }
   
-  invariant_objset: IDENT                 { return ASTVariable.new :lineno => val[0].lineno, :var_name => val[0] }
-                  | subset '(' objset ')' { return ASTSubset.new :lineno => val[0], :objset => val[2] }
-                  | allof '(' IDENT ')'   { return ASTAllOf.new :lineno => val[0], :class_name => val[2] }
-                  | objset '.' IDENT      { return ASTDereference.new :lineno => val[0].lineno, :objset => val[0], :rel_name => val[2] }
+  invariant_objset: IDENT                       { return ASTVariable.new :lineno => val[0].lineno, :var_name => val[0] }
+                  | subset '(' objset ')'       { return ASTSubset.new :lineno => val[0], :objset => val[2] }
+                  | allof '(' IDENT ')'         { return ASTAllOf.new :lineno => val[0], :class_name => val[2] }
+                  | invariant_objset '.' IDENT  { return ASTDereference.new :lineno => val[0].lineno, :objset => val[0], :rel_name => val[2] }
+                  | empty                       { return ASTEmptyObjset.new :lineno => val[0] }
 
   invariant_decl: invariant formula           { return ASTInvariant.new :lineno => val[0], :name => nil, :formula => val[1] }
                 | invariant IDENT ':' formula { return ASTInvariant.new :lineno => val[0], :name => val[1], :formula => val[3] }

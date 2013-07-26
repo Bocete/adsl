@@ -72,14 +72,14 @@ module ADSL::Extract::Rails
           abb << :c
           if abb.branch_choice 2
             abb << :d
-            abb.do_return
+            abb.do_return :nil
             abb << :e
           else
             abb << :f
           end
         else
           abb << :g
-          abb.do_return
+          abb.do_return :nil
           abb << :h
         end
         abb << :i
@@ -90,14 +90,15 @@ module ADSL::Extract::Rails
         end
         abb << :l
       end
-      
+
       expected_choices = [
         [:a, :b, :c, :d],
         [:a, :b, :c, :f, :i, :j, :l],
         [:a, :b, :c, :f, :i, :k, :l],
         [:a, :b, :g]
       ]
-      assert (Set[*abb.root_paths] ^ Set[*expected_choices]).empty?
+
+      assert_set_equal expected_choices, abb.root_paths
     end
 
     def test__common_return_value

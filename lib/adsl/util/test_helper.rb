@@ -55,4 +55,17 @@ class Test::Unit::TestCase
   ensure
     file.unlink unless file.nil?
   end
+
+  def assert_set_equal(expected, actual, failure_msg = nil)
+    expected.each do |elem|
+      assert_block failure_msg || "Actual collection does not contain #{elem}" do
+        actual.include? elem
+      end
+    end
+    actual.each do |elem|
+      assert_block failure_msg || "Expected collection does not contain #{elem}" do
+        expected.include? elem
+      end
+    end
+  end
 end

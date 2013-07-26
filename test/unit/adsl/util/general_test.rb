@@ -54,13 +54,13 @@ class ADSL::Util::GeneralTest < Test::Unit::TestCase
   end
 
   def test_container_for__blank
-    assert_raise ArgumentError do
-      eval <<-ruby
-        class Foo
-          container_for
-        end
-      ruby
-    end
+    eval <<-ruby
+      class Foo
+        container_for
+      end
+    ruby
+
+    assert Foo.container_for_fields.empty?
   end
 
   def test_container_for__does_list
