@@ -16,20 +16,28 @@ module Kernel
   end
 
   def ins_assignment(outer_binding, name, value)
+    adsl_ast_name = if /^@@[^@]+$/ =~ name.to_s
+      "atat__#{ name.to_s[2..-1] }"
+    elsif /^@[^@]+$/ =~ name.to_s
+      "at__#{ name.to_s[1..-1] }"
+    else
+      name.to_s
+    end
+
     if value.nil?
       assignment = ::ADSL::Parser::ASTAssignment.new(
-        :var_name => ::ADSL::Parser::ASTIdent.new(:text => name),
+        :var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name),
         :objset => ::ADSL::Parser::ASTEmptyObjset.new
       )
       outer_binding.eval "#{name} = nil"
       assignment
     elsif value.is_a? ActiveRecord::Base
       assignment = ::ADSL::Parser::ASTAssignment.new(
-        :var_name => ::ADSL::Parser::ASTIdent.new(:text => name),
+        :var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name),
         :objset => value.adsl_ast
       )
       variable = value.class.new(:adsl_ast =>
-        ::ADSL::Parser::ASTVariable.new(:var_name => ::ADSL::Parser::ASTIdent.new(:text => name))
+        ::ADSL::Parser::ASTVariable.new(:var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name))
       )
       outer_binding.eval "#{name} = ObjectSpace._id2ref(#{variable.object_id})"
       assignment
@@ -179,17 +187,19 @@ module ADSL
           # make the implicit return explicit
           replace :defn, :defs do |sexp|
             container = sexp
-            while [:ensure, :rescue, :block].include? container.last.sexp_type
-              container = container.last.sexp_type == :block ? container.last : container[1]
+            return_stmt_index = -1
+            while [:ensure, :rescue, :block].include? container[return_stmt_index].sexp_type
+              container = container[return_stmt_index]
+              return_stmt_index = container.sexp_type == :block ? -1 : 1
             end
-            container[-1] = s(:return, container.last) unless container.last.sexp_type == :return
+            container[return_stmt_index] = s(:return, container[return_stmt_index]) unless container[return_stmt_index].sexp_type == :return
             sexp
           end
           
           # instrument assignments
-          replace :lasgn do |sexp|
+          replace :lasgn, :iasgn, :cvasgn do |sexp|
             [
-              s(:lasgn, sexp[1], s(:nil)),
+              s(sexp.sexp_type, sexp[1], s(:nil)),
               s(:call, nil, :ins_assignment, s(:call, nil, :binding), s(:str, sexp[1].to_s), sexp[2])
             ]
           end
