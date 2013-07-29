@@ -8,6 +8,11 @@ require 'adsl/extract/rails/action_block_builder'
 
 module Kernel
   def ins_stmt(expr = nil, options = {})
+    if expr.is_a? Array
+      expr.each do |subexpr|
+        ins_stmt subexpr, options
+      end
+    end
     stmt = ::ADSL::Extract::Rails::ActionInstrumenter.extract_stmt_from_expr expr
     if stmt.is_a? ::ADSL::Parser::ASTNode
       ::ADSL::Extract::Instrumenter.get_instance.abb.append_stmt stmt, options
@@ -47,8 +52,51 @@ module Kernel
     end
   end
 
-  def ins_do_return(return_value = nil)
-    ::ADSL::Extract::Instrumenter.get_instance.abb.do_return return_value
+  def ins_multi_assignment(outer_binding, names, values)
+    values = [values] unless values.is_a? Array
+
+    values_to_be_returned = []
+    names.length.times do |index|
+      name = names[index]
+      value = values[index]
+
+      adsl_ast_name = if /^@@[^@]+$/ =~ name.to_s
+        "atat__#{ name.to_s[2..-1] }"
+      elsif /^@[^@]+$/ =~ name.to_s
+        "at__#{ name.to_s[1..-1] }"
+      else
+        name.to_s
+      end
+      
+      if value.nil?
+        outer_binding.eval "#{name} = nil"
+        
+        values_to_be_returned << ::ADSL::Parser::ASTAssignment.new(
+          :var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name),
+          :objset => ::ADSL::Parser::ASTEmptyObjset.new
+        )
+      elsif value.is_a? ActiveRecord::Base
+        variable = value.class.new(:adsl_ast =>
+          ::ADSL::Parser::ASTVariable.new(:var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name))
+        )
+        outer_binding.eval "#{name} = ObjectSpace._id2ref(#{variable.object_id})"
+        
+        values_to_be_returned << ::ADSL::Parser::ASTAssignment.new(
+          :var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name),
+          :objset => value.adsl_ast
+        )
+      else
+        outer_binding.eval "#{name} = ObjectSpace._id2ref(#{value.object_id})"
+        
+        values_to_be_returned << value
+      end
+    end
+
+    values_to_be_returned
+  end
+
+  def ins_do_return(*return_values)
+    ::ADSL::Extract::Instrumenter.get_instance.abb.do_return *return_values
   end
 
   def ins_branch_choice(branch_id)
@@ -81,7 +129,7 @@ module Kernel
     unless adsl_ast.nil?
       instrumenter = ::ADSL::Extract::Instrumenter.get_instance
       instrumenter.abb.root_paths.each do |root_path|
-        root_path << adsl_ast
+        root_path << adsl_ast unless root_path.include? adsl_ast
       end
     end
     expr
@@ -168,6 +216,29 @@ module ADSL
           replace :return do |sexp|
             s(:call, nil, :ins_do_return, *sexp.sexp_body)
           end
+          
+          # instrument assignments
+          replace :lasgn, :iasgn, :cvasgn, :masgn do |sexp|
+            next sexp if sexp.length <= 2
+
+            prepare_assignment = if sexp.sexp_type == :masgn
+              nils = s(:array, *([s(:nil)] * sexp[1].sexp_body.length))
+              s(:masgn, sexp[1], nils)
+            else
+              s(sexp[0], sexp[1], s(:nil))
+            end
+            
+            var_names = if sexp.sexp_type == :masgn
+              sexp[1].sexp_body.map{ |var| s(:str, var[1].to_s) }.to_a
+            else
+              [s(:str, sexp[1].to_s)]
+            end
+
+            s(:block,
+              prepare_assignment,
+              s(:call, nil, :ins_multi_assignment, s(:call, nil, :binding), s(:array, *var_names), sexp[2])
+            )
+          end
 
           # prepend ins_stmt to every non-return or non-if statement
           replace :defn, :defs, :block do |sexp|
@@ -194,14 +265,6 @@ module ADSL
             end
             container[return_stmt_index] = s(:return, container[return_stmt_index]) unless container[return_stmt_index].sexp_type == :return
             sexp
-          end
-          
-          # instrument assignments
-          replace :lasgn, :iasgn, :cvasgn do |sexp|
-            [
-              s(sexp.sexp_type, sexp[1], s(:nil)),
-              s(:call, nil, :ins_assignment, s(:call, nil, :binding), s(:str, sexp[1].to_s), sexp[2])
-            ]
           end
           
           # instrument branches

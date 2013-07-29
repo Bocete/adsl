@@ -80,6 +80,7 @@ module ADSL
           else
             # append all return values to root paths
             # cause they won't be returned and handled by the caller
+            # if an array is returned, assume the 'return 1, 2, 3' syntax
             @return_values.length.times do |index|
               stmt = ADSL::Extract::Rails::ActionInstrumenter.extract_stmt_from_expr @return_values[index]
               @root_paths[index] << stmt unless stmt.nil? or @root_paths[index].include?(stmt)
@@ -102,7 +103,7 @@ module ADSL
           @root_paths << all_stmts_so_far
           @return_values << return_value
           @has_returned = true
-          return_value
+          return return_value
         end
 
         def adsl_ast

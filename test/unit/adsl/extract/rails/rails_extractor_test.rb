@@ -328,5 +328,96 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 1, either.blocks.second.statements.length
     assert_equal ADSL::Parser::ASTCreateObjset, either.blocks.second.statements.first.objset.class
   end
+
+  def test_action_extraction__multiple_return
+    AsdsController.class_exec do
+      def blah
+        return Asd.new, Kme.new
+      end
+      
+      def nothing
+        blah
+        raise 'Not returned properly' unless vals.length == 2
+      end
+    end
+
+    extractor = create_rails_extractor
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    statements = ast.block.statements
+
+    assert_equal 2, statements.length
+
+    assert_equal ADSL::Parser::ASTCreateObjset, statements.first.objset.class
+    assert_equal 'Asd', statements.first.objset.class_name.text
+    
+    assert_equal ADSL::Parser::ASTCreateObjset, statements.second.objset.class
+    assert_equal 'Kme', statements.second.objset.class_name.text
+  end
+
+  def test_action_extraction__multiple_assignment
+    AsdsController.class_exec do
+      def nothing
+        a, b = Asd.new, Kme.new
+        a.destroy!
+        b.destroy!
+      end
+    end
+    extractor = create_rails_extractor
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    statements = ast.block.statements
+
+    assert_equal 4, statements.length
+
+    assert_equal ADSL::Parser::ASTAssignment, statements[0].class
+    assert_equal 'a', statements[0].var_name.text
+    assert_equal ADSL::Parser::ASTCreateObjset, statements[0].objset.class
+    assert_equal 'Asd', statements[0].objset.class_name.text
+    
+    assert_equal ADSL::Parser::ASTAssignment, statements[1].class
+    assert_equal 'b', statements[1].var_name.text
+    assert_equal ADSL::Parser::ASTCreateObjset, statements[1].objset.class
+    assert_equal 'Kme', statements[1].objset.class_name.text
+    
+    assert_equal ADSL::Parser::ASTDeleteObj, statements[2].class
+    assert_equal 'a', statements[2].objset.var_name.text
+    
+    assert_equal ADSL::Parser::ASTDeleteObj, statements[3].class
+    assert_equal 'b', statements[3].objset.var_name.text
+  end
+  
+  def test_action_extraction__multiple_assignment_of_return
+    AsdsController.class_exec do
+      def blah
+        return Asd.new, Kme.new
+      end
+     
+      def nothing
+        a, b = blah
+        a.destroy!
+        b.destroy!
+      end
+    end
+    extractor = create_rails_extractor
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    statements = ast.block.statements
+
+    assert_equal 4, statements.length
+
+    assert_equal ADSL::Parser::ASTAssignment, statements[0].class
+    assert_equal 'a', statements[0].var_name.text
+    assert_equal ADSL::Parser::ASTCreateObjset, statements[0].objset.class
+    assert_equal 'Asd', statements[0].objset.class_name.text
+    
+    assert_equal ADSL::Parser::ASTAssignment, statements[1].class
+    assert_equal 'b', statements[1].var_name.text
+    assert_equal ADSL::Parser::ASTCreateObjset, statements[1].objset.class
+    assert_equal 'Kme', statements[1].objset.class_name.text
+    
+    assert_equal ADSL::Parser::ASTDeleteObj, statements[2].class
+    assert_equal 'a', statements[2].objset.var_name.text
+    
+    assert_equal ADSL::Parser::ASTDeleteObj, statements[3].class
+    assert_equal 'b', statements[3].objset.var_name.text
+  end
   
 end

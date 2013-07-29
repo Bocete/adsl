@@ -479,6 +479,9 @@ module ADSL
         @statements.reject! do |stmt|
           stmt.is_a?(ASTObjsetStmt) and !stmt.objset.class.objset_has_side_effects?
         end
+        @statements.reject! do |stmt|
+          stmt.is_a?(ASTEither) and stmt.blocks.inject(true){ |so_far, block| so_far && block.statements.empty? }
+        end
       end
     end
 
@@ -616,6 +619,7 @@ module ADSL
 
       def optimize!
         super
+        
         changed = true
         while changed
           changed = false
@@ -627,6 +631,12 @@ module ADSL
               [block]
             end
           end.flatten! 1
+        end
+
+        if @blocks.select{ |b| b.statements.empty? }.length > 1
+          @blocks.delete_if{ |b| b.statements.empty? }
+          @blocks << ASTBlock.new(:statements => [])
+          @blocks << ASTBlock.new(:statements => []) if @blocks.length == 1
         end
       end
     end
