@@ -1,6 +1,7 @@
 require 'active_record'
 require 'active_support'
 require 'adsl/parser/ast_nodes'
+require 'adsl/extract/rails/other_meta'
 
 module ADSL
   module Extract
@@ -20,6 +21,67 @@ module ADSL
 
         def target_classname
           ActiveRecordMetaclassGenerator.target_classname(@ar_class.name)
+        end
+
+        def parent_classname
+          if @ar_class.superclass == ActiveRecord::Base
+            nil
+          else
+            ASTIdent.new :text => @ar_class.superclass.instrumented_counterpart.adsl_ast_class_name
+          end
+        end
+
+        def reflection_to_adsl_ast(reflection)
+          assoc_name = reflection.name
+          target_class = reflection.class_name
+          cardinality = reflection.collection? ? [0, 1.0/0.0] : [0, 1]
+          inverse_of = case reflection.macro
+          when :belongs_to; nil
+          when :has_one, :has_many
+            reflection.has_inverse? ? reflection.inverse_of : reflection.foreign_key[0..-4]
+          when :has_and_belongs_to_many
+            foreign_name = reflection.has_inverse? ? reflection.inverse_of : reflection.foreign_key[0..-4]
+            assoc_name < foreign_name ? nil : foreign_name
+          else
+            raise "Unknown association macro `#{reflection.macro}' on #{reflection}"
+          end
+
+          ASTRelation.new(
+            :cardinality => cardinality,
+            :to_class_name => ASTIdent.new(:text => target_class.sub('::', '_')),
+            :name => ASTIdent.new(:text => assoc_name.to_s),
+            :inverse_of_name => (inverse_of.nil? ? nil : ASTIdent.new(:text => inverse_of.sub('::', '_')))
+          )
+        end
+
+        def reflections(options = {})
+          # true => include only
+          # false => exclude
+          # nil => ignore filter
+          options = {
+            :this_class => true,
+            :polymorphic => false,
+            :through => nil
+          }.merge options
+
+          reflections = @ar_class.reflections.values.dup
+
+          case options[:this_class]
+          when true;  reflections.select!{ |ref| ref.active_record == @ar_class }
+          when false; reflections.select!{ |ref| ref.active_record != @ar_class}
+          end
+          
+          case options[:polymorphic]
+          when true;  reflections.select!{ |ref| ref.options[:as] or ref.options[:polymorphic] }
+          when false; reflections.select!{ |ref| !ref.options[:as] and !ref.options[:polymorphic] }
+          end
+
+          case options[:through]
+          when true;  reflections.select!{ |ref| ref.through_reflection }
+          when false; reflections.select!{ |ref| ref.through_reflection.nil? }
+          end
+
+          reflections
         end
 
         def generate_class
@@ -99,21 +161,41 @@ module ADSL
             new_class
           end
 
-          @ar_class.reflections.values.each do |assoc|
+          reflections(:polymorphic => false, :through => false).each do |assoc|
             new_class.send :define_method, assoc.name do
               target_class = self.class.parent_module.const_get(ActiveRecordMetaclassGenerator.target_classname assoc.class_name)
-              target_class.new :adsl_ast => ASTDereference.new(
+              result = target_class.new :adsl_ast => ASTDereference.new(
                 :objset => self.adsl_ast,
-                :rel_name => ASTIdent.new(:text => assoc.name)
+                :rel_name => ASTIdent.new(:text => assoc.name.to_s)
               )
+              assoc.options[:conditions].nil? ? result : ASTSubset.new(:objset => result)
             end
           end
+          reflections(:polymorphic => false, :through => true).each do |assoc|
+            new_class.send :define_method, assoc.name do
+              through_assoc = assoc.through_reflection
+              source_assoc = assoc.source_reflection
+
+              first_step = self.send through_assoc.name
+              result = first_step.send source_assoc.name
+
+              assoc.options[:conditions].nil? ? result : ASTSubset.new(:objset => result)
+            end
+          end
+          reflections(:polymorphic => true).each do |assoc|
+            new_class.send :define_method, assoc.name do
+              ADSL::Extract::Rails::MetaUnknown.new
+            end
+          end
+
+          adsl_ast_parent_name = parent_classname
+          adsl_ast_relations = reflections(:polymorphic => false, :through => false).map{ |ref| reflection_to_adsl_ast ref }
 
           new_class.singleton_class.send :define_method, :adsl_ast do
             ASTClass.new(
               :name => ASTIdent.new(:text => adsl_ast_class_name),
-              :parent_name => (ar_class.superclass == ActiveRecord::Base ? nil : ASTIdent.new(:text => ar_class.superclass.instrumented_counterpart.adsl_ast_class_name)),
-              :relations => []
+              :parent_name => adsl_ast_parent_name,
+              :relations => adsl_ast_relations
             )
           end
 

@@ -8,16 +8,16 @@ ENV["RAILS_ENV"] ||= 'test'
 def initialize_test_context
   Object.lookup_or_create_class('::Asd', ActiveRecord::Base).class_exec do
     has_many :blahs, :class_name => 'Mod::Blah'
+    has_many :kmes, :through => :blahs, :source => :kme12
   end
   
-  Object.lookup_or_create_class('::Kme', Asd)
+  Object.lookup_or_create_class('::Kme', Asd).class_exec do
+    belongs_to :blah, :class_name => 'Mod::Blah'
+  end
   
   Object.lookup_or_create_class('::Mod::Blah', ActiveRecord::Base).class_exec do
     belongs_to :asd
-  end
-  
-  Object.lookup_or_create_class('::Asd', ActiveRecord::Base).class_exec do
-    has_many :blahs, :class_name => 'Mod::Blah'
+    has_one :kme12, :class_name => 'Kme'
   end
 
   Object.lookup_or_create_class('::ApplicationController', ActionController::Base).class_exec do

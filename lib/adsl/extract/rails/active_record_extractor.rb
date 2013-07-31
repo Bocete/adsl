@@ -17,17 +17,9 @@ module ADSL
         end
 
         def extract_static(classes)
-          defined_classes = Set[ActiveRecord::Base]
           mapping = {}
-          classes.dup.worklist_each do |ar_klass|
-            if defined_classes.include? ar_klass.superclass
-              metaclass = extract_class ar_klass
-              defined_classes << ar_klass
-              mapping[ar_klass] = metaclass
-              next nil
-            else
-              next ar_klass
-            end
+          classes.each do |ar_klass|
+            mapping[ar_klass] = extract_class ar_klass
           end
           mapping
         end

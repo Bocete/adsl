@@ -715,6 +715,12 @@ module ADSL
         return ADSL::DS::DSEmptyObjset.new if objset.type.nil?
         return ADSL::DS::DSSubset.new :objset => objset
       end
+
+      def optimize!
+        while @objset.is_a? ASTSubset
+          @objset = @objset.objset
+        end
+      end
     end
     
     class ASTOneOf < ASTNode

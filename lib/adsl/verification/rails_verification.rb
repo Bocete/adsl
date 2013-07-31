@@ -15,6 +15,7 @@ module ADSL
         }.merge options
         ast = options[:ast]
         ast = extract_ast(options[:extract_options]) if ast.nil?
+
         spec = ast.typecheck_and_resolve
         
         require 'adsl/spass/bin'

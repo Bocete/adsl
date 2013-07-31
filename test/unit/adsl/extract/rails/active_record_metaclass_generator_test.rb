@@ -85,5 +85,55 @@ module ADSL::Extract::Rails
       assert blah.respond_to? :asd
       assert_equal ADSLMetaAsd, blah.asd.class
     end
+
+    def test_generate__associations_adsl_ast
+      ActiveRecordMetaclassGenerator.new(Asd).generate_class
+      ActiveRecordMetaclassGenerator.new(Kme).generate_class
+      ActiveRecordMetaclassGenerator.new(Mod::Blah).generate_class
+      
+      asd = ADSLMetaAsd.adsl_ast
+      assert_equal 1, asd.relations.length
+      assert_equal [0, 1.0/0.0], asd.relations.first.cardinality
+      assert_equal 'Mod_Blah', asd.relations.first.to_class_name.text
+      assert_equal 'blahs', asd.relations.first.name.text
+      assert_equal 'asd', asd.relations.first.inverse_of_name.text
+
+      kme = ADSLMetaKme.adsl_ast
+      assert_equal 1, kme.relations.length
+      assert_equal [0, 1], kme.relations.last.cardinality
+      assert_equal 'Mod_Blah', kme.relations.last.to_class_name.text
+      assert_equal 'blah', kme.relations.last.name.text
+      assert_nil kme.relations.last.inverse_of_name
+
+      blah = Mod::ADSLMetaBlah.adsl_ast
+      assert_equal 2, blah.relations.length
+
+      assert_equal [0, 1], blah.relations.first.cardinality
+      assert_equal 'Asd', blah.relations.first.to_class_name.text
+      assert_equal 'asd', blah.relations.first.name.text
+      assert_nil blah.relations.first.inverse_of_name
+
+      assert_equal [0, 1], blah.relations.second.cardinality
+      assert_equal 'Kme', blah.relations.second.to_class_name.text
+      assert_equal 'kme12', blah.relations.second.name.text
+      assert_equal 'blah', blah.relations.second.inverse_of_name.text
+    end
+
+    def test_generate__associations_through
+      ActiveRecordMetaclassGenerator.new(Asd).generate_class
+      ActiveRecordMetaclassGenerator.new(Kme).generate_class
+      ActiveRecordMetaclassGenerator.new(Mod::Blah).generate_class
+     
+      assert ADSLMetaAsd.adsl_ast.relations.select{ |rel| rel.name.text == 'kmes' }.empty?
+      objset = ADSLMetaAsd.new :adsl_ast => :something_unique
+      through = objset.kmes
+      assert_equal ADSLMetaKme, through.class
+
+      assert_equal ASTDereference, through.adsl_ast.class
+      assert_equal 'kme12', through.adsl_ast.rel_name.text 
+      assert_equal ASTDereference, through.adsl_ast.objset.class
+      assert_equal 'blahs', through.adsl_ast.objset.rel_name.text 
+      assert_equal :something_unique, through.adsl_ast.objset.objset
+    end
   end
 end
