@@ -20,13 +20,15 @@ module ADSL
           @active_record_instrumenter = ADSL::Extract::Rails::ActiveRecordExtractor.new
           @class_map = @active_record_instrumenter.extract_static options[:ar_classes]
           
-          @action_instrumenter = ADSL::Extract::Rails::ActionInstrumenter.new(@class_map.keys.map{ |n| n.name.split('::').last })
+          ar_class_names = @class_map.keys.map{ |n| n.name.split('::').last }
+
+          @action_instrumenter = ADSL::Extract::Rails::ActionInstrumenter.new ar_class_names
           @actions = []
           all_routes.each do |route|
             @actions << action_to_adsl_ast(route)
           end
           
-          @invariant_extractor = ADSL::Extract::Rails::InvariantExtractor.new
+          @invariant_extractor = ADSL::Extract::Rails::InvariantExtractor.new ar_class_names
           @invariants = @invariant_extractor.extract(options[:invariants]).map{ |inv| inv.adsl_ast }
         end
 

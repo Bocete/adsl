@@ -13,23 +13,43 @@ module ADSL
         @is_statement
       end
 
+      def self.is_objset?
+        @is_objset
+      end
+
+      def self.is_formula?
+        @is_formula
+      end
+
       def self.objset_has_side_effects?
         @objset_has_side_effects
       end
 
       def self.node_type(*fields)
         options = {
-          :is_statement => false,
           :objset_has_side_effects => false
         }
         if fields.last.is_a? Hash
           options.merge! fields.pop
         end
-        @is_statement = options[:is_statement]
+
+        if options.include?(:type) and !options.include?(:types)
+          options[:types] = [options[:type]]
+        end
+        if options.include?(:types)
+          @is_statement = options[:types].include? :statement
+          @is_objset = options[:types].include? :objset
+          @is_formula = options[:types].include? :formula
+        end
+
         @objset_has_side_effects = options[:objset_has_side_effects]
 
         container_for *fields
         container_for :lineno
+      end
+
+      def adsl_ast
+        self
       end
 
       def optimize!
@@ -446,7 +466,7 @@ module ADSL
     end
 
     class ASTBlock < ASTNode
-      node_type :statements, :is_statement => true
+      node_type :statements, :type => :statement
 
       def typecheck_and_resolve(context, open_subcontext=true)
         context.push_frame if open_subcontext
@@ -486,7 +506,7 @@ module ADSL
     end
 
     class ASTAssignment < ASTNode
-      node_type :var_name, :objset, :is_statement => true
+      node_type :var_name, :objset, :type => :statement
 
       def typecheck_and_resolve(context)
         objset = @objset.typecheck_and_resolve context
@@ -497,7 +517,7 @@ module ADSL
     end
 
     class ASTObjsetStmt < ASTNode
-      node_type :objset, :is_statement => true
+      node_type :objset, :type => :statement
 
       def typecheck_and_resolve(context)
         @objset.typecheck_and_resolve(context)
@@ -506,7 +526,7 @@ module ADSL
     end
 
     class ASTCreateObjset < ASTNode
-      node_type :class_name, :objset_has_side_effects => true
+      node_type :class_name, :type => :objset, :objset_has_side_effects => true
 
       def typecheck_and_resolve(context)
         klass_node, klass = context.classes[@class_name.text]
@@ -518,7 +538,7 @@ module ADSL
     end
 
     class ASTForEach < ASTNode
-      node_type :var_name, :objset, :block, :is_statement => true
+      node_type :var_name, :objset, :block, :type => :statement
 
       def typecheck_and_resolve(context)
         before_context = context.dup
@@ -579,7 +599,7 @@ module ADSL
     end
 
     class ASTEither < ASTNode
-      node_type :blocks, :is_statement => true
+      node_type :blocks, :type => :statement
 
       def typecheck_and_resolve(context)
         context.push_frame
@@ -642,7 +662,7 @@ module ADSL
     end
 
     class ASTDeleteObj < ASTNode
-      node_type :objset, :is_statement => true
+      node_type :objset, :type => :statement
 
       def typecheck_and_resolve(context)
         objset = @objset.typecheck_and_resolve context
@@ -652,7 +672,7 @@ module ADSL
     end
 
     class ASTCreateTup < ASTNode
-      node_type :objset1, :rel_name, :objset2, :is_statement => true
+      node_type :objset1, :rel_name, :objset2, :type => :statement
 
       def typecheck_and_resolve(context)
         objset1 = @objset1.typecheck_and_resolve context
@@ -665,7 +685,7 @@ module ADSL
     end
 
     class ASTDeleteTup < ASTNode
-      node_type :objset1, :rel_name, :objset2, :is_statement => true
+      node_type :objset1, :rel_name, :objset2, :type => :statement
       
       def typecheck_and_resolve(context)
         objset1 = @objset1.typecheck_and_resolve context
@@ -678,7 +698,7 @@ module ADSL
     end
 
     class ASTSetTup < ASTNode
-      node_type :objset1, :rel_name, :objset2, :is_statement => true
+      node_type :objset1, :rel_name, :objset2, :type => :statement
 
       def typecheck_and_resolve(context)
         objset1 = @objset1.typecheck_and_resolve context
@@ -694,7 +714,7 @@ module ADSL
     end
 
     class ASTAllOf < ASTNode
-      node_type :class_name
+      node_type :class_name, :type => :objset
 
       def typecheck_and_resolve(context)
         klass_node, klass = context.classes[@class_name.text]
@@ -708,7 +728,7 @@ module ADSL
     end
 
     class ASTSubset < ASTNode
-      node_type :objset
+      node_type :objset, :type => :objset
 
       def typecheck_and_resolve(context)
         objset = @objset.typecheck_and_resolve context
@@ -724,7 +744,7 @@ module ADSL
     end
     
     class ASTOneOf < ASTNode
-      node_type :objset
+      node_type :objset, :type => :objset
 
       def typecheck_and_resolve(context)
         objset = @objset.typecheck_and_resolve context
@@ -734,7 +754,7 @@ module ADSL
     end
     
     class ASTVariable < ASTNode
-      node_type :var_name
+      node_type :var_name, :type => :objset
 
       def typecheck_and_resolve(context)
         var_node, var = context.lookup_var @var_name.text
@@ -745,7 +765,7 @@ module ADSL
     end
 
     class ASTDereference < ASTNode
-      node_type :objset, :rel_name
+      node_type :objset, :rel_name, :type => :objset
 
       def typecheck_and_resolve(context)
         objset = @objset.typecheck_and_resolve context
@@ -765,7 +785,7 @@ module ADSL
     end
 
     class ASTInvariant < ASTNode
-      node_type :name, :formula
+      node_type :name, :formula, :type => :formula
 
       def typecheck_and_resolve(context)
         formula = @formula.typecheck_and_resolve context
@@ -775,7 +795,7 @@ module ADSL
     end
 
     class ASTBoolean < ASTNode
-      node_type :bool_value
+      node_type :bool_value, :type => :formula
 
       def typecheck_and_resolve(context)
         return ADSL::DS::DSBoolean::TRUE if @bool_value
@@ -784,7 +804,7 @@ module ADSL
     end
 
     class ASTForAll < ASTNode
-      node_type :vars, :subformula
+      node_type :vars, :subformula, :type => :formula
 
       def typecheck_and_resolve(context)
         context.in_stack_frame do
@@ -806,7 +826,7 @@ module ADSL
     end
 
     class ASTExists < ASTNode
-      node_type :vars, :subformula
+      node_type :vars, :subformula, :type => :formula
 
       def typecheck_and_resolve(context)
         context.in_stack_frame do
@@ -828,7 +848,7 @@ module ADSL
     end
 
     class ASTNot < ASTNode
-      node_type :subformula
+      node_type :subformula, :type => :formula
 
       def typecheck_and_resolve(context)
         subformula = @subformula.typecheck_and_resolve context
@@ -839,7 +859,7 @@ module ADSL
     end
 
     class ASTAnd < ASTNode
-      node_type :subformulae
+      node_type :subformulae, :type => :formula
 
       def typecheck_and_resolve(context)
         subformulae = @subformulae.map{ |o| o.typecheck_and_resolve context }
@@ -859,7 +879,7 @@ module ADSL
     end
     
     class ASTOr < ASTNode
-      node_type :subformulae
+      node_type :subformulae, :type => :formula
 
       def typecheck_and_resolve(context)
         subformulae = @subformulae.map{ |o| o.typecheck_and_resolve context }
@@ -879,7 +899,7 @@ module ADSL
     end
 
     class ASTEquiv < ASTNode
-      node_type :subformulae
+      node_type :subformulae, :type => :formula
 
       def typecheck_and_resolve(context)
         subformulae = @subformulae.map{ |o| o.typecheck_and_resolve context }
@@ -891,7 +911,7 @@ module ADSL
     end
 
     class ASTImplies < ASTNode
-      node_type :subformula1, :subformula2
+      node_type :subformula1, :subformula2, :type => :formula
 
       def typecheck_and_resolve(context)
         subformula1 = @subformula1.typecheck_and_resolve context
@@ -905,7 +925,7 @@ module ADSL
     end
 
     class ASTEqual < ASTNode
-      node_type :objsets
+      node_type :objsets, :type => :formula
       
       def typecheck_and_resolve(context)
         objsets = @objsets.map{ |o| o.typecheck_and_resolve context }
@@ -928,7 +948,7 @@ module ADSL
     end
 
     class ASTIn < ASTNode
-      node_type :objset1, :objset2
+      node_type :objset1, :objset2, :type => :formula
 
       def typecheck_and_resolve(context)
         objset1 = @objset1.typecheck_and_resolve context
@@ -943,7 +963,7 @@ module ADSL
     end
     
     class ASTEmpty < ASTNode
-      node_type :objset
+      node_type :objset, :type => :formula
 
       def typecheck_and_resolve(context)
         objset = @objset.typecheck_and_resolve context

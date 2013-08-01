@@ -107,7 +107,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
         @a = Asd.new
         @a.save!
         a = nil
-        @a.destroy! # will throw an exception if a == @a
+        @a.delete! # will throw an exception if a == @a
         respond_to
       end
     end
@@ -138,7 +138,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
         @@a.save!
         a = nil
         @a = nil
-        @@a.destroy! # will throw an exception if @@a == @a or @@ == a
+        @@a.delete! # will throw an exception if @@a == @a or @@ == a
         respond_to
       end
     end
@@ -181,7 +181,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
         if something
           Asd.new
         else
-          Asd.find.destroy!
+          Asd.find.delete!
         end
       end
     end
@@ -210,7 +210,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
         else
           Asd.build
         end
-        Asd.find.destroy!
+        Asd.find.delete!
       end
     end
 
@@ -302,7 +302,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
         if whatever
           return Asd.new
         else
-          Asd.find.destroy!
+          Asd.find.delete!
         end
       end
 
@@ -358,8 +358,8 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     AsdsController.class_exec do
       def nothing
         a, b = Asd.new, Kme.new
-        a.destroy!
-        b.destroy!
+        a.delete!
+        b.delete!
       end
     end
     extractor = create_rails_extractor
@@ -393,8 +393,8 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
      
       def nothing
         a, b = blah
-        a.destroy!
-        b.destroy!
+        a.delete!
+        b.delete!
       end
     end
     extractor = create_rails_extractor

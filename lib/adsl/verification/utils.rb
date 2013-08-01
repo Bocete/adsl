@@ -9,7 +9,7 @@ module ADSL
       end
       
       def infer_classname_from_varname(varname)
-        varname.to_s.match(/^(\w+?)(?:_*\d*)?$/)[1].camelize
+        varname.to_s.match(/^(\w+?)(?:_*\d+)?$/)[1].camelize
       end
         
       def classname_for_classname(klass)

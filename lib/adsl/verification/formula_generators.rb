@@ -1,7 +1,6 @@
 require 'adsl/verification/utils'
 require 'adsl/parser/ast_nodes'
 require 'adsl/util/general'
-require 'adsl/verification/objset'
 
 module ADSL
   module Verification
@@ -15,48 +14,56 @@ module ADSL
 
       def in_formula_builder
         formula_builder = nil
-        if self.is_a?(FormulaBuilder)
+        if self.is_a? ::ADSL::Verification::FormulaBuilder
           formula_builder = self
         else
-          formula_builder = FormulaBuilder.new
+          formula_builder = ::ADSL::Verification::FormulaBuilder.new
           formula_builder.adsl_stack << self.adsl_ast if self.respond_to? :adsl_ast
         end
         yield formula_builder
         formula_builder
       end
 
-      def handle_quantifier(quantifier, klass, arg_types, block)
+      def handle_quantifier(quantifier, adsl_ast_node_klass, arg_types, block)
         raise "A block needs to be passed to quantifiers" if block.nil?
         raise "At least some variables need to be given to the block" if block.parameters.empty?
         in_formula_builder do |fb|
           
           param_types = {}
           block.parameters.each do |param|
-            param_types[param[1]] = infer_classname_from_varname param[1]
+            classname = infer_classname_from_varname param[1]
+            klass = Object.lookup_const classname
+            param_types[param[1].to_sym] = klass
           end
           arg_types.each do |explicit_name, explicit_type|
-            param_types[explicit_name.to_sym] = classname_for_classname explicit_type
+            classname = classname_for_classname explicit_type
+            klass = Object.lookup_const classname
+            raise "Unknown class #{explicit_type} for parameter #{explicit_name}" if klass.nil?
+            param_types[explicit_name.to_sym] = klass
           end
 
-          param_types.each do |param_name, param_type|
-            raise "Unknown type #{param_type} for parameter #{param_name}" if Object.lookup_const(param_type).nil?
+          param_types.each do |name, klass|
+            raise "Unknown klass for variable `#{name}' in #{quantifier} quantifier" if klass.nil?
+            raise "Class #{klass.name} is not instrumented" unless klass.respond_to? :instrumented_counterpart
           end
 
+          param_types.keys.each do |name|
+            param_types[name] = param_types[name].instrumented_counterpart
+          end
+          
           vars_and_objsets = block.parameters.map{ |param|
             [
-              t(param[1]),
-              Objset.allof(param_types[param[1]]).adsl_ast
+              t(param[1].to_s),
+              param_types[param[1].to_sym].all.adsl_ast
             ]
           }
-          subformula = block.(*block.parameters.map{ |param| Objset.new :adsl_ast => ASTVariable.new(:var_name => t(param[1])) })
+          subformula = block.(*block.parameters.map do |param|
+            param_types[param[1].to_sym].new :adsl_ast => ASTVariable.new(:var_name => t(param[1]))
+          end)
           subformula = true if subformula.nil?
           raise "Invalid formula returned by block in `#{quantifier}'" unless subformula.respond_to? :adsl_ast 
-          fb.adsl_stack << klass.new(:vars => vars_and_objsets, :subformula => subformula.adsl_ast)
+          fb.adsl_stack << adsl_ast_node_klass.new(:vars => vars_and_objsets, :subformula => subformula.adsl_ast)
         end
-      end
-
-      def allof(klass)
-        Objset.allof klass
       end
 
       def forall(arg_types = {}, &block)
@@ -96,7 +103,7 @@ module ADSL
             fb.adsl_stack << op
           else
             params.each do |param|
-              raise "Invalid formula in `#{op}' parameter list" unless param.respond_to? :adsl_ast
+              raise "Invalid formula `#{param}' in `#{op}' parameter list" unless param.respond_to? :adsl_ast
             end
             fb.adsl_stack << klass.new(:subformulae => params.map(&:adsl_ast))
           end
@@ -110,7 +117,7 @@ module ADSL
             fb.adsl_stack << op
           else
             params.each do |param|
-              raise "Invalid formula in `#{op}' parameter list" unless param.respond_to? :adsl_ast
+              raise "Invalid formula `#{param}' in `#{op}' parameter list" unless param.respond_to? :adsl_ast
             end
             fb.adsl_stack << klass.new(:subformula1 => params.first.adsl_ast, :subformula2 => params.last.adsl_ast)
           end

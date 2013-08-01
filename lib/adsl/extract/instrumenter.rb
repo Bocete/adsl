@@ -107,8 +107,11 @@ module ADSL
 
       def should_instrument?(object, method_name)
         method = object.method method_name
+
         return false if method.source_location.nil?
+        return false if method.owner == Kernel
         return true if @instrument_domain.nil? || method.source_location =~ /^#{@instrument_domain}.*$/
+        
         source = method.source
         sexp = ruby_parser.process source
         !sexp_instrumented? sexp
@@ -132,6 +135,16 @@ module ADSL
         sexp.sexp_type == :defs ? s(:defn, *sexp[2..-1]) : sexp
       end
 
+      def instrument_string(source)
+        sexp = ruby_parser.process source
+        unless sexp.nil?
+          instrumented_sexp = instrument_sexp sexp
+          new_code = Ruby2Ruby.new.process instrumented_sexp
+        else
+          source
+        end
+      end
+
       def instrument(object, method_name)
         if should_instrument? object, method_name
           begin
@@ -141,21 +154,26 @@ module ADSL
             # Ruby 2.0.0 support is in development as of writing this
             sexp = ruby_parser.process source
 
-            sexp = convert_root_defs_into_defn sexp
+            unless sexp.nil?
+              sexp = convert_root_defs_into_defn sexp
 
-            instrumented_sexp = instrument_sexp sexp
-            
-            new_code = Ruby2Ruby.new.process instrumented_sexp
+              instrumented_sexp = instrument_sexp sexp
+              
+              new_code = Ruby2Ruby.new.process instrumented_sexp
 
-            object.replace_method method_name, new_code
+              object.replace_method method_name, new_code
 
-            return new_code
+              new_code
+            else
+              source
+            end
           rescue MethodSource::SourceNotFoundError
           end
         end
       end
 
       def instrument_sexp(sexp)
+        return nil if sexp.nil?
         @replacers.reverse_each do |types, block|
           sexp = sexp.block_replace *types, &block
         end

@@ -135,5 +135,64 @@ module ADSL::Extract::Rails
       assert_equal 'blahs', through.adsl_ast.objset.rel_name.text 
       assert_equal :something_unique, through.adsl_ast.objset.objset
     end
+
+    def test_generate__delete_single_statements
+      ActiveRecordMetaclassGenerator.new(Asd).generate_class
+      ActiveRecordMetaclassGenerator.new(Kme).generate_class
+      ActiveRecordMetaclassGenerator.new(Mod::Blah).generate_class
+
+      asd_delete = ADSLMetaAsd.new.delete
+      assert_equal 1, asd_delete.length
+      assert_equal ASTDeleteObj, asd_delete.first.class
+      
+      kme_delete = ADSLMetaKme.new.delete
+      assert_equal 1, kme_delete.length
+      assert_equal ASTDeleteObj, kme_delete.first.class
+      
+      blah_delete = Mod::ADSLMetaBlah.new.delete
+      assert_equal 1, blah_delete.length
+      assert_equal ASTDeleteObj, blah_delete.first.class
+    end
+
+    def test_generate__destroy_propagates_to_delete_but_not_further
+      ActiveRecordMetaclassGenerator.new(Asd).generate_class
+      ActiveRecordMetaclassGenerator.new(Kme).generate_class
+      ActiveRecordMetaclassGenerator.new(Mod::Blah).generate_class
+
+      asd_delete = Mod::ADSLMetaBlah.new(:adsl_ast => :blah).destroy
+      assert_equal 2, asd_delete.length
+
+      assert_equal ASTDeleteObj, asd_delete.first.class
+      assert_equal ASTDereference, asd_delete.first.objset.class
+      assert_equal 'kme12', asd_delete.first.objset.rel_name.text
+      assert_equal :blah, asd_delete.first.objset.objset
+
+      assert_equal ASTDeleteObj, asd_delete.last.class
+      assert_equal :blah, asd_delete.last.objset
+    end
+    
+    def test_generate__destroy_through_destroys_the_join_object
+      ActiveRecordMetaclassGenerator.new(Asd).generate_class
+      ActiveRecordMetaclassGenerator.new(Kme).generate_class
+      ActiveRecordMetaclassGenerator.new(Mod::Blah).generate_class
+
+      asd_delete = ADSLMetaAsd.new(:adsl_ast => :blah).destroy
+      assert_equal 3, asd_delete.length
+      
+      assert_equal ASTDeleteObj, asd_delete[0].class
+      assert_equal ASTDereference, asd_delete[0].objset.class
+      assert_equal ASTDereference, asd_delete[0].objset.objset.class
+      assert_equal 'kme12', asd_delete[0].objset.rel_name.text
+      assert_equal 'blahs', asd_delete[0].objset.objset.rel_name.text
+      assert_equal :blah, asd_delete[0].objset.objset.objset
+
+      assert_equal ASTDeleteObj, asd_delete[1].class
+      assert_equal ASTDereference, asd_delete[1].objset.class
+      assert_equal 'blahs', asd_delete[1].objset.rel_name.text
+      assert_equal :blah, asd_delete[1].objset.objset
+      
+      assert_equal ASTDeleteObj, asd_delete[2].class
+      assert_equal :blah, asd_delete[2].objset
+    end
   end
 end

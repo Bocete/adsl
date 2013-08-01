@@ -3,24 +3,18 @@ require 'pp'
 require 'adsl/extract/meta'
 require 'adsl/util/test_helper'
 require 'adsl/verification/formula_generators'
-require 'adsl/verification/objset'
+require 'adsl/extract/rails/rails_instrumentation_test_case'
 
-class ADSL::Verification::FormulaGeneratorsTest < Test::Unit::TestCase
+class ADSL::Verification::FormulaGeneratorsTest < ADSL::Extract::Rails::RailsInstrumentationTestCase
   include ADSL::Verification::FormulaGenerators
   include ADSL::Parser
   include ADSL::Verification
-  
+
   def setup
-    eval <<-ruby
-      class ::User; end
-      class ::UserAddress; end
-    ruby
+    super
+    initialize_metaclasses
   end
-
-  def teardown
-    unload_class :User, :UserAddress
-  end
-
+  
   def anything_with_adsl_ast
     o = Object.new
     o.define_singleton_method :adsl_ast do
@@ -30,11 +24,11 @@ class ADSL::Verification::FormulaGeneratorsTest < Test::Unit::TestCase
   end
 
   def test_forall__raises_unless_return_value_has_an_adsl_ast
-    forall do |user|
+    forall do |asd|
       anything_with_adsl_ast
     end
     assert_raise do
-      forall do |user|
+      forall do |asd|
         'blah!'
       end
     end
@@ -67,66 +61,66 @@ class ADSL::Verification::FormulaGeneratorsTest < Test::Unit::TestCase
   
   def test_quantification__explicit_types_from_block_params
     {:forall => ASTForAll, :exists => ASTExists}.each do |quantifier, klass|
-      formula = send(quantifier, {:a => User}, &lambda do |a|
-        assert_equal Objset, a.class
+      formula = send(quantifier, {:a => Asd}, &lambda do |a|
+        assert_equal ADSLMetaAsd, a.class
         assert_equal ASTVariable, a.adsl_ast.class
         assert_equal 'a', a.adsl_ast.var_name.text
         anything_with_adsl_ast
       end)
       assert_equal klass, formula.adsl_ast.class
-      assert_equal 'User', formula.adsl_ast.vars[0][1].class_name.text
+      assert_equal 'Asd', formula.adsl_ast.vars[0][1].class_name.text
 
-      formula = send(quantifier, {:a => User, :b => UserAddress}, &lambda do |a, b|
-        assert_equal Objset, a.class
+      formula = send(quantifier, {:a => Asd, :b => Kme}, &lambda do |a, b|
+        assert_equal ADSLMetaAsd, a.class
         assert_equal ASTVariable, a.adsl_ast.class
         assert_equal 'a', a.adsl_ast.var_name.text
-        assert_equal Objset, b.class
+        assert_equal ADSLMetaKme, b.class
         assert_equal ASTVariable, b.adsl_ast.class
         assert_equal 'b', b.adsl_ast.var_name.text
         anything_with_adsl_ast
       end)
       assert_equal klass, formula.adsl_ast.class
-      assert_equal 'User', formula.adsl_ast.vars[0][1].class_name.text
-      assert_equal 'UserAddress', formula.adsl_ast.vars[1][1].class_name.text
+      assert_equal 'Asd', formula.adsl_ast.vars[0][1].class_name.text
+      assert_equal 'Kme', formula.adsl_ast.vars[1][1].class_name.text
     end
   end
 
   def test_quantifiers__infer_types_from_block_params
     {:forall => ASTForAll, :exists => ASTExists}.each do |quantifier, klass|
-      formula = send(quantifier, &lambda do |user|
-        assert_equal Objset, user.class
-        assert_equal ASTVariable, user.adsl_ast.class
-        assert_equal 'user', user.adsl_ast.var_name.text
+      formula = send(quantifier, &lambda do |asd|
+        assert_equal ADSLMetaAsd, asd.class
+        assert_equal ASTVariable, asd.adsl_ast.class
+        assert_equal 'asd', asd.adsl_ast.var_name.text
         anything_with_adsl_ast
       end)
       assert_equal klass, formula.adsl_ast.class
-      assert_equal 'User', formula.adsl_ast.vars[0][1].class_name.text
+      assert_equal 'Asd', formula.adsl_ast.vars[0][1].class_name.text
 
-      formula = send(quantifier, &lambda do |user, user_address|
-        assert_equal Objset, user.class
-        assert_equal ASTVariable, user.adsl_ast.class
-        assert_equal 'user', user.adsl_ast.var_name.text
-        assert_equal Objset, user_address.class
-        assert_equal ASTVariable, user_address.adsl_ast.class
-        assert_equal 'user_address', user_address.adsl_ast.var_name.text
+      formula = send(quantifier, &lambda do |asd, kme|
+        assert_equal ADSLMetaAsd, asd.class
+        assert_equal ASTVariable, asd.adsl_ast.class
+        assert_equal 'asd',       asd.adsl_ast.var_name.text
+        assert_equal ADSLMetaKme, kme.class
+        assert_equal ASTVariable, kme.adsl_ast.class
+        assert_equal 'kme',       kme.adsl_ast.var_name.text
         anything_with_adsl_ast
       end)
       assert_equal klass, formula.adsl_ast.class
-      assert_equal 'User', formula.adsl_ast.vars[0][1].class_name.text
-      assert_equal 'UserAddress', formula.adsl_ast.vars[1][1].class_name.text
+      assert_equal 'Asd', formula.adsl_ast.vars[0][1].class_name.text
+      assert_equal 'Kme', formula.adsl_ast.vars[1][1].class_name.text
     end
   end
   
   def test_quantifier__precedence_of_type_inferment_lesser_than_explicit_declaration
     {:forall => ASTForAll, :exists => ASTExists}.each do |quantifier, klass|
-      formula = send(quantifier, {:user => UserAddress}, &lambda do |user|
-        assert_equal Objset, user.class
-        assert_equal ASTVariable, user.adsl_ast.class
-        assert_equal 'user', user.adsl_ast.var_name.text
+      formula = send(quantifier, {:asd => Kme}, &lambda do |asd|
+        assert_equal ADSLMetaKme, asd.class
+        assert_equal ASTVariable, asd.adsl_ast.class
+        assert_equal 'asd', asd.adsl_ast.var_name.text
         anything_with_adsl_ast
       end)
       assert_equal klass, formula.adsl_ast.class
-      assert_equal 'UserAddress', formula.adsl_ast.vars[0][1].class_name.text
+      assert_equal 'Kme', formula.adsl_ast.vars[0][1].class_name.text
     end
   end
 
@@ -142,7 +136,7 @@ class ADSL::Verification::FormulaGeneratorsTest < Test::Unit::TestCase
 
   def test_quantifier__contains_the_subformula
     {:forall => ASTForAll, :exists => ASTExists}.each do |quantifier, klass|
-      formula = send(quantifier, &lambda do |user|
+      formula = send(quantifier, &lambda do |asd|
         true
       end)
       assert_equal klass, formula.adsl_ast.class

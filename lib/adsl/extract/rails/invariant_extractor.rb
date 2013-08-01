@@ -1,5 +1,6 @@
 require 'adsl/verification/invariant'
 require 'adsl/verification/formula_generators'
+require 'adsl/extract/rails/invariant_instrumenter'
 
 module ADSL
   module Extract
@@ -7,11 +8,12 @@ module ADSL
       class InvariantExtractor
 
         include ADSL::Verification
-        include FormulaGenerators
+        include ADSL::Verification::FormulaGenerators
 
         attr_reader :invariants
 
-        def initialize
+        def initialize(ar_class_names)
+          @ar_class_names = ar_class_names
           @invariants = []
           @builder = nil
           @stack_level = 0
@@ -23,7 +25,7 @@ module ADSL
 
         def load_in_context(path)
           file = File.open path, 'r'
-          self.instance_eval file.read
+          ADSL::Extract::Rails::InvariantInstrumenter.new(@ar_class_names).instrument_and_execute_source self, file.read
         ensure
           file.close
         end
@@ -34,7 +36,7 @@ module ADSL
               load_in_context path
             end
           else
-            self.instance_eval param
+            ADSL::Extract::Rails::InvariantInstrumenter.new(@ar_class_names).instrument_and_execute_source self, param
           end
           @invariants
         end

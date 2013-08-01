@@ -74,6 +74,7 @@ module ADSL
         end
 
         def common_return_value
+          puts "DUP DUP [#{@return_values.join ', '}]"
           uniq = @return_values.uniq
           if uniq.length == 1
             uniq.first
@@ -84,8 +85,9 @@ module ADSL
 
             @return_values.length.times do |index|
               [@return_values[index]].flatten.each do |ret_value|
+                puts "Return value #{ret_value} on branch #{index}"
                 stmt = ADSL::Extract::Rails::ActionInstrumenter.extract_stmt_from_expr ret_value
-                @root_paths[index] << stmt unless stmt.nil? or !stmt.class.is_statement? or @root_paths[index].include?(stmt)
+                @root_paths[index] << stmt unless stmt.nil? or !stmt.class.is_statement or @root_paths[index].include?(stmt)
               end
             end
             

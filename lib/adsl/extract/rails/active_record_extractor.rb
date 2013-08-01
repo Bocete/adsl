@@ -19,7 +19,7 @@ module ADSL
         def extract_static(classes)
           mapping = {}
           classes.each do |ar_klass|
-            mapping[ar_klass] = extract_class ar_klass
+            mapping[ar_klass] = extract_class ar_klass if ar_klass < ActiveRecord::Base
           end
           mapping
         end

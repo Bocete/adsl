@@ -1,10 +1,11 @@
 require 'active_support'
 require 'active_record'
+require 'adsl/parser/ast_nodes'
 require 'adsl/extract/instrumenter'
 require 'adsl/extract/sexp_utils'
-require 'adsl/parser/ast_nodes'
 require 'adsl/extract/rails/other_meta'
 require 'adsl/extract/rails/action_block_builder'
+require 'adsl/extract/rails/active_record_metaclass_generator'
 
 module Kernel
   def ins_stmt(expr = nil, options = {})
@@ -12,10 +13,11 @@ module Kernel
       expr.each do |subexpr|
         ins_stmt subexpr, options
       end
-    end
-    stmt = ::ADSL::Extract::Rails::ActionInstrumenter.extract_stmt_from_expr expr
-    if stmt.is_a? ::ADSL::Parser::ASTNode
-      ::ADSL::Extract::Instrumenter.get_instance.abb.append_stmt stmt, options
+    else
+      stmt = ::ADSL::Extract::Rails::ActionInstrumenter.extract_stmt_from_expr expr
+      if stmt.is_a? ::ADSL::Parser::ASTNode and stmt.class.is_statement?
+        ::ADSL::Extract::Instrumenter.get_instance.abb.append_stmt stmt, options
+      end
     end
     expr
   end
@@ -108,7 +110,6 @@ module Kernel
     return_value = instrumenter.abb.explore_all_choices &block
     
     instrumenter.prev_abb << instrumenter.abb.adsl_ast
-    
     return_value
   end
 
@@ -125,11 +126,13 @@ module Kernel
   end
 
   def ins_root_lvl_push_expr(expr = nil)
-    adsl_ast = ::ADSL::Extract::Rails::ActionInstrumenter.extract_stmt_from_expr expr
-    unless adsl_ast.nil?
-      instrumenter = ::ADSL::Extract::Instrumenter.get_instance
-      instrumenter.abb.root_paths.each do |root_path|
-        root_path << adsl_ast unless root_path.include? adsl_ast
+    (expr.is_a?(Array) ? expr : [expr]).each do |final_return|
+      adsl_ast = ::ADSL::Extract::Rails::ActionInstrumenter.extract_stmt_from_expr final_return
+      if adsl_ast and adsl_ast.class.is_statement?
+        instrumenter = ::ADSL::Extract::Instrumenter.get_instance
+        instrumenter.abb.root_paths.each do |root_path|
+          root_path << adsl_ast unless root_path.include? adsl_ast
+        end
       end
     end
     expr
@@ -145,12 +148,10 @@ module ADSL
         def self.extract_stmt_from_expr(expr)
           adsl_ast = expr
           adsl_ast = expr.adsl_ast if adsl_ast.respond_to? :adsl_ast
-          if adsl_ast.is_a? ::ADSL::Parser::ASTNode
-            adsl_ast = ::ADSL::Parser::ASTObjsetStmt.new :objset => adsl_ast unless adsl_ast.class.is_statement?
-            adsl_ast
-          else
-            nil
-          end
+          return nil unless adsl_ast.is_a? ::ADSL::Parser::ASTNode
+          return adsl_ast if adsl_ast.class.is_statement?
+          return ::ADSL::Parser::ASTObjsetStmt.new :objset => adsl_ast if adsl_ast.class.is_objset?
+          nil
         end
 
         attr_accessor :action_block
@@ -292,7 +293,6 @@ module ADSL
           klass.name.match(/^ADSL::.*$/).nil? &&
             !method.owner.respond_to?(:adsl_ast_class_name) &&
             !method.owner.method_defined?(:adsl_ast_class_name) &&
-            method.owner != Kernel &&
             super
         end
       end

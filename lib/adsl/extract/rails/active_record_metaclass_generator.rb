@@ -61,27 +61,61 @@ module ADSL
           options = {
             :this_class => true,
             :polymorphic => false,
-            :through => nil
+            :through => nil,
           }.merge options
 
-          reflections = @ar_class.reflections.values.dup
+          refs = @ar_class.reflections.values.dup
 
           case options[:this_class]
-          when true;  reflections.select!{ |ref| ref.active_record == @ar_class }
-          when false; reflections.select!{ |ref| ref.active_record != @ar_class}
+          when true;  refs.select!{ |ref| ref.active_record == @ar_class }
+          when false; refs.select!{ |ref| ref.active_record != @ar_class}
           end
           
           case options[:polymorphic]
-          when true;  reflections.select!{ |ref| ref.options[:as] or ref.options[:polymorphic] }
-          when false; reflections.select!{ |ref| !ref.options[:as] and !ref.options[:polymorphic] }
+          when true;  refs.select!{ |ref| ref.options[:as] or ref.options[:polymorphic] }
+          when false; refs.select!{ |ref| !ref.options[:as] and !ref.options[:polymorphic] }
           end
 
           case options[:through]
-          when true;  reflections.select!{ |ref| ref.through_reflection }
-          when false; reflections.select!{ |ref| ref.through_reflection.nil? }
+          when true;  refs.select!{ |ref| ref.through_reflection }
+          when false; refs.select!{ |ref| ref.through_reflection.nil? }
           end
 
-          reflections
+          refs
+        end
+
+        def create_destroys(new_class)
+          refls = reflections :this_class => nil
+          new_class.send :define_method, :destroy do
+            stmts = []
+            
+            refls.each do |refl|
+              next unless [:delete, :delete_all, :destroy, :destroy_all].include? refl.options[:dependent]
+                
+              if refl.options[:dependent] == :destroy or refl.options[:dependent] == :destroy_all
+                if refl.through_reflection.nil?
+                  stmts += self.send(refl.name).destroy
+                else
+                  stmts += self.send(refl.through_reflection.name).destroy
+                end
+              else
+                if refl.through_reflection.nil?
+                  stmts += self.send(refl.name).delete
+                else
+                  stmts += self.send(refl.through_reflection.name).delete
+                end
+              end
+            end
+
+            stmts << ASTDeleteObj.new(:objset => self.adsl_ast)
+            stmts
+          end
+          new_class.send :alias_method, :destroy!, :destroy
+
+          new_class.send :define_method, :delete do
+            [ASTDeleteObj.new(:objset => self.adsl_ast)]
+          end
+          new_class.send :alias_method, :delete!, :delete
         end
 
         def generate_class
@@ -106,15 +140,22 @@ module ADSL
             def save; end
             def save!; end
 
-            def destroy
-              ASTDeleteObj.new :objset => self.adsl_ast
-            end
-            alias_method :destroy!, :destroy
-
             def take
               self.new :adsl_ast => ASTOneOf.new(:objset => self.adsl_ast)
             end
             alias_method :take!, :take
+
+            def empty?
+              ASTEmpty.new :objset => self.adsl_ast
+            end
+
+            def <(other)
+              if other.is_a? ASTNode and other.class.is_formula?
+                ASTSubset.new :objset1 => self.adsl_ast, :objset2 => other.adsl_ast
+              else
+                super
+              end
+            end
 
             class << self
               include ADSL::Parser
@@ -160,6 +201,8 @@ module ADSL
           @ar_class.singleton_class.send :define_method, :instrumented_counterpart do
             new_class
           end
+
+          create_destroys new_class
 
           reflections(:polymorphic => false, :through => false).each do |assoc|
             new_class.send :define_method, assoc.name do

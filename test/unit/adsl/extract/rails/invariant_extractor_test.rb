@@ -2,32 +2,91 @@ require 'test/unit'
 require 'adsl/util/test_helper'
 require 'adsl/extract/rails/invariant_extractor'
 require 'adsl/extract/rails/rails_instrumentation_test_case'
+require 'adsl/parser/ast_nodes'
 
 module ADSL::Extract::Rails
   class InvariantExtractorTest < ADSL::Extract::Rails::RailsInstrumentationTestCase
-    def test_load_in_context
+
+    include ADSL::Parser
+
+    def test_load_in_context__basic
       invariant_string = <<-invariants
         invariant "blah", true
-
-        invariant("second", forall do |asd|
-          asd.empty?
-        end)
-
         invariant true
       invariants
       
-      ie = InvariantExtractor.new
+      ie = InvariantExtractor.new ar_class_names
       ie.extract invariant_string
-      assert_equal 3, ie.invariants.length
+      assert_equal 2, ie.invariants.length
 
       assert_equal 'blah',   ie.invariants[0].description
       assert_equal true,     ie.invariants[0].formula.bool_value
 
-      assert_equal 'second', ie.invariants[1].description
-      assert_equal 'asd',    ie.invariants[1].formula.vars[0][0].text
-      
-      assert_equal nil,      ie.invariants[2].description
-      assert_equal true,     ie.invariants[2].formula.bool_value
+      assert_equal nil,      ie.invariants[1].description
+      assert_equal true,     ie.invariants[1].formula.bool_value
     end
+    
+    def test_load_in_context__do_end_moved_to_parameter
+      invariant_string = <<-invariants
+        invariant 'first', forall{ |asd|
+          asd.empty?
+        }
+        invariant 'second', forall do |asd|
+          asd.empty?
+        end
+      invariants
+      
+      ie = InvariantExtractor.new ar_class_names
+      ie.extract invariant_string
+      assert_equal 2, ie.invariants.length
+
+      assert_equal 'first',   ie.invariants[0].description
+      assert_equal ASTForAll, ie.invariants[0].formula.class
+      assert_equal ASTEmpty,  ie.invariants[0].formula.subformula.class
+
+      assert_equal 'second',  ie.invariants[1].description
+      assert_equal ASTForAll, ie.invariants[1].formula.class
+      assert_equal ASTEmpty,  ie.invariants[1].formula.subformula.class
+    end
+    
+    def test_load_in_context__instrumented_ar_classes
+      initialize_metaclasses
+
+      invariant_string = <<-invariants
+        invariant Asd.all.kmes.empty?
+      invariants
+      
+      ie = InvariantExtractor.new ar_class_names
+      ie.extract invariant_string
+      assert_equal 1, ie.invariants.length
+
+      inv = ie.invariants.first.formula
+
+      assert_equal ASTEmpty, inv.class
+      assert_equal ASTDereference, inv.objset.class
+      assert_equal 'kme12', inv.objset.rel_name.text
+      assert_equal ASTDereference, inv.objset.objset.class
+      assert_equal 'blahs', inv.objset.objset.rel_name.text
+      assert_equal ASTAllOf, inv.objset.objset.objset.class
+    end
+
+    def test_load_in_context__instrumented_boolean_operators
+      invariant_string = <<-invariants
+        invariant((!true) && false)
+      invariants
+
+      ie = InvariantExtractor.new ar_class_names
+      ie.extract invariant_string
+      assert_equal 1, ie.invariants.length
+
+      assert_equal ASTAnd,     ie.invariants[0].formula.class
+      assert_equal ASTNot, ie.invariants[0].formula.subformulae[0].class
+      assert_equal ASTBoolean, ie.invariants[0].formula.subformulae[0].subformula.class
+      assert_equal true, ie.invariants[0].formula.subformulae[0].subformula.bool_value
+      
+      assert_equal ASTBoolean, ie.invariants[0].formula.subformulae[1].class
+      assert_equal false, ie.invariants[0].formula.subformulae[1].bool_value
+    end
+
   end
 end
