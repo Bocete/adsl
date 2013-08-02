@@ -130,9 +130,9 @@ module ADSL
             end
 
             def initialize(attributes = {}, options = {})
-              attributes = {
-                :adsl_ast => ASTCreateObjset.new(:class_name => ASTIdent.new(:text => self.class.adsl_ast_class_name))
-              }.merge attributes
+              @adsl_ast = attributes.delete :adsl_ast do
+                ASTCreateObjset.new(:class_name => ASTIdent.new(:text => self.class.adsl_ast_class_name))
+              end
               super
             end
 
@@ -149,13 +149,19 @@ module ADSL
               ASTEmpty.new :objset => self.adsl_ast
             end
 
-            def <(other)
-              if other.is_a? ASTNode and other.class.is_formula?
-                ASTSubset.new :objset1 => self.adsl_ast, :objset2 => other.adsl_ast
+            def <=(other)
+              other.include? self
+            end
+
+            def include?(other)
+              other = other.adsl_ast if other.respond_to? :adsl_ast
+              if other.is_a? ASTNode and other.class.is_objset?
+                ASTIn.new :objset1 => other, :objset2 => self.adsl_ast
               else
                 super
               end
             end
+            alias_method :>=, :include?
 
             class << self
               include ADSL::Parser

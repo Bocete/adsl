@@ -68,7 +68,7 @@ module ADSL
     class ADSLError < StandardError; end
 
     class ASTDummyObjset < ASTNode
-      node_type :type
+      node_type :type, :type => :objset
 
       def typecheck_and_resolve(context)
         self
@@ -76,7 +76,7 @@ module ADSL
     end
 
     class ASTDummyStmt < ASTNode
-      node_type :type
+      node_type :type, :type => :statement
 
       def typecheck_and_resolve(context)
         self

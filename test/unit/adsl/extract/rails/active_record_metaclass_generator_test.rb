@@ -194,5 +194,35 @@ module ADSL::Extract::Rails
       assert_equal ASTDeleteObj, asd_delete[2].class
       assert_equal :blah, asd_delete[2].objset
     end
+  
+    def test_generate__include_subset_ops
+      ActiveRecordMetaclassGenerator.new(Asd).generate_class
+      ActiveRecordMetaclassGenerator.new(Kme).generate_class
+      ActiveRecordMetaclassGenerator.new(Mod::Blah).generate_class
+      
+      asd = ADSLMetaAsd.new :adsl_ast => ASTDummyObjset.new(:type => :blah)
+      assert asd.respond_to? :include?
+      assert asd.respond_to? :<=
+      assert asd.respond_to? :>=
+      
+      kme = ADSLMetaKme.new :adsl_ast => ASTDummyObjset.new(:type => :blah2)
+
+      subset = asd.include? kme
+      assert_equal ASTIn, subset.class
+      assert_equal :blah, subset.objset2.type
+      assert_equal :blah2, subset.objset1.type
+
+      subset = asd >= kme
+      assert_equal ASTIn, subset.class
+      assert_equal :blah, subset.objset2.type
+      assert_equal :blah2, subset.objset1.type
+
+      subset = asd <= kme
+      assert_equal ASTIn, subset.class
+      assert_equal :blah2, subset.objset2.type
+      assert_equal :blah, subset.objset1.type
+    end
+
+
   end
 end
