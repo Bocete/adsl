@@ -7,6 +7,7 @@ class Object
 
     im = self.singleton_class.instance_method(method_name)
     owner = im.owner
+
     owner.class_eval source
 
     true

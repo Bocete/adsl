@@ -1,6 +1,7 @@
 require 'adsl/extract/rails/active_record_extractor'
 require 'adsl/extract/rails/action_instrumenter'
 require 'adsl/extract/rails/invariant_extractor'
+require 'adsl/extract/rails/callback_chain_simulator'
 require 'adsl/extract/rails/other_meta'
 require 'adsl/parser/ast_nodes'
 require 'pathname'
@@ -9,6 +10,9 @@ module ADSL
   module Extract
     module Rails
       class RailsExtractor
+        
+        include ADSL::Extract::Rails::CallbackChainSimulator
+        
         attr_accessor :class_map, :actions, :invariants
 
         def initialize(options = {})
@@ -57,25 +61,36 @@ module ADSL
           "#{route[:controller]}__#{route[:action]}"
         end
 
+        def callbacks(controller)
+          controller._process_action_callbacks
+        end
+
+        def prepare_instrumentation(controller_class, action)
+          controller = controller_class.new
+          @action_instrumenter.instrument controller, action
+          callbacks(controller_class).each do |callback|
+            @action_instrumenter.instrument controller, callback.filter
+          end
+        end
+
         def action_to_adsl_ast(route)
           action_name = action_name_for route
           potential_adsl_asts = @actions.select{ |action| action.name.text == action_name }
           raise "Multiple actions with identical names" if potential_adsl_asts.length > 1
           return potential_adsl_asts.first if potential_adsl_asts.length == 1
 
-          @action_instrumenter.instrument route[:controller].new, route[:action]
+          prepare_instrumentation route[:controller], route[:action]
 
           session = ActionDispatch::Integration::Session.new(::Rails.application)
 
           block = @action_instrumenter.exec_within do
-            # this block behaves like the original method caller
-            @action_instrumenter.abb.explore_all_choices do
-              @action_instrumenter.exec_within do
-                session.send(route[:request_method].to_s.downcase, route[:url], ADSL::Extract::Rails::MetaUnknown.new)
-              end
+            @action_instrumenter.exec_within do
+              session.send(route[:request_method].to_s.downcase, route[:url], ADSL::Extract::Rails::MetaUnknown.new)
             end
-            @action_instrumenter.abb.adsl_ast
+            @action_instrumenter.abb.root_lvl_adsl_ast 
           end
+
+          interrupt_callback_chain_on_render block, route[:action]
 
           action = ADSL::Parser::ASTAction.new({
             :name => ADSL::Parser::ASTIdent.new(:text => action_name),

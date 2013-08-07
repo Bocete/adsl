@@ -43,6 +43,25 @@ class ADSL::Extract::SexpUtilsTest < Test::Unit::TestCase
     assert_equal s(:blah, s(:array, s(:lit, 2), s(:lit, 4))), replacement
   end
 
+  def test_block_replace__unless_in
+    sexp = s(:blah, s(:array, s(:lit, 1), s(:blah, s(:lit, 1))), s(:lit, 1))
+    
+    replacement = sexp.block_replace(:lit, :unless_in => :array) do |sexp|
+      s(:lit, sexp[1]*2)
+    end
+
+    assert_equal s(:blah, s(:array, s(:lit, 1), s(:blah, s(:lit, 1))), s(:lit, 2)), replacement
+    
+    
+    sexp = s(:blah, s(:array, s(:lit, 1), s(:blah, s(:lit, 1))), s(:lit, 1))
+    
+    replacement = sexp.block_replace(:lit, :unless_in => [:array]) do |sexp|
+      s(:lit, sexp[1]*2)
+    end
+
+    assert_equal s(:blah, s(:array, s(:lit, 1), s(:blah, s(:lit, 1))), s(:lit, 2)), replacement
+  end
+
   def test_find_shallowest__plain
     assert_equal [], s(s(:self)).find_shallowest(:lit)
     assert_equal [s(:lit, 1), s(:lit, 2)], s(s(:lit, 1), s(:self), s(:lit, 2), s(:self)).find_shallowest(:lit)
@@ -56,4 +75,5 @@ class ADSL::Extract::SexpUtilsTest < Test::Unit::TestCase
   def test_find_shallowest__only_the_shallowest
     assert_equal [s(:lit, s(:lit, 2))], s(s(:lit, s(:lit, 2)), s(:self)).find_shallowest(:lit)
   end
+
 end

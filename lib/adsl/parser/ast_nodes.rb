@@ -491,6 +491,9 @@ module ADSL
             if stmt.is_a?(ASTBlock)
               change = true
               stmt.statements
+            elsif stmt.is_a?(ASTDummyStmt)
+              change = true
+              []
             else
               [stmt]
             end

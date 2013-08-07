@@ -16,7 +16,7 @@ module ADSL
   module Extract
     class Instrumenter
       
-      attr_reader :stack_depth
+      attr_reader :stack_depth, :method_locals_stack
       
       @instance = nil
       @method_locals_stack = []
@@ -80,7 +80,7 @@ module ADSL
         return nil
       end
 
-      def initialize(instrument_domain = nil)
+      def initialize(instrument_domain = Dir.pwd)
         @instrument_domain = instrument_domain
         @replacers = []
         @stack_depth = 0
@@ -110,7 +110,7 @@ module ADSL
 
         return false if method.source_location.nil?
         return false if method.owner == Kernel
-        return true if @instrument_domain.nil? || method.source_location =~ /^#{@instrument_domain}.*$/
+        return false if @instrument_domain && !(method.source_location.first =~ /^#{@instrument_domain}.*$/)
         
         source = method.source
         sexp = ruby_parser.process source
@@ -121,7 +121,15 @@ module ADSL
       end
 
       def replace(*types, &block)
-        @replacers << [types, block]
+        options = types.last.is_a?(Hash) ? types.pop : {}
+        @replacers << [types, block, options]
+      end
+
+      def with_replace(*types, replacer)
+        replace *types, replacer
+        yield
+      ensure
+        @replacers.pop
       end
 
       def execute_instrumented(object, method_name, *args, &block)
@@ -149,6 +157,7 @@ module ADSL
         if should_instrument? object, method_name
           begin
             method = object.method method_name
+            
             source = method.source
             
             # Ruby 2.0.0 support is in development as of writing this
@@ -160,7 +169,7 @@ module ADSL
               instrumented_sexp = instrument_sexp sexp
               
               new_code = Ruby2Ruby.new.process instrumented_sexp
-
+              
               object.replace_method method_name, new_code
 
               new_code
@@ -174,11 +183,12 @@ module ADSL
 
       def instrument_sexp(sexp)
         return nil if sexp.nil?
-        @replacers.reverse_each do |types, block|
-          sexp = sexp.block_replace *types, &block
+        @replacers.reverse_each do |types, block, options|
+          sexp = sexp.block_replace *types, options, &block
         end
         sexp
       end
+
     end
   end
 end

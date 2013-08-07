@@ -1,8 +1,10 @@
 require 'adsl/extract/rails/action_block_builder'
 require 'adsl/extract/rails/other_meta'
+require 'adsl/parser/ast_nodes'
 
 module ADSL::Extract::Rails
   class ActionBlockBuilderTest < Test::Unit::TestCase
+    include ADSL::Parser
 
     def test__in_stmt_frame
       abb = ActionBlockBuilder.new
@@ -158,6 +160,18 @@ module ADSL::Extract::Rails
         abb.do_return :a
         abb << :b
       end)
+    end
+
+    def test__adsl_ast__simple
+      abb = ActionBlockBuilder.new
+      abb.explore_all_choices do
+        abb << :a
+        abb << :b
+        abb << :c
+      end
+      adsl_ast = abb.adsl_ast
+      assert_equal ASTBlock, adsl_ast.class
+      assert_equal [:a, :b, :c], adsl_ast.statements
     end
 
   end

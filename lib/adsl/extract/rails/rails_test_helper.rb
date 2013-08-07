@@ -1,4 +1,7 @@
 require 'adsl/util/general'
+require 'active_record'
+require 'action_controller'
+require 'action_view'
 
 $LOAD_PATH.unshift(File.dirname(__FILE__))
 $LOAD_PATH.unshift(File.join(File.dirname(__FILE__), '..', 'lib'))
@@ -22,11 +25,18 @@ def initialize_test_context
 
   Object.lookup_or_create_class('::ApplicationController', ActionController::Base).class_exec do
     def respond_to
+      # allow for empty render statements, for testing purposes only
       if block_given?
-        yield
+        super
       else
-        render nothing: true
+        render :nothing => true
       end
+    end
+
+    def render(options = {}, extra_options = nil, &block)
+      options ||= {}
+      options[:nothing] = true
+      super
     end
 
     # no templates exist and we do not care
@@ -48,6 +58,23 @@ def initialize_test_context
     def update;  respond_to; end
     def destroy; respond_to; end
     def nothing; respond_to; end
+
+    before_filter :before,  :only => :before_filter_action
+    before_filter :before2, :only => :before_filter_action
+    after_filter  :after,   :only => :after_filter_action
+
+    before_filter :before_nothing, :only => :nothing
+    after_filter  :after_nothing,  :only => :nothing
+
+    def before_filter_action; respond_to; end
+    def after_filter_action;  respond_to; end
+    
+    def before; end
+    def before2; end
+    def after; end
+
+    def before_nothing; end
+    def after_nothing; end
   end
 end
 
@@ -92,6 +119,9 @@ if ENV["RAILS_ENV"] == 'test'
     resources :asds do
       collection do
         get :nothing
+        get :before_filter_action
+        get :after_filter_action
+        get :around_filter_action
       end
     end
   end

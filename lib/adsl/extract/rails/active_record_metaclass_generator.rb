@@ -212,7 +212,7 @@ module ADSL
 
           reflections(:polymorphic => false, :through => false).each do |assoc|
             new_class.send :define_method, assoc.name do
-              target_class = self.class.parent_module.const_get(ActiveRecordMetaclassGenerator.target_classname assoc.class_name)
+              target_class = self.class.parent_module.lookup_const(ActiveRecordMetaclassGenerator.target_classname assoc.class_name)
               result = target_class.new :adsl_ast => ASTDereference.new(
                 :objset => self.adsl_ast,
                 :rel_name => ASTIdent.new(:text => assoc.name.to_s)

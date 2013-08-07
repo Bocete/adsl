@@ -22,39 +22,26 @@ module Kernel
     expr
   end
 
-  def ins_assignment(outer_binding, name, value)
-    adsl_ast_name = if /^@@[^@]+$/ =~ name.to_s
-      "atat__#{ name.to_s[2..-1] }"
-    elsif /^@[^@]+$/ =~ name.to_s
-      "at__#{ name.to_s[1..-1] }"
-    else
-      name.to_s
-    end
-
-    if value.nil?
-      assignment = ::ADSL::Parser::ASTAssignment.new(
-        :var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name),
-        :objset => ::ADSL::Parser::ASTEmptyObjset.new
-      )
-      outer_binding.eval "#{name} = nil"
-      assignment
-    elsif value.is_a? ActiveRecord::Base
-      assignment = ::ADSL::Parser::ASTAssignment.new(
-        :var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name),
-        :objset => value.adsl_ast
-      )
-      variable = value.class.new(:adsl_ast =>
-        ::ADSL::Parser::ASTVariable.new(:var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name))
-      )
-      outer_binding.eval "#{name} = ObjectSpace._id2ref(#{variable.object_id})"
-      assignment
-    else
-      outer_binding.eval "#{name} = ObjectSpace._id2ref(#{value.object_id})"
-      value
-    end
+  def ins_mark_render_statement()
+    ::ADSL::Parser::ASTDummyStmt.new :type => :render
   end
 
-  def ins_multi_assignment(outer_binding, names, values)
+  def ins_optional_assignment(outer_binding, name, value)
+    result = ins_multi_assignment(outer_binding, [name], value, '||=')
+    mapped = result.map do |return_value|
+      if return_value.is_a? ::ADSL::Parser::ASTNode
+        ::ADSL::Parser::ASTEither.new :blocks => [
+          ::ADSL::Parser::ASTBlock.new(:statements => [return_value]),
+          ::ADSL::Parser::ASTBlock.new(:statements => [])
+        ]
+      else
+        return_value
+      end
+    end
+    mapped
+  end
+
+  def ins_multi_assignment(outer_binding, names, values, operator = '=')
     values = [values] unless values.is_a? Array
 
     values_to_be_returned = []
@@ -71,7 +58,7 @@ module Kernel
       end
       
       if value.nil?
-        outer_binding.eval "#{name} = nil"
+        outer_binding.eval "#{name} #{operator} nil"
         
         values_to_be_returned << ::ADSL::Parser::ASTAssignment.new(
           :var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name),
@@ -81,19 +68,17 @@ module Kernel
         variable = value.class.new(:adsl_ast =>
           ::ADSL::Parser::ASTVariable.new(:var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name))
         )
-        outer_binding.eval "#{name} = ObjectSpace._id2ref(#{variable.object_id})"
+        outer_binding.eval "#{name} #{operator} ObjectSpace._id2ref(#{variable.object_id})"
         
         values_to_be_returned << ::ADSL::Parser::ASTAssignment.new(
           :var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name),
           :objset => value.adsl_ast
         )
       else
-        outer_binding.eval "#{name} = ObjectSpace._id2ref(#{value.object_id})"
-        
+        outer_binding.eval "#{name} #{operator} ObjectSpace._id2ref(#{value.object_id})"
         values_to_be_returned << value
       end
     end
-
     values_to_be_returned
   end
 
@@ -105,11 +90,12 @@ module Kernel
     ::ADSL::Extract::Instrumenter.get_instance.abb.branch_choice branch_id
   end
 
-  def ins_explore_all(&block)
+  def ins_explore_all(method_name = nil, &block)
     instrumenter = ::ADSL::Extract::Instrumenter.get_instance
     return_value = instrumenter.abb.explore_all_choices &block
     
     instrumenter.prev_abb << instrumenter.abb.adsl_ast
+    instrumenter.prev_abb << ::ADSL::Parser::ASTDummyStmt.new(:type => method_name) unless method_name.nil?
     return_value
   end
 
@@ -126,12 +112,12 @@ module Kernel
   end
 
   def ins_root_lvl_push_expr(expr = nil)
-    (expr.is_a?(Array) ? expr : [expr]).each do |final_return|
+    Array.wrap(expr).each do |final_return|
       adsl_ast = ::ADSL::Extract::Rails::ActionInstrumenter.extract_stmt_from_expr final_return
       if adsl_ast and adsl_ast.class.is_statement?
         instrumenter = ::ADSL::Extract::Instrumenter.get_instance
         instrumenter.abb.root_paths.each do |root_path|
-          root_path << adsl_ast unless root_path.include? adsl_ast
+          root_path << adsl_ast unless instrumenter.abb.included_already? root_path, adsl_ast
         end
       end
     end
@@ -139,13 +125,12 @@ module Kernel
   end
 end
 
-
 module ADSL
   module Extract
     module Rails
 
       class ActionInstrumenter < ::ADSL::Extract::Instrumenter
-        def self.extract_stmt_from_expr(expr)
+        def self.extract_stmt_from_expr(expr, method_name=nil)
           adsl_ast = expr
           adsl_ast = expr.adsl_ast if adsl_ast.respond_to? :adsl_ast
           return nil unless adsl_ast.is_a? ::ADSL::Parser::ASTNode
@@ -192,13 +177,14 @@ module ADSL
           end
 
           # remove respond_to and render
-          [:respond_to, :render].each do |stmt|
-            replace :call do |sexp|
-              sexp == s(:call, nil, stmt) ? s(:nil) : sexp
-            end
-            replace :iter do |sexp|
-              sexp[1] == s(:call, nil, stmt) ? s(:nil) : sexp
-            end
+          [:respond_to, :render, :redirect_to].each do |stmt|
+            replacer = lambda{ |sexp|
+              next sexp unless sexp.length >= 3 and sexp[0] == :call and sexp[1].nil? and sexp[2] == stmt
+              s(:call, nil, :ins_mark_render_statement)
+            }
+
+            replace :iter, &replacer
+            replace :call, &replacer
           end
 
           # surround the entire method with a call to abb.explore_all_choices
@@ -206,9 +192,15 @@ module ADSL
             header_elem_count = sexp.sexp_type == :defn ? 3 : 4
             stmts = sexp.pop(sexp.length - header_elem_count)
             single_stmt = stmts.length > 1 ? s(:block, *stmts) : stmts.first
+
             explore_all = s(:iter, s(:call, nil, :ins_explore_all), s(:args), single_stmt)
-            # ins_stmt explore_all on root call, since the caller will not handle it
-            explore_all = s(:call, nil, :ins_root_lvl_push_expr, explore_all) if @stack_depth == 0
+            
+            if @stack_depth == 0
+              explore_all[1] << s(:lit, sexp[header_elem_count - 2])
+              # ins_stmt explore_all on root call, since the caller will not handle it
+              explore_all = s(:call, nil, :ins_root_lvl_push_expr, explore_all)
+            end
+            
             sexp.push explore_all
             sexp
           end
@@ -217,9 +209,20 @@ module ADSL
           replace :return do |sexp|
             s(:call, nil, :ins_do_return, *sexp.sexp_body)
           end
+
+          # instrument ||= assignments
+          replace :op_asgn_or do |sexp|
+            prepare_assignment = s(:op_asgn_or, sexp[1].dup, s(sexp[2][0], sexp[2][1], s(:nil)))
+            var_name = sexp[1][1].to_s
+
+            s(:block,
+              prepare_assignment,
+              s(:call, nil, :ins_optional_assignment, s(:call, nil, :binding), s(:str, var_name.to_s), sexp[2][2]),
+            )
+          end
           
           # instrument assignments
-          replace :lasgn, :iasgn, :cvasgn, :masgn do |sexp|
+          replace :lasgn, :iasgn, :cvasgn, :masgn, :unless_in => [:args, :op_asgn_or] do |sexp|
             next sexp if sexp.length <= 2
 
             prepare_assignment = if sexp.sexp_type == :masgn

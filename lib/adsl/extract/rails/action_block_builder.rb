@@ -1,4 +1,5 @@
 require 'adsl/extract/rails/other_meta'
+require 'adsl/parser/ast_nodes'
 
 module ADSL
   module Extract
@@ -23,9 +24,18 @@ module ADSL
           return @stmt_frames.pop
         end
 
+        def included_already?(where, what)
+          return where.include?(what) ||
+            (
+              where.last.is_a?(ADSL::Parser::ASTObjsetStmt) &&
+              what.is_a?(ADSL::Parser::ASTObjsetStmt) &&
+              where.last.objset == what.objset
+            )
+        end
+
         def append_stmt(stmt, options = {})
-          return stmt if @stmt_frames.last.include? stmt
           return stmt if @has_returned && !options[:ignore_has_returned]
+          return stmt if included_already? @stmt_frames.last, stmt
           @stmt_frames.last << stmt
           stmt
         end
@@ -85,7 +95,11 @@ module ADSL
             @return_values.length.times do |index|
               [@return_values[index]].flatten.each do |ret_value|
                 stmt = ADSL::Extract::Rails::ActionInstrumenter.extract_stmt_from_expr ret_value
-                @root_paths[index] << stmt unless stmt.nil? or !stmt.class.is_statement? or @root_paths[index].include?(stmt)
+                @root_paths[index] << stmt unless (
+                  stmt.nil? ||
+                  !stmt.class.is_statement? ||
+                  included_already?(@root_paths[index], stmt)
+                )
               end
             end
             
@@ -102,10 +116,11 @@ module ADSL
         end
 
         def do_return(return_value = nil)
-          return return_value if @has_returned
-          @root_paths << all_stmts_so_far
-          @return_values << return_value
-          @has_returned = true
+          unless @has_returned
+            @root_paths << all_stmts_so_far
+            @return_values << return_value
+            @has_returned = true
+          end
           return return_value
         end
 
@@ -113,10 +128,18 @@ module ADSL
           blocks = @root_paths.map do |root_path|
             ::ADSL::Parser::ASTBlock.new :statements => root_path
           end
-         
-          return ::ADSL::Parser::ASTBlock.new :statements => [] if blocks.empty?
-          return blocks.first if blocks.length == 1
-          ::ADSL::Parser::ASTBlock.new :statements => [::ADSL::Parser::ASTEither.new(:blocks => blocks)]
+
+          if blocks.empty?
+            ::ADSL::Parser::ASTBlock.new :statements => []
+          elsif blocks.length == 1
+            blocks.first
+          else
+            ::ADSL::Parser::ASTBlock.new :statements => [::ADSL::Parser::ASTEither.new(:blocks => blocks)]
+          end
+        end
+
+        def root_lvl_adsl_ast()
+          ::ADSL::Parser::ASTBlock.new :statements => @stmt_frames.first
         end
       end
 
