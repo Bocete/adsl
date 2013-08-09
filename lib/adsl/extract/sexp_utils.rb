@@ -31,7 +31,11 @@ class Sexp
   end
 
   def may_return?
-    not find_nodes(:return).empty?
+    return true if sexp_type == :return
+    sexp_body.each do |subsexp|
+      return true if subsexp.is_a?(Sexp) && subsexp.may_return?
+    end
+    false
   end
 end
 

@@ -26,8 +26,8 @@ module Kernel
     ::ADSL::Parser::ASTDummyStmt.new :type => :render
   end
 
-  def ins_optional_assignment(outer_binding, name, value)
-    result = ins_multi_assignment(outer_binding, [name], value, '||=')
+  def ins_optional_assignment(outer_binding, names, values)
+    result = ins_multi_assignment(outer_binding, names, values, '||=')
     mapped = result.map do |return_value|
       if return_value.is_a? ::ADSL::Parser::ASTNode
         ::ADSL::Parser::ASTEither.new :blocks => [
@@ -42,8 +42,6 @@ module Kernel
   end
 
   def ins_multi_assignment(outer_binding, names, values, operator = '=')
-    values = [values] unless values.is_a? Array
-
     values_to_be_returned = []
     names.length.times do |index|
       name = names[index]
@@ -87,7 +85,7 @@ module Kernel
   end
 
   def ins_branch_choice(branch_id)
-    ::ADSL::Extract::Instrumenter.get_instance.abb.branch_choice branch_id
+    ::ADSL::Extract::Instrumenter.get_instance.abb.branch_choice branch_id 
   end
 
   def ins_explore_all(method_name = nil, &block)
@@ -102,11 +100,21 @@ module Kernel
   def ins_if(lambda1, lambda2)
     instrumenter = ::ADSL::Extract::Instrumenter.get_instance
 
-    stmts = instrumenter.abb.in_stmt_frame &lambda1
-    block1 = ::ADSL::Parser::ASTBlock.new :statements => stmts
+    begin
+      stmts = instrumenter.abb.in_stmt_frame &lambda1
+      block1 = ::ADSL::Parser::ASTBlock.new :statements => stmts
+    rescue Exception
+      # assume that this branch was illegal in context
+      block1 = ::ADSL::Parser::ASTBlock.new :statements => []
+    end
 
-    stmts = instrumenter.abb.in_stmt_frame &lambda2
-    block2 = ::ADSL::Parser::ASTBlock.new :statements => stmts
+    begin
+      stmts = instrumenter.abb.in_stmt_frame &lambda2
+      block2 = ::ADSL::Parser::ASTBlock.new :statements => stmts
+    rescue Exception
+      # assume that this branch was illegal in context
+      block2 = ::ADSL::Parser::ASTBlock.new :statements => []
+    end
 
     ::ADSL::Parser::ASTEither.new :blocks => [block1, block2]
   end
@@ -213,11 +221,12 @@ module ADSL
           # instrument ||= assignments
           replace :op_asgn_or do |sexp|
             prepare_assignment = s(:op_asgn_or, sexp[1].dup, s(sexp[2][0], sexp[2][1], s(:nil)))
-            var_name = sexp[1][1].to_s
+            var_names = s(:array, s(:str, sexp[1][1].to_s))
+            values = s(:array, sexp[2][2])
 
             s(:block,
               prepare_assignment,
-              s(:call, nil, :ins_optional_assignment, s(:call, nil, :binding), s(:str, var_name.to_s), sexp[2][2]),
+              s(:call, nil, :ins_optional_assignment, s(:call, nil, :binding), var_names, values),
             )
           end
           
@@ -238,9 +247,15 @@ module ADSL
               [s(:str, sexp[1].to_s)]
             end
 
+            values = if sexp.sexp_type == :masgn
+              sexp[2]
+            else
+              s(:array, sexp[2])
+            end
+
             s(:block,
               prepare_assignment,
-              s(:call, nil, :ins_multi_assignment, s(:call, nil, :binding), s(:array, *var_names), sexp[2])
+              s(:call, nil, :ins_multi_assignment, s(:call, nil, :binding), s(:array, *var_names), values)
             )
           end
 
@@ -290,13 +305,14 @@ module ADSL
         end
 
         def should_instrument?(object, method_name)
+          return false unless super
+
           klass = object.class != Class ? object.class : object
           method = object.method method_name
           
           klass.name.match(/^ADSL::.*$/).nil? &&
             !method.owner.respond_to?(:adsl_ast_class_name) &&
-            !method.owner.method_defined?(:adsl_ast_class_name) &&
-            super
+            !method.owner.method_defined?(:adsl_ast_class_name)
         end
       end
 

@@ -746,6 +746,20 @@ module ADSL
       end
     end
 
+    class DSUnion
+      def prepare_action(translation)
+        @objsets.each{ |objset| objset.prepare_action translation }
+      end
+
+      def resolve_action_objset(translation, ps, var)
+        FOL::Or.new(@objsets.map{ |objset| objset.resolve_action_objset translation, ps, var })
+      end
+
+      def resolve_invariant_objset(translation, ps, var)
+        FOL::Or.new(@objsets.map{ |objset| objset.resolve_invariant_objset translation, ps, var })
+      end
+    end
+
     class DSEmptyObjset < DSNode
       def prepare_action(translation)
       end

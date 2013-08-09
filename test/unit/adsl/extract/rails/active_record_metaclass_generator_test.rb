@@ -223,6 +223,48 @@ module ADSL::Extract::Rails
       assert_equal :blah, subset.objset1.type
     end
 
+    def test_generate__scopes_work_on_classes
+      Asd.class_exec do
+        scope :something_special, lambda{ puts "Calling lambda in context of #{self}"; where('id = ?', 4).order('id') }
+      end
+      assert Asd.respond_to? :something_special
+
+      ActiveRecordMetaclassGenerator.new(Asd).generate_class
+      ActiveRecordMetaclassGenerator.new(Kme).generate_class
+      ActiveRecordMetaclassGenerator.new(Mod::Blah).generate_class
+
+      assert ADSLMetaAsd.respond_to? :something_special
+      ss = ADSLMetaAsd.something_special
+      assert ss.respond_to? :adsl_ast
+
+      assert_equal ASTSubset, ss.adsl_ast.class
+      assert_equal ASTAllOf,  ss.adsl_ast.objset.class
+      assert_equal 'Asd',     ss.adsl_ast.objset.class_name.text
+    end
+    
+    def test_generate__scopes_work_on_relations
+      Asd.class_exec do
+        scope :something_special, lambda{ order('id') }
+      end
+      assert Asd.where('id < ?', 5).respond_to? :something_special
+
+      ActiveRecordMetaclassGenerator.new(Asd).generate_class
+      ActiveRecordMetaclassGenerator.new(Kme).generate_class
+      ActiveRecordMetaclassGenerator.new(Mod::Blah).generate_class
+
+      # make sure the scope does not do subset
+      assert ADSLMetaAsd.respond_to? :something_special
+      assert_equal ASTAllOf, ADSLMetaAsd.something_special.adsl_ast.class
+
+
+      assert ADSLMetaAsd.where('id = ?', 4).respond_to? :something_special
+      ss = ADSLMetaAsd.where('id = ?', 4).something_special
+
+      assert_equal ASTSubset, ss.adsl_ast.class
+      assert_equal ASTAllOf,  ss.adsl_ast.objset.class
+      assert_equal 'Asd',     ss.adsl_ast.objset.class_name.text
+    end
+
 
   end
 end

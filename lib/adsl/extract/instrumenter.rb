@@ -17,6 +17,7 @@ module ADSL
     class Instrumenter
       
       attr_reader :stack_depth, :method_locals_stack
+      attr_accessor :instrumentation_filters
       
       @instance = nil
       @method_locals_stack = []
@@ -50,7 +51,7 @@ module ADSL
         @stack_depth += 1
         @method_locals_stack << create_locals if respond_to? :create_locals
 
-        return yield(self)
+        yield(self)
       ensure
         @stack_depth -= 1
         @method_locals_stack.pop
@@ -106,11 +107,16 @@ module ADSL
       end
 
       def should_instrument?(object, method_name)
-        method = object.method method_name
+        return false if object.is_a?(Fixnum) or object.is_a?(Symbol)
+        method = object.singleton_class.instance_method method_name
 
         return false if method.source_location.nil?
         return false if method.owner == Kernel
         return false if @instrument_domain && !(method.source_location.first =~ /^#{@instrument_domain}.*$/)
+
+        (instrumentation_filters || []).each do |filter|
+          return false unless filter.allow_instrumentation? object, method_name
+        end
         
         source = method.source
         sexp = ruby_parser.process source
@@ -118,6 +124,13 @@ module ADSL
       rescue MethodSource::SourceNotFoundError
         # sometimes this happens because the method_source gem bugs out with evals etc
         return false
+      rescue NameError => e
+        # maybe it's a ghost method?
+        if object.respond_to? method_name
+          return false
+        else
+          raise e
+        end
       end
 
       def replace(*types, &block)
@@ -156,7 +169,9 @@ module ADSL
       def instrument(object, method_name)
         if should_instrument? object, method_name
           begin
-            method = object.method method_name
+            # this is complex because I want to avoid using .method on non-class objects
+            # because they might implement method themselves
+            method = object.singleton_class.instance_method method_name
             
             source = method.source
             
@@ -171,7 +186,7 @@ module ADSL
               new_code = Ruby2Ruby.new.process instrumented_sexp
               
               object.replace_method method_name, new_code
-
+              
               new_code
             else
               source

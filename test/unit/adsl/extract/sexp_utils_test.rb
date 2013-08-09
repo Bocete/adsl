@@ -76,4 +76,22 @@ class ADSL::Extract::SexpUtilsTest < Test::Unit::TestCase
     assert_equal [s(:lit, s(:lit, 2))], s(s(:lit, s(:lit, 2)), s(:self)).find_shallowest(:lit)
   end
 
+  def test_may_return__simple
+    assert_false s(:block, s(:if, s(:true), s(:block), s(:block))).may_return?
+    assert s(:block, s(:if, s(:true), s(:block), s(:block, s(:return, s(:nil))))).may_return?
+  end
+
+  def test_may_return__deep
+    sexp = s(:if,
+      s(:lasgn, :user, s(:call, s(:const, :User), :authenticate, s(:call, nil, :http_user), s(:call, nil, :http_pass))),
+      s(:block,
+        s(:attrasgn, s(:call, nil, :session), :[]=, s(:str, "user_id"), s(:call, s(:lvar, :user), :id)),
+        s(:call, nil, :set_current_user, s(:lvar, :user)),
+        s(:return, s(:true))
+      ),
+      nil
+    )
+    assert sexp.may_return?
+  end
+
 end

@@ -65,6 +65,22 @@ module ADSL
         end
         return false
       end
+
+      def self.common_supertype(classes)
+        types = classes.uniq
+        while types.length > 1
+          type1 = types.pop
+          type2 = types.pop
+          if type1.superclass_of? type2
+            types << type2
+          elsif type2.superclass_of? type1
+            types << type1
+          else
+            raise ADSLError, "Object sets are not of compatible types: #{classes.map { |c| c.name }.join(", ")}"
+          end
+        end
+        types.first
+      end
     end
 
     class DSRelation < DSNode
@@ -182,6 +198,14 @@ module ADSL
 
       def type
         @objset.type
+      end
+    end
+
+    class DSUnion < DSNode
+      container_for :objsets
+
+      def type
+        DSClass.common_supertype objsets.reject{ |o| o.type.nil? }.map{ |o| o.type }
       end
     end
 

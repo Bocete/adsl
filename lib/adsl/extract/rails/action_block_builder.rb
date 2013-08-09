@@ -77,8 +77,8 @@ module ADSL
             increment_branch_choice
 
             return_value = yield
+            
             do_return return_value unless @has_returned
-
             return common_return_value unless has_more_executions?
           end
         end
@@ -93,7 +93,7 @@ module ADSL
             # if an array is returned, assume the 'return 1, 2, 3' syntax
 
             @return_values.length.times do |index|
-              [@return_values[index]].flatten.each do |ret_value|
+              Array.wrap(@return_values[index]).flatten.each do |ret_value|
                 stmt = ADSL::Extract::Rails::ActionInstrumenter.extract_stmt_from_expr ret_value
                 @root_paths[index] << stmt unless (
                   stmt.nil? ||
@@ -121,7 +121,7 @@ module ADSL
             @return_values << return_value
             @has_returned = true
           end
-          return return_value
+          return_value
         end
 
         def adsl_ast

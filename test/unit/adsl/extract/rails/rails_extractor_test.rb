@@ -769,4 +769,54 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 'Asd', blocks[0].statements[0].objset.class_name.text
   end
 
+  def test_extract_action__does_not_rescue_errors
+    AsdsController.class_exec do
+      def nothing
+        raise
+      end
+    end
+
+    assert_raise do
+      extractor = create_rails_extractor
+      ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    end
+  end
+
+  def test_extract_action__does_not_rescue_errors_from_callbacks
+    AsdsController.class_exec do
+      def before_nothing
+        raise
+      end
+
+      def nothing
+      end
+    end
+
+    assert_raise do
+      extractor = create_rails_extractor
+      ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    end
+  end
+
+  def test_extract_action__instrumentation_filters_work
+    AsdsController.class_exec do
+      def before_nothing
+        Asd.new
+      end
+
+      def nothing
+        Asd.new
+      end
+    end
+    
+    extractor = create_rails_extractor <<-filters
+      blacklist :before_nothing
+    filters
+
+    assert_equal 1, extractor.instrumentation_filters.length
+
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    statements = ast.block.statements
+    assert_equal 1, statements.length
+  end
 end

@@ -13,27 +13,31 @@ module ADSL
         
         include ADSL::Extract::Rails::CallbackChainSimulator
         
-        attr_accessor :class_map, :actions, :invariants
+        attr_accessor :class_map, :actions, :invariants, :instrumentation_filters
 
         def initialize(options = {})
           options = Hash[
             :ar_classes => default_activerecord_models,
-            :invariants => Dir['invariants/**/*_invs.rb']
+            :invariants => Dir['invariants/**/*_invs.rb'],
+            :instrumentation_filters => []
           ].merge options
           
           @active_record_instrumenter = ADSL::Extract::Rails::ActiveRecordExtractor.new
           @class_map = @active_record_instrumenter.extract_static options[:ar_classes]
           
           ar_class_names = @class_map.keys.map{ |n| n.name.split('::').last }
+          
+          @invariant_extractor = ADSL::Extract::Rails::InvariantExtractor.new ar_class_names
+          @invariants = @invariant_extractor.extract(options[:invariants]).map{ |inv| inv.adsl_ast }
+          @instrumentation_filters = @invariant_extractor.instrumentation_filters
+          @instrumentation_filters += options[:instrumentation_filters]
 
           @action_instrumenter = ADSL::Extract::Rails::ActionInstrumenter.new ar_class_names
+          @action_instrumenter.instrumentation_filters = @instrumentation_filters
           @actions = []
           all_routes.each do |route|
             @actions << action_to_adsl_ast(route)
           end
-          
-          @invariant_extractor = ADSL::Extract::Rails::InvariantExtractor.new ar_class_names
-          @invariants = @invariant_extractor.extract(options[:invariants]).map{ |inv| inv.adsl_ast }
         end
 
         def all_routes
@@ -82,6 +86,7 @@ module ADSL
           prepare_instrumentation route[:controller], route[:action]
 
           session = ActionDispatch::Integration::Session.new(::Rails.application)
+          ::Rails.application.config.action_dispatch.show_exceptions = false
 
           block = @action_instrumenter.exec_within do
             @action_instrumenter.exec_within do

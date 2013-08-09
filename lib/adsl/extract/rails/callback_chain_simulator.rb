@@ -80,7 +80,10 @@ module ADSL
         def interrupt_callback_chain_on_render(root_block, action_name)
           stmts = root_block.statements
           index = stmts.index{ |stmt| stmt.is_a?(ADSL::Parser::ASTDummyStmt) && stmt.type == action_name }
-          raise if index.nil?
+          if index.nil?
+            pp root_block
+            raise "Action block not found in instrumented execution"
+          end
           # skip the action and proceed to the most prior before block
           index -= 3
           until index < 0

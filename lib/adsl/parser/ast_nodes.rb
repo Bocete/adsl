@@ -755,6 +755,31 @@ module ADSL
         return ADSL::DS::DSOneOf.new :objset => objset
       end
     end
+
+    class ASTUnion < ASTNode
+      node_type :objsets, :type => :objset
+
+      def typecheck_and_resolve(context)
+        objsets = @objsets.map{ |o| o.typecheck_and_resolve context }
+        @objsets.reject!{ |o| o.type.nil? }
+
+        return ADSL::DS::DSEmptyObjset.new if objsets.length == 0
+        return objsets.first if objsets.length == 1
+
+        types = objsets.map{ |o| o.type }
+        # will raise an error if no single common supertype exists
+        ADSL::DS::DSClass.common_supertype(types)
+
+        return ADSL::DS::DSUnion.new :objsets => objsets
+      end
+
+      def optimize!
+        @objsets = @objsets.map{ |o|
+          o.is_a?(ASTUnion) ? o.objsets : [o]
+        }.flatten(1)
+        @objsets.delete_if{ |o| o.is_a?(ASTEmpty) }
+      end
+    end
     
     class ASTVariable < ASTNode
       node_type :var_name, :type => :objset
@@ -933,19 +958,10 @@ module ADSL
       def typecheck_and_resolve(context)
         objsets = @objsets.map{ |o| o.typecheck_and_resolve context }
 
-        types = objsets.map{ |o| o.type }.select{ |o| not o.nil? }.uniq
-        while types.length > 1
-          type1 = types.pop
-          type2 = types.pop
-          if type1.superclass_of? type2
-            types << type2
-          elsif type2.superclass_of? type1
-            types << type1
-          else
-            raise ADSLError, "Object sets are not of compatible types: #{objsets.map { |o| o.type.name }.join(", ")}"
-          end
-        end
-
+        types = objsets.map{ |o| o.type }.select{ |o| not o.nil? }
+        # will raise an error if no single common supertype exists
+        ADSL::DS::DSClass.common_supertype(types)
+          
         return ADSL::DS::DSEqual.new :objsets => objsets
       end
     end

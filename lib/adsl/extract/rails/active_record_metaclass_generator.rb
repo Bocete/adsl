@@ -137,20 +137,47 @@ module ADSL
             end
 
             # no-ops
-            def save; end
-            def save!; end
+            def save;  self; end
+            def save!; self; end
+            def reorder(*params);  self; end
+            def includes(*params); self; end
+            def all(*params);      self; end
 
             def take
-              self.new :adsl_ast => ASTOneOf.new(:objset => self.adsl_ast)
+              self.class.new :adsl_ast => ASTOneOf.new(:objset => self.adsl_ast)
             end
             alias_method :take!, :take
+            alias_method :first, :take
+            alias_method :last,  :take
+
+            def where(*args)
+              self.class.new :adsl_ast => ASTSubset.new(:objset => self.adsl_ast)
+            end
+            alias_method :only,   :where
+            alias_method :except, :where
+
+            def merge(other)
+              # other can either be a collection of objects or a hash of additional options for scope
+              puts 'MERGE'
+              pp [self, other]
+              puts caller.first(10)
+              if other.respond_to?(:adsl_ast) && other.adsl_ast.is_a?(ASTSubset)
+                return where
+              else
+                self
+              end
+            end
 
             def empty?
               ASTEmpty.new :objset => self.adsl_ast
             end
 
-            def <=(other)
-              other.include? self
+            def +(other)
+              self.class.new :adsl_ast => ASTUnion.new(:objsets => [self.adsl_ast, other.adsl_ast])
+            end
+
+            def size
+              MetaUnknown.new
             end
 
             def include?(other)
@@ -161,7 +188,19 @@ module ADSL
                 super
               end
             end
+            def <=(other); other.include? self; end
             alias_method :>=, :include?
+
+            def method_missing(method, *args, &block)
+              # it could be that scopes are being invoked. In this case call the class method
+              if self.class.respond_to? method
+                self.scoping do
+                  return self.class.send method, *args, &block
+                end
+              else
+                super
+              end
+            end
 
             class << self
               include ADSL::Parser
@@ -179,16 +218,23 @@ module ADSL
               end
 
               def all
-                new :adsl_ast => ASTAllOf.new(:class_name => ASTIdent.new(:text => (adsl_ast_class_name)))
+                new :adsl_ast => ASTAllOf.new(:class_name => ASTIdent.new(:text => adsl_ast_class_name))
+              end
+              alias_method :scoped, :all
+              def unscoped
+                yield
               end
 
               def find(*args)
-                new :adsl_ast => ASTOneOf.new(:objset => self.all.adsl_ast)
+                self.all.take
               end
 
               def where(*args)
-                new :adsl_ast => ASTSubset.new(:objset => self.all.adsl_ast)
+                self.all.where
               end
+              alias_method :merge,  :where
+              alias_method :only,   :where
+              alias_method :except, :where
 
               def build(*args)
                 new(*args)
@@ -200,6 +246,11 @@ module ADSL
                 else
                   super
                 end
+              end
+
+              def respond_to?(method, include_all = false)
+                return true if method.to_s =~ /^find_.*$/
+                super
               end
             end
           end

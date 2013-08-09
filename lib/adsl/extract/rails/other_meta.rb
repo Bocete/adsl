@@ -16,6 +16,10 @@ module ADSL
           self
         end
 
+        def respond_to?(*args)
+          true
+        end
+
         def adsl_ast
           nil
         end
