@@ -14,20 +14,11 @@ module ADSL
           @ar_class = ar_class
         end
 
-        def self.target_classname(classname)
-          module_split = classname.split '::'
-          (module_split[0..-2] + ["ADSLMeta#{module_split.last}"]).join '::'
-        end
-
-        def target_classname
-          ActiveRecordMetaclassGenerator.target_classname(@ar_class.name)
-        end
-
         def parent_classname
           if @ar_class.superclass == ActiveRecord::Base
             nil
           else
-            ASTIdent.new :text => @ar_class.superclass.instrumented_counterpart.adsl_ast_class_name
+            ASTIdent.new :text => @ar_class.superclass.adsl_ast_class_name
           end
         end
 
@@ -119,7 +110,7 @@ module ADSL
         end
 
         def generate_class
-          new_class = Class.new(@ar_class) do
+          @ar_class.class_exec do
 
             include ADSL::Parser
             
@@ -130,18 +121,20 @@ module ADSL
             end
 
             def initialize(attributes = {}, options = {})
-              @adsl_ast = attributes.delete :adsl_ast do
+              @adsl_ast = unless attributes.include? :adsl_ast
                 ASTCreateObjset.new(:class_name => ASTIdent.new(:text => self.class.adsl_ast_class_name))
               end
               super
             end
 
             # no-ops
-            def save;  self; end
-            def save!; self; end
+            def save;  end
+            def save!; end
             def reorder(*params);  self; end
+            def order(*params);    self; end
             def includes(*params); self; end
             def all(*params);      self; end
+            def scope_for_create;  self; end
 
             def take
               self.class.new :adsl_ast => ASTOneOf.new(:objset => self.adsl_ast)
@@ -155,17 +148,24 @@ module ADSL
             end
             alias_method :only,   :where
             alias_method :except, :where
-
             def merge(other)
-              # other can either be a collection of objects or a hash of additional options for scope
-              puts 'MERGE'
-              pp [self, other]
-              puts caller.first(10)
-              if other.respond_to?(:adsl_ast) && other.adsl_ast.is_a?(ASTSubset)
-                return where
+              if other.adsl_ast.is_a? ASTAllOf
+                self
+              elsif self.adsl_ast.is_a? ASTAllOf
+                other
+              elsif other.is_a? ActiveRecord::Base
+                # the scope is on the right hand side; so we can just replace all AllOfs in the right
+                # with the left hand side
+                other.adsl_ast.block_replace do |node|
+                  self if node.is_a? ASTAllOf
+                end
               else
                 self
               end
+            end
+
+            def apply_finder_options(options)
+              options.include?(:conditions) ? self.class.new(:adsl_ast => ASTSubset.new(:objset => self.adsl_ast)) : self
             end
 
             def empty?
@@ -192,14 +192,23 @@ module ADSL
             alias_method :>=, :include?
 
             def method_missing(method, *args, &block)
-              # it could be that scopes are being invoked. In this case call the class method
+              # maybe this is a scope invocation?
               if self.class.respond_to? method
-                self.scoping do
+                begin
+                  prev_scoped = self.class.scoped
+                  self.class.scoped = self
                   return self.class.send method, *args, &block
+                ensure
+                  self.class.scoped = prev_scoped
                 end
               else
                 super
               end
+            end
+
+            def respond_to?(method, include_all = false)
+              # maybe this is a scope invocation? hard to say
+              super || self.class.respond_to?(method)
             end
 
             class << self
@@ -214,16 +223,17 @@ module ADSL
               end
 
               def adsl_ast_class_name
-                ar_class.name.sub('::', '_')
+                name.sub('::', '_')
               end
 
-              def all
+              def all(*params)
                 new :adsl_ast => ASTAllOf.new(:class_name => ASTIdent.new(:text => adsl_ast_class_name))
               end
-              alias_method :scoped, :all
-              def unscoped
-                yield
-              end
+              def scope_for_create;  self; end
+              def scope_attributes?; false; end
+              def scoped; @scoped || all; end
+              def scoped=(scoped); @scoped = scoped; end
+              alias_method :order,  :all
 
               def find(*args)
                 self.all.take
@@ -232,7 +242,6 @@ module ADSL
               def where(*args)
                 self.all.where
               end
-              alias_method :merge,  :where
               alias_method :only,   :where
               alias_method :except, :where
 
@@ -255,35 +264,39 @@ module ADSL
             end
           end
 
-          @ar_class.singleton_class.send :define_method, :instrumented_counterpart do
-            new_class
-          end
+          #@ar_class.singleton_class.send :define_method, :instrumented_counterpart do
+          #  new_class
+          #end
 
-          create_destroys new_class
+          create_destroys @ar_class
+
+          @ar_class.send :default_scope, @ar_class.all
 
           reflections(:polymorphic => false, :through => false).each do |assoc|
-            new_class.send :define_method, assoc.name do
-              target_class = self.class.parent_module.lookup_const(ActiveRecordMetaclassGenerator.target_classname assoc.class_name)
+            @ar_class.send :define_method, assoc.name do
+              target_class = assoc.class_name.constantize
               result = target_class.new :adsl_ast => ASTDereference.new(
                 :objset => self.adsl_ast,
                 :rel_name => ASTIdent.new(:text => assoc.name.to_s)
               )
-              assoc.options[:conditions].nil? ? result : ASTSubset.new(:objset => result)
+              result.adsl_ast = ASTSubset.new(:objset => result.adsl_ast) if assoc.options.include? :conditions
+              result
             end
           end
           reflections(:polymorphic => false, :through => true).each do |assoc|
-            new_class.send :define_method, assoc.name do
+            @ar_class.send :define_method, assoc.name do
               through_assoc = assoc.through_reflection
               source_assoc = assoc.source_reflection
 
               first_step = self.send through_assoc.name
               result = first_step.send source_assoc.name
 
-              assoc.options[:conditions].nil? ? result : ASTSubset.new(:objset => result)
+              result.adsl_ast = ASTSubset.new(:objset => result.adsl_ast) if assoc.options.include? :conditions
+              result
             end
           end
           reflections(:polymorphic => true).each do |assoc|
-            new_class.send :define_method, assoc.name do
+            @ar_class.send :define_method, assoc.name do
               ADSL::Extract::Rails::MetaUnknown.new
             end
           end
@@ -291,16 +304,13 @@ module ADSL
           adsl_ast_parent_name = parent_classname
           adsl_ast_relations = reflections(:polymorphic => false, :through => false).map{ |ref| reflection_to_adsl_ast ref }
 
-          new_class.singleton_class.send :define_method, :adsl_ast do
+          @ar_class.singleton_class.send :define_method, :adsl_ast do
             ASTClass.new(
               :name => ASTIdent.new(:text => adsl_ast_class_name),
               :parent_name => adsl_ast_parent_name,
               :relations => adsl_ast_relations
             )
           end
-
-          @ar_class.parent_module.const_set target_classname.split('::').last, new_class
-          new_class
         end
 
       end

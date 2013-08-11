@@ -62,7 +62,7 @@ class ADSL::Verification::FormulaGeneratorsTest < ADSL::Extract::Rails::RailsIns
   def test_quantification__explicit_types_from_block_params
     {:forall => ASTForAll, :exists => ASTExists}.each do |quantifier, klass|
       formula = send(quantifier, {:a => Asd}, &lambda do |a|
-        assert_equal ADSLMetaAsd, a.class
+        assert_equal Asd, a.class
         assert_equal ASTVariable, a.adsl_ast.class
         assert_equal 'a', a.adsl_ast.var_name.text
         anything_with_adsl_ast
@@ -71,10 +71,10 @@ class ADSL::Verification::FormulaGeneratorsTest < ADSL::Extract::Rails::RailsIns
       assert_equal 'Asd', formula.adsl_ast.vars[0][1].class_name.text
 
       formula = send(quantifier, {:a => Asd, :b => Kme}, &lambda do |a, b|
-        assert_equal ADSLMetaAsd, a.class
+        assert_equal Asd, a.class
         assert_equal ASTVariable, a.adsl_ast.class
         assert_equal 'a', a.adsl_ast.var_name.text
-        assert_equal ADSLMetaKme, b.class
+        assert_equal Kme, b.class
         assert_equal ASTVariable, b.adsl_ast.class
         assert_equal 'b', b.adsl_ast.var_name.text
         anything_with_adsl_ast
@@ -88,7 +88,7 @@ class ADSL::Verification::FormulaGeneratorsTest < ADSL::Extract::Rails::RailsIns
   def test_quantifiers__infer_types_from_block_params
     {:forall => ASTForAll, :exists => ASTExists}.each do |quantifier, klass|
       formula = send(quantifier, &lambda do |asd|
-        assert_equal ADSLMetaAsd, asd.class
+        assert_equal Asd, asd.class
         assert_equal ASTVariable, asd.adsl_ast.class
         assert_equal 'asd', asd.adsl_ast.var_name.text
         anything_with_adsl_ast
@@ -97,10 +97,10 @@ class ADSL::Verification::FormulaGeneratorsTest < ADSL::Extract::Rails::RailsIns
       assert_equal 'Asd', formula.adsl_ast.vars[0][1].class_name.text
 
       formula = send(quantifier, &lambda do |asd, kme|
-        assert_equal ADSLMetaAsd, asd.class
+        assert_equal Asd, asd.class
         assert_equal ASTVariable, asd.adsl_ast.class
         assert_equal 'asd',       asd.adsl_ast.var_name.text
-        assert_equal ADSLMetaKme, kme.class
+        assert_equal Kme, kme.class
         assert_equal ASTVariable, kme.adsl_ast.class
         assert_equal 'kme',       kme.adsl_ast.var_name.text
         anything_with_adsl_ast
@@ -114,7 +114,7 @@ class ADSL::Verification::FormulaGeneratorsTest < ADSL::Extract::Rails::RailsIns
   def test_quantifier__precedence_of_type_inferment_lesser_than_explicit_declaration
     {:forall => ASTForAll, :exists => ASTExists}.each do |quantifier, klass|
       formula = send(quantifier, {:asd => Kme}, &lambda do |asd|
-        assert_equal ADSLMetaKme, asd.class
+        assert_equal Kme, asd.class
         assert_equal ASTVariable, asd.adsl_ast.class
         assert_equal 'asd', asd.adsl_ast.var_name.text
         anything_with_adsl_ast

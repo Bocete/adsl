@@ -35,7 +35,8 @@ module ADSL::Extract::Rails
           asd.empty?
         end
       invariants
-      
+      initialize_metaclasses
+
       ie = InvariantExtractor.new ar_class_names
       ie.extract invariant_string
       assert_equal 2, ie.invariants.length

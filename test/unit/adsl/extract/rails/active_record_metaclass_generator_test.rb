@@ -5,107 +5,59 @@ require 'adsl/util/test_helper'
 require 'adsl/parser/ast_nodes'
 require 'adsl/extract/rails/active_record_metaclass_generator'
 require 'adsl/extract/rails/rails_test_helper'
+require 'adsl/extract/rails/rails_instrumentation_test_case'
 
 module ADSL::Extract::Rails
-  class ActiveRecordMetaclassGeneratorTest < Test::Unit::TestCase
+  class ActiveRecordMetaclassGeneratorTest < RailsInstrumentationTestCase
 
     include ADSL::Parser
 
-    def setup
-      assert_false class_defined? :ADSLMetaAsd, :ADSLMetaKme, 'Mod::ADSLMetaBlah'
-      initialize_test_context
-    end
-
-    def teardown
-      unload_class :ADSLMetaAsd, :ADSLMetaKme, 'Mod::ADSLMetaBlah'
-    end
-
-    def test_target_classname
-      generator = ActiveRecordMetaclassGenerator.new Asd
-      assert_equal 'ADSLMetaAsd', generator.target_classname
-      assert_equal 'ADSLMetaTesting', ActiveRecordMetaclassGenerator.target_classname('Testing')
-      
-      generator = ActiveRecordMetaclassGenerator.new Kme
-      assert_equal 'ADSLMetaKme', generator.target_classname
-      
-      generator = ActiveRecordMetaclassGenerator.new Mod::Blah
-      assert_equal 'Mod::ADSLMetaBlah', generator.target_classname
-    end
-
     def test_adsl_ast_class_name
-      ActiveRecordMetaclassGenerator.new(Asd).generate_class
-      ActiveRecordMetaclassGenerator.new(Kme).generate_class
-      ActiveRecordMetaclassGenerator.new(Mod::Blah).generate_class
+      initialize_metaclasses
       
-      assert_equal 'Asd',      ADSLMetaAsd.adsl_ast_class_name
-      assert_equal 'Kme',      ADSLMetaKme.adsl_ast_class_name
-      assert_equal 'Mod_Blah', Mod::ADSLMetaBlah.adsl_ast_class_name
+      assert_equal 'Asd',      Asd.adsl_ast_class_name
+      assert_equal 'Kme',      Kme.adsl_ast_class_name
+      assert_equal 'Mod_Blah', Mod::Blah.adsl_ast_class_name
     end
 
-    def test_generate__links_superclasses_properly
-      ActiveRecordMetaclassGenerator.new(Asd).generate_class
-      ActiveRecordMetaclassGenerator.new(Kme).generate_class
-      ActiveRecordMetaclassGenerator.new(Mod::Blah).generate_class
-      
-      assert_equal Asd, ADSLMetaAsd.superclass
-      assert_equal Kme, ADSLMetaKme.superclass
-      assert_equal Mod::Blah, Mod::ADSLMetaBlah.superclass
-    end
-
-    def test_generate__creates_the_correct_classes_in_correct_modules
-      ActiveRecordMetaclassGenerator.new(Asd).generate_class
-      ActiveRecordMetaclassGenerator.new(Kme).generate_class
-      ActiveRecordMetaclassGenerator.new(Mod::Blah).generate_class
-
-      assert self.class.const_defined? :ADSLMetaAsd
-      assert self.class.const_defined? :ADSLMetaKme
-      assert Mod.const_defined? :ADSLMetaBlah
-    end
-    
     def test_generate__class_method_defined__all
-      ActiveRecordMetaclassGenerator.new(Asd).generate_class
-      ActiveRecordMetaclassGenerator.new(Kme).generate_class
-      ActiveRecordMetaclassGenerator.new(Mod::Blah).generate_class
+      initialize_metaclasses
 
-      assert ADSLMetaAsd.respond_to? :all
-      assert_equal ADSLMetaAsd, ADSLMetaAsd.all.class
-      assert_equal ASTAllOf, ADSLMetaAsd.all.adsl_ast.class
+      assert Asd.respond_to? :all
+      assert_equal Asd, Asd.all.class
+      assert_equal ASTAllOf, Asd.all.adsl_ast.class
     end
     
     def test_generate__metaclasses_create_instances_with_association_accessors
-      ActiveRecordMetaclassGenerator.new(Asd).generate_class
-      ActiveRecordMetaclassGenerator.new(Kme).generate_class
-      ActiveRecordMetaclassGenerator.new(Mod::Blah).generate_class
+      initialize_metaclasses
 
-      asd = ADSLMetaAsd.new :adsl_ast => nil
+      asd = Asd.new :adsl_ast => nil
       assert asd.respond_to? :blahs
-      assert_equal Mod::ADSLMetaBlah, asd.blahs.class
+      assert_equal Mod::Blah, asd.blahs.class
       
-      blah = Mod::ADSLMetaBlah.new :adsl_ast => nil
+      blah = Mod::Blah.new :adsl_ast => nil
       assert blah.respond_to? :asd
-      assert_equal ADSLMetaAsd, blah.asd.class
+      assert_equal Asd, blah.asd.class
     end
 
     def test_generate__associations_adsl_ast
-      ActiveRecordMetaclassGenerator.new(Asd).generate_class
-      ActiveRecordMetaclassGenerator.new(Kme).generate_class
-      ActiveRecordMetaclassGenerator.new(Mod::Blah).generate_class
+      initialize_metaclasses
       
-      asd = ADSLMetaAsd.adsl_ast
+      asd = Asd.adsl_ast
       assert_equal 1, asd.relations.length
       assert_equal [0, 1.0/0.0], asd.relations.first.cardinality
       assert_equal 'Mod_Blah', asd.relations.first.to_class_name.text
       assert_equal 'blahs', asd.relations.first.name.text
       assert_equal 'asd', asd.relations.first.inverse_of_name.text
 
-      kme = ADSLMetaKme.adsl_ast
+      kme = Kme.adsl_ast
       assert_equal 1, kme.relations.length
       assert_equal [0, 1], kme.relations.last.cardinality
       assert_equal 'Mod_Blah', kme.relations.last.to_class_name.text
       assert_equal 'blah', kme.relations.last.name.text
       assert_nil kme.relations.last.inverse_of_name
 
-      blah = Mod::ADSLMetaBlah.adsl_ast
+      blah = Mod::Blah.adsl_ast
       assert_equal 2, blah.relations.length
 
       assert_equal [0, 1], blah.relations.first.cardinality
@@ -120,14 +72,12 @@ module ADSL::Extract::Rails
     end
 
     def test_generate__associations_through
-      ActiveRecordMetaclassGenerator.new(Asd).generate_class
-      ActiveRecordMetaclassGenerator.new(Kme).generate_class
-      ActiveRecordMetaclassGenerator.new(Mod::Blah).generate_class
+      initialize_metaclasses
      
-      assert ADSLMetaAsd.adsl_ast.relations.select{ |rel| rel.name.text == 'kmes' }.empty?
-      objset = ADSLMetaAsd.new :adsl_ast => :something_unique
+      assert Asd.adsl_ast.relations.select{ |rel| rel.name.text == 'kmes' }.empty?
+      objset = Asd.new :adsl_ast => :something_unique
       through = objset.kmes
-      assert_equal ADSLMetaKme, through.class
+      assert_equal Kme, through.class
 
       assert_equal ASTDereference, through.adsl_ast.class
       assert_equal 'kme12', through.adsl_ast.rel_name.text 
@@ -137,29 +87,25 @@ module ADSL::Extract::Rails
     end
 
     def test_generate__delete_single_statements
-      ActiveRecordMetaclassGenerator.new(Asd).generate_class
-      ActiveRecordMetaclassGenerator.new(Kme).generate_class
-      ActiveRecordMetaclassGenerator.new(Mod::Blah).generate_class
+      initialize_metaclasses
 
-      asd_delete = ADSLMetaAsd.new.delete
+      asd_delete = Asd.new.delete
       assert_equal 1, asd_delete.length
       assert_equal ASTDeleteObj, asd_delete.first.class
       
-      kme_delete = ADSLMetaKme.new.delete
+      kme_delete = Kme.new.delete
       assert_equal 1, kme_delete.length
       assert_equal ASTDeleteObj, kme_delete.first.class
       
-      blah_delete = Mod::ADSLMetaBlah.new.delete
+      blah_delete = Mod::Blah.new.delete
       assert_equal 1, blah_delete.length
       assert_equal ASTDeleteObj, blah_delete.first.class
     end
 
     def test_generate__destroy_propagates_to_delete_but_not_further
-      ActiveRecordMetaclassGenerator.new(Asd).generate_class
-      ActiveRecordMetaclassGenerator.new(Kme).generate_class
-      ActiveRecordMetaclassGenerator.new(Mod::Blah).generate_class
+      initialize_metaclasses
 
-      asd_delete = Mod::ADSLMetaBlah.new(:adsl_ast => :blah).destroy
+      asd_delete = Mod::Blah.new(:adsl_ast => :blah).destroy
       assert_equal 2, asd_delete.length
 
       assert_equal ASTDeleteObj, asd_delete.first.class
@@ -172,11 +118,9 @@ module ADSL::Extract::Rails
     end
     
     def test_generate__destroy_through_destroys_the_join_object
-      ActiveRecordMetaclassGenerator.new(Asd).generate_class
-      ActiveRecordMetaclassGenerator.new(Kme).generate_class
-      ActiveRecordMetaclassGenerator.new(Mod::Blah).generate_class
+      initialize_metaclasses
 
-      asd_delete = ADSLMetaAsd.new(:adsl_ast => :blah).destroy
+      asd_delete = Asd.new(:adsl_ast => :blah).destroy
       assert_equal 3, asd_delete.length
       
       assert_equal ASTDeleteObj, asd_delete[0].class
@@ -196,16 +140,14 @@ module ADSL::Extract::Rails
     end
   
     def test_generate__include_subset_ops
-      ActiveRecordMetaclassGenerator.new(Asd).generate_class
-      ActiveRecordMetaclassGenerator.new(Kme).generate_class
-      ActiveRecordMetaclassGenerator.new(Mod::Blah).generate_class
+      initialize_metaclasses
       
-      asd = ADSLMetaAsd.new :adsl_ast => ASTDummyObjset.new(:type => :blah)
+      asd = Asd.new :adsl_ast => ASTDummyObjset.new(:type => :blah)
       assert asd.respond_to? :include?
       assert asd.respond_to? :<=
       assert asd.respond_to? :>=
       
-      kme = ADSLMetaKme.new :adsl_ast => ASTDummyObjset.new(:type => :blah2)
+      kme = Kme.new :adsl_ast => ASTDummyObjset.new(:type => :blah2)
 
       subset = asd.include? kme
       assert_equal ASTIn, subset.class
@@ -225,16 +167,14 @@ module ADSL::Extract::Rails
 
     def test_generate__scopes_work_on_classes
       Asd.class_exec do
-        scope :something_special, lambda{ puts "Calling lambda in context of #{self}"; where('id = ?', 4).order('id') }
+        scope :something_special, lambda{ where('id = ?', 4).order('id') }
       end
       assert Asd.respond_to? :something_special
 
-      ActiveRecordMetaclassGenerator.new(Asd).generate_class
-      ActiveRecordMetaclassGenerator.new(Kme).generate_class
-      ActiveRecordMetaclassGenerator.new(Mod::Blah).generate_class
+      initialize_metaclasses
 
-      assert ADSLMetaAsd.respond_to? :something_special
-      ss = ADSLMetaAsd.something_special
+      assert Asd.respond_to? :something_special
+      ss = Asd.something_special
       assert ss.respond_to? :adsl_ast
 
       assert_equal ASTSubset, ss.adsl_ast.class
@@ -248,23 +188,73 @@ module ADSL::Extract::Rails
       end
       assert Asd.where('id < ?', 5).respond_to? :something_special
 
-      ActiveRecordMetaclassGenerator.new(Asd).generate_class
-      ActiveRecordMetaclassGenerator.new(Kme).generate_class
-      ActiveRecordMetaclassGenerator.new(Mod::Blah).generate_class
+      initialize_metaclasses
 
       # make sure the scope does not do subset
-      assert ADSLMetaAsd.respond_to? :something_special
-      assert_equal ASTAllOf, ADSLMetaAsd.something_special.adsl_ast.class
+      assert Asd.respond_to? :something_special
+      assert_equal ASTAllOf, Asd.something_special.adsl_ast.class
 
 
-      assert ADSLMetaAsd.where('id = ?', 4).respond_to? :something_special
-      ss = ADSLMetaAsd.where('id = ?', 4).something_special
+      assert Asd.where('id = ?', 4).respond_to? :something_special
+      ss = Asd.where('id = ?', 4).something_special
 
       assert_equal ASTSubset, ss.adsl_ast.class
       assert_equal ASTAllOf,  ss.adsl_ast.objset.class
       assert_equal 'Asd',     ss.adsl_ast.objset.class_name.text
     end
 
+    def test_generate__conditions_scopes_work_on_classes
+      Asd.class_exec do
+        scope :something_special, :conditions => ["id < ?", 5]
+      end
+      assert Asd.respond_to? :something_special
+
+      initialize_metaclasses
+
+      assert Asd.respond_to? :something_special
+      ss = Asd.something_special
+      assert ss.respond_to? :adsl_ast
+
+      assert_equal ASTSubset, ss.adsl_ast.class
+      assert_equal ASTAllOf,  ss.adsl_ast.objset.class
+      assert_equal 'Asd',     ss.adsl_ast.objset.class_name.text
+    end
+
+    def test_generate__scopes_through_associations
+      Asd.class_exec do
+        scope :asd_scope, lambda{ order('id') }
+      end
+      Mod::Blah.class_exec do
+        scope :blah_scope, :conditions => ["id < ?", 5]
+      end
+
+      initialize_metaclasses
+
+      assert_equal Mod::Blah, Asd.all.blahs.class
+      assert_equal ASTDereference, Asd.all.blahs.adsl_ast.class
+
+      ss = Asd.all.blahs.blah_scope.adsl_ast
+
+      assert_equal ASTSubset,      ss.class
+      assert_equal ASTDereference, ss.objset.class
+    end
+
+    def test_generate__conditions_scopes_work_on_relations
+      Asd.class_exec do
+        scope :asd_scope, lambda{ order('id') }
+      end
+      Mod::Blah.class_exec do
+        scope :blah_scope, :conditions => ["id < ?", 5]
+      end
+
+      initialize_metaclasses
+
+      assert_equal ASTSubset,      Mod::Blah.new.blah_scope.adsl_ast.class
+
+      assert_equal ASTAllOf,       Asd.asd_scope.adsl_ast.class
+      assert_equal ASTDereference, Asd.asd_scope.blahs.adsl_ast.class
+      assert_equal ASTSubset,      Asd.asd_scope.blahs.blah_scope.adsl_ast.class
+    end
 
   end
 end

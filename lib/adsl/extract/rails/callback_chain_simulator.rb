@@ -77,35 +77,56 @@ module ADSL
           paths
         end
 
-        def interrupt_callback_chain_on_render(root_block, action_name)
-          stmts = root_block.statements
-          index = stmts.index{ |stmt| stmt.is_a?(ADSL::Parser::ASTDummyStmt) && stmt.type == action_name }
-          if index.nil?
-            pp root_block
-            raise "Action block not found in instrumented execution"
+        def split_into_callbacks(root_block)
+          pairs = []
+          root_block.statements.reverse_each do |stmt|
+            if stmt.is_a? ADSL::Parser::ASTDummyStmt
+              pairs << [stmt.type, []]
+            else
+              pairs.last[1] << stmt
+            end
           end
+          pairs.reverse!
+          pairs.length.times do |index|
+            stmts = pairs[index][1]
+            pairs[index][1] = (stmts.length == 1 ? stmts.first : ASTBlock.new(:statements => stmts.reverse))
+          end
+          pairs
+        end
+
+        def interrupt_callback_chain_on_render(root_block, action_name)
+          callbacks = split_into_callbacks root_block
+
+          index = callbacks.index{ |callback_name, block| callback_name == action_name } 
+          if index.nil?
+            pp callbacks
+            raise "Action `#{action_name}' block not found in instrumented execution"
+          end
+
           # skip the action and proceed to the most prior before block
-          index -= 3
           until index < 0
-            block = stmts[index]
+            block = callbacks[index][1]
 
             case render_status_of block
             when true
               # will always render
-              root_block.statements = root_block.statements.first(index + 1)
+              callbacks = callbacks.first(index + 1)
             when nil
+              # may render
               paths = split_into_paths_that_must_or_may_not_render block
-              what_happens_unless_renders = root_block.statements[index+1..-1]
-              root_block.statements = root_block.statements.first(index)
-              root_block.statements << ASTEither.new(:blocks => [
+              what_happens_unless_renders = ASTBlock.new(:statements => callbacks[index+1..-1].map{ |c| c[1] })
+              callbacks = callbacks.first(index + 1)
+              callbacks.last[1] = ASTEither.new(:blocks => [
                 paths[:render],
                 ASTBlock.new(:statements => [paths[:not_render], *what_happens_unless_renders])
               ])
             else
+              # doesn't render, all good!
             end
-
-            index -= 2
+            index -= 1
           end
+
+          root_block.statements = callbacks.map{ |name, block| block }
         end
         
       end

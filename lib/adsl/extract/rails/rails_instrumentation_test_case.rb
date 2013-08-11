@@ -11,14 +11,7 @@ class ADSL::Extract::Rails::RailsInstrumentationTestCase < Test::Unit::TestCase
   end
 
   def teardown
-    unload_class :ADSLMetaAsd, :ADSLMetaKme, 'Mod::ADSLMetaBlah'
-
-    assert_false self.class.const_defined?(:ADSLMetaBlah) 
-    assert_false Mod.const_defined?(:ADSLMetaBlah)
-
-    Asd.delete_all
-    Kme.delete_all
-    Mod::Blah.delete_all
+    unload_class :Asd, :Kme, 'Mod::Blah'
   end
 
   def initialize_metaclasses

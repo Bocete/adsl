@@ -17,20 +17,6 @@ module ADSL
         def initialize(ar_class_names, *params)
           super *params
 
-          # replace all ActiveRecord classes with their meta-variants
-          replace :const do |sexp|
-            if ar_class_names.include? sexp[1].to_s
-              sexp[1] = ActiveRecordMetaclassGenerator.target_classname(sexp[1].to_s).to_sym
-            end
-            sexp
-          end
-          replace :colon2 do |sexp|
-            if ar_class_names.include? sexp[2].to_s
-              sexp[2] = ActiveRecordMetaclassGenerator.target_classname(sexp[2].to_s).to_sym
-            end
-            sexp
-          end
-          
           # if a block is passed to the invariant call, add that block to the last of the parameters instead
           replace :iter do |sexp|
             next sexp unless (

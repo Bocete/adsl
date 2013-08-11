@@ -44,13 +44,9 @@ module ADSL
 
           param_types.each do |name, klass|
             raise "Unknown klass for variable `#{name}' in #{quantifier} quantifier" if klass.nil?
-            raise "Class #{klass.name} is not instrumented" unless klass.respond_to? :instrumented_counterpart
+            raise "Class #{klass.name} is not instrumented" unless klass.respond_to? :adsl_ast
           end
 
-          param_types.keys.each do |name|
-            param_types[name] = param_types[name].instrumented_counterpart
-          end
-          
           vars_and_objsets = block.parameters.map{ |param|
             [
               t(param[1].to_s),

@@ -63,6 +63,51 @@ module ADSL
           end
         end
       end
+
+      def dup
+        new_values = {}
+        self.class.container_for_fields.each do |field_name|
+          value = send field_name
+          new_values[field_name] = if value.is_a?(Symbol) || value.nil?
+            value
+          else
+            value.dup
+          end
+        end
+        self.class.new new_values
+      end
+
+      def block_replace(&block)
+        children = self.class.container_for_fields.map{ |field_name| [field_name, send(field_name)] }
+        children.each do |name, value|
+          new_value = if value.is_a? Array
+            value.map do |e|
+              new_e = e.block_replace(&block)
+              new_e.nil? ? e.dup : new_e
+            end
+          elsif value.is_a? ASTNode
+            new_value = value.block_replace(&block)
+            new_value.nil? ? value.dup : new_value
+          elsif value.is_a?(Symbol) || value.nil?
+            value
+          else
+            value.dup
+          end
+          send("#{name}=", new_value) if new_value != value
+        end
+        new_value = block[self]
+        new_value.nil? ? self.dup : new_value
+      end
+
+      def ==(other)
+        return false unless other.is_a? self.class
+        self.class.container_for_fields.each do |field_name|
+          child1 = self.send field_name
+          child2 = other.send field_name
+          return false unless child1 == child2
+        end
+        true
+      end
     end
 
     class ADSLError < StandardError; end

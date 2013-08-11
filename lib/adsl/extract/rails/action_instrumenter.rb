@@ -66,7 +66,8 @@ module Kernel
         variable = value.class.new(:adsl_ast =>
           ::ADSL::Parser::ASTVariable.new(:var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name))
         )
-        outer_binding.eval "#{name} #{operator} ObjectSpace._id2ref(#{variable.object_id})"
+        str = "#{name} #{operator} ObjectSpace._id2ref(#{variable.object_id})"
+        outer_binding.eval str
         
         values_to_be_returned << ::ADSL::Parser::ASTAssignment.new(
           :var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name),
@@ -91,9 +92,18 @@ module Kernel
   def ins_explore_all(method_name = nil, &block)
     instrumenter = ::ADSL::Extract::Instrumenter.get_instance
     return_value = instrumenter.abb.explore_all_choices &block
-    
-    instrumenter.prev_abb << instrumenter.abb.adsl_ast
-    instrumenter.prev_abb << ::ADSL::Parser::ASTDummyStmt.new(:type => method_name) unless method_name.nil?
+
+    block_adsl_ast = instrumenter.abb.adsl_ast
+    instrumenter.prev_abb << block_adsl_ast
+
+    unless method_name.nil?
+      Array.wrap(return_value).each do |final_return|
+        adsl_ast = ::ADSL::Extract::Rails::ActionInstrumenter.extract_stmt_from_expr final_return
+        block_adsl_ast.statements << adsl_ast if !adsl_ast.nil? and adsl_ast.class.is_statement?
+      end
+      instrumenter.prev_abb << ::ADSL::Parser::ASTDummyStmt.new(:type => method_name) unless method_name.nil?
+    end
+
     return_value
   end
 
@@ -115,21 +125,8 @@ module Kernel
       # assume that this branch was illegal in context
       block2 = ::ADSL::Parser::ASTBlock.new :statements => []
     end
-
+    
     ::ADSL::Parser::ASTEither.new :blocks => [block1, block2]
-  end
-
-  def ins_root_lvl_push_expr(expr = nil)
-    Array.wrap(expr).each do |final_return|
-      adsl_ast = ::ADSL::Extract::Rails::ActionInstrumenter.extract_stmt_from_expr final_return
-      if adsl_ast and adsl_ast.class.is_statement?
-        instrumenter = ::ADSL::Extract::Instrumenter.get_instance
-        instrumenter.abb.root_paths.each do |root_path|
-          root_path << adsl_ast unless instrumenter.abb.included_already? root_path, adsl_ast
-        end
-      end
-    end
-    expr
   end
 end
 
@@ -168,22 +165,6 @@ module ADSL
 
           @branch_index = 0
 
-          ar_class_names = ar_class_names.map{ |n| n.split('::').last }
-
-          # replace all ActiveRecord classes with their meta-variants
-          replace :const do |sexp|
-            if ar_class_names.include? sexp[1].to_s
-              sexp[1] = ActiveRecordMetaclassGenerator.target_classname(sexp[1].to_s).to_sym
-            end
-            sexp
-          end
-          replace :colon2 do |sexp|
-            if ar_class_names.include? sexp[2].to_s
-              sexp[2] = ActiveRecordMetaclassGenerator.target_classname(sexp[2].to_s).to_sym
-            end
-            sexp
-          end
-
           # remove respond_to and render
           [:respond_to, :render, :redirect_to].each do |stmt|
             replacer = lambda{ |sexp|
@@ -206,7 +187,7 @@ module ADSL
             if @stack_depth == 0
               explore_all[1] << s(:lit, sexp[header_elem_count - 2])
               # ins_stmt explore_all on root call, since the caller will not handle it
-              explore_all = s(:call, nil, :ins_root_lvl_push_expr, explore_all)
+              # explore_all = s(:call, nil, :ins_root_lvl_push_expr, explore_all)
             end
             
             sexp.push explore_all

@@ -25,7 +25,7 @@ module ADSL
         end
 
         def included_already?(where, what)
-          return where.include?(what) ||
+          return where.map{ |e| e.equal? what }.include?(true) ||
             (
               where.last.is_a?(ADSL::Parser::ASTObjsetStmt) &&
               what.is_a?(ADSL::Parser::ASTObjsetStmt) &&
@@ -138,7 +138,7 @@ module ADSL
           end
         end
 
-        def root_lvl_adsl_ast()
+        def root_lvl_adsl_ast
           ::ADSL::Parser::ASTBlock.new :statements => @stmt_frames.first
         end
       end

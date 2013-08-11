@@ -162,4 +162,36 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
     assert_equal 1, action.block.statements.length
     assert_equal ASTAssignment, action.block.statements.first.class
   end
+
+  def test__equality
+    assert ASTIdent.new(:text => 'asd') == ASTIdent.new(:text => 'asd')
+    assert_false ASTIdent.new(:text => 'asd') == ASTIdent.new(:text => :asd)
+    assert(
+      ASTSubset.new(:objset => ASTAllOf.new(:class_name => 'asd')) ==
+      ASTSubset.new(:objset => ASTAllOf.new(:class_name => 'asd'))
+    )
+    assert_false(
+      ASTSubset.new(:objset => ASTAllOf.new(:class_name => 'asd')) ==
+      ASTSubset.new(:objset => ASTAllOf.new(:class_name => :asd))
+    )
+    assert_false ASTSubset.new == nil
+    assert ASTAnd.new(:subformulae => [1, 2, 3, nil, ASTIdent.new]) == ASTAnd.new(:subformulae => [1, 2, 3, nil, ASTIdent.new])
+    assert_false ASTAnd.new(:subformulae => [1, 2, 3, 4, ASTIdent.new]) == ASTAnd.new(:subformulae => [1, 2, 3, nil, ASTIdent.new])
+    assert_false(
+      ASTAnd.new(:subformulae => [1, 2, 3, nil, ASTIdent.new(:text => '')]) ==
+      ASTAnd.new(:subformulae => [1, 2, 3, nil, ASTIdent.new])
+    )
+  end
+
+  def test__block_replace__replaces_the_instance
+    ast_node = ASTSubset.new(:objset => ASTAllOf.new(:class_name => ASTIdent.new(:text => :text)))
+    replaced = ast_node.block_replace do |node|
+      next unless node.is_a? ASTIdent
+      ASTIdent.new :text => 'new_text'
+    end
+    assert_equal ASTSubset,  replaced.class
+    assert_equal ASTAllOf,   replaced.objset.class
+    assert_equal ASTIdent,   replaced.objset.class_name.class
+    assert_equal 'new_text', replaced.objset.class_name.text
+  end
 end
