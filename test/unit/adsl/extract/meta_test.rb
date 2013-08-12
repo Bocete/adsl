@@ -123,4 +123,20 @@ class ADSL::Util::MetaTest < Test::Unit::TestCase
     assert_equal :new, Bar.new.a
   end
 
+  def test_objset__replace_method__block
+    eval <<-ruby
+      class Foo
+        def a; :old; end
+      end
+    ruby
+
+    assert_equal :old, Foo.new.a
+
+    Foo.new.replace_method :a do
+      :new
+    end
+
+    assert_equal :new, Foo.new.a
+  end
+
 end

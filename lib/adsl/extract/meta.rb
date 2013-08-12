@@ -2,9 +2,9 @@ require 'rubygems'
 require 'backports'
 
 class Object
-  def replace_method(method_name, source)
+  def replace_method(method_name, source = nil, &block)
     raise "Object #{self} of class #{self.class} does not respond to #{method_name}" unless self.respond_to? method_name, true
-
+    
     im = self.singleton_class.instance_method(method_name)
     
     aliases = []
@@ -16,7 +16,11 @@ class Object
 
     owner = im.owner
 
-    owner.class_eval source
+    unless source.nil?
+      owner.class_eval source
+    else
+      owner.send :define_method, method_name, &block
+    end
 
     aliases.each do |other_name, other|
       other.owner.class_exec do

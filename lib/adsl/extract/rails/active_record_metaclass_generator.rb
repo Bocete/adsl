@@ -261,7 +261,7 @@ module ADSL
           @ar_class.send :default_scope, @ar_class.all
 
           reflections(:polymorphic => false, :through => false).each do |assoc|
-            @ar_class.send :define_method, assoc.name do
+            @ar_class.new.replace_method assoc.name do
               target_class = assoc.class_name.constantize
               result = target_class.new :adsl_ast => ASTDereference.new(
                 :objset => self.adsl_ast,
@@ -272,7 +272,7 @@ module ADSL
             end
           end
           reflections(:polymorphic => false, :through => true).each do |assoc|
-            @ar_class.send :define_method, assoc.name do
+            @ar_class.new.replace_method assoc.name do
               through_assoc = assoc.through_reflection
               source_assoc = assoc.source_reflection
 
@@ -284,7 +284,7 @@ module ADSL
             end
           end
           reflections(:polymorphic => true).each do |assoc|
-            @ar_class.send :define_method, assoc.name do
+            @ar_class.new.replace_method assoc.name do
               ADSL::Extract::Rails::MetaUnknown.new
             end
           end

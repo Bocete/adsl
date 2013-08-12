@@ -59,10 +59,7 @@ module ADSL
           klass = object.class != Class ? object.class : object
           method = object.method method_name
           
-          klass.name.match(/^ADSL::.*$/).nil? &&
-            !method.owner.respond_to?(:adsl_ast_class_name) &&
-            !method.owner.method_defined?(:adsl_ast_class_name) &&
-            super
+          klass.name.match(/^ADSL::.*$/).nil? && !(method.source_location[0] =~ /.*lib\/adsl\/.*/)
         end
 
       end
