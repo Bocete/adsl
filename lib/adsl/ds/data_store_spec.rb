@@ -209,6 +209,14 @@ module ADSL
       end
     end
 
+    class DSOneOfObjset < DSNode
+      container_for :objsets
+
+      def type
+        DSClass.common_supertype objsets.reject{ |o| o.type.nil? }.map{ |o| o.type }
+      end
+    end
+
     class DSOneOf < DSNode
       container_for :objset
       def type

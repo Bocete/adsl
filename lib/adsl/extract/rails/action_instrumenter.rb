@@ -91,6 +91,7 @@ module Kernel
 
   def ins_explore_all(method_name = nil, &block)
     instrumenter = ::ADSL::Extract::Instrumenter.get_instance
+
     return_value = instrumenter.abb.explore_all_choices &block
 
     block_adsl_ast = instrumenter.abb.adsl_ast
@@ -155,9 +156,32 @@ module ADSL
         end
 
         def create_locals
-          {
-            :abb => ActionBlockBuilder.new 
-          }
+          { :abb => ActionBlockBuilder.new }
+        end
+
+        def make_returns_explicit(sexp, last_stmt_index = -1)
+          last_stmt = sexp[last_stmt_index]
+          case last_stmt.sexp_type
+          when :block
+            make_returns_explicit last_stmt, -1
+          when :if
+            if last_stmt[2].nil?
+              last_stmt[2] = s(:return)
+            else
+              make_returns_explicit last_stmt, 2
+            end
+            if last_stmt[3].nil?
+              last_stmt[3] = s(:return)
+            else
+              make_returns_explicit last_stmt, 3
+            end
+          when :ensure
+            make_returns_explicit last_stmt, 1
+          when :rescue
+            make_returns_explicit last_stmt, 1
+          else
+            sexp[last_stmt_index] = s(:return, last_stmt) unless last_stmt.sexp_type == :return
+          end
         end
 
         def initialize(ar_class_names, instrument_domain = Dir.pwd)
@@ -254,18 +278,6 @@ module ADSL
             end
             sexp
           end
-
-          # make the implicit return explicit
-          replace :defn, :defs do |sexp|
-            container = sexp
-            return_stmt_index = -1
-            while [:ensure, :rescue, :block].include? container[return_stmt_index].sexp_type
-              container = container[return_stmt_index]
-              return_stmt_index = container.sexp_type == :block ? -1 : 1
-            end
-            container[return_stmt_index] = s(:return, container[return_stmt_index]) unless container[return_stmt_index].sexp_type == :return
-            sexp
-          end
           
           # instrument branches
           replace :if do |sexp|
@@ -283,17 +295,21 @@ module ADSL
               )
             end
           end
+
+          # make the implicit return explicit
+          replace :defn, :defs do |sexp|
+            make_returns_explicit sexp
+            sexp
+          end
         end
 
         def should_instrument?(object, method_name)
           return false unless super
 
-          klass = object.class != Class ? object.class : object
+          klass = object.is_a?(Class) ? object : object.class
           method = object.method method_name
           
-          klass.name.match(/^ADSL::.*$/).nil? &&
-            !method.owner.respond_to?(:adsl_ast_class_name) &&
-            !method.owner.method_defined?(:adsl_ast_class_name)
+          klass.name.match(/^ADSL::.*$/).nil? && !(method.source_location[0] =~ /.*lib\/adsl\/.*/)
         end
       end
 

@@ -13,12 +13,19 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
     assert difference.empty?
   end
 
-  def test__only_create_objset_has_sideeffects
-    all_nodes = ADSL::Parser.constants.map{ |c| ADSL::Parser.const_get c }.select{ |c| c < ADSL::Parser::ASTNode }
-    nodes = [:create_objset]
-    nodes = nodes.map{ |c| ADSL::Parser.const_get "AST#{c.to_s.camelize}" }
-    difference = Set[*nodes] ^ Set[*all_nodes.select{ |c| c.objset_has_side_effects? }]
-    assert difference.empty?
+  def test__create_objset_has_transitive_sideeffects
+    assert ASTCreateObjset.new.objset_has_side_effects?
+
+    assert_false ASTSubset.new.objset_has_side_effects?
+    assert ASTSubset.new(:objset => ASTCreateObjset.new).objset_has_side_effects?
+
+    assert_false ASTUnion.new.objset_has_side_effects?
+    assert_false ASTUnion.new(:objsets => [
+      ASTSubset.new, ASTSubset.new
+    ]).objset_has_side_effects?
+    assert ASTUnion.new(:objsets => [
+      ASTSubset.new, ASTSubset.new, ASTCreateObjset.new
+    ]).objset_has_side_effects?
   end
 
   def test__block_optimize__merges_nested_blocks

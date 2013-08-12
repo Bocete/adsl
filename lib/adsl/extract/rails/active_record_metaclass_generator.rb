@@ -6,7 +6,7 @@ require 'adsl/extract/rails/other_meta'
 module ADSL
   module Extract
     module Rails
-      
+
       class ActiveRecordMetaclassGenerator
         include ADSL::Parser
 
@@ -113,18 +113,14 @@ module ADSL
           @ar_class.class_exec do
 
             include ADSL::Parser
-            
-            attr_accessor :adsl_ast
 
-            def instrumenter
-              self.class.instrumenter
-            end
+            attr_accessor :adsl_ast
+            attr_accessible :adsl_ast
 
             def initialize(attributes = {}, options = {})
-              @adsl_ast = unless attributes.include? :adsl_ast
-                ASTCreateObjset.new(:class_name => ASTIdent.new(:text => self.class.adsl_ast_class_name))
-              end
-              super
+              super({
+                :adsl_ast => ASTCreateObjset.new(:class_name => ASTIdent.new(:text => self.class.adsl_ast_class_name))
+              }.merge(attributes), options)
             end
 
             # no-ops
@@ -213,10 +209,6 @@ module ADSL
 
             class << self
               include ADSL::Parser
-
-              def instrumenter
-                ADSL::Extract::Instrumenter.get_instance
-              end
             
               def ar_class
                 superclass
@@ -263,10 +255,6 @@ module ADSL
               end
             end
           end
-
-          #@ar_class.singleton_class.send :define_method, :instrumented_counterpart do
-          #  new_class
-          #end
 
           create_destroys @ar_class
 

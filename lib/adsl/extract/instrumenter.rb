@@ -51,7 +51,7 @@ module ADSL
         @stack_depth += 1
         @method_locals_stack << create_locals if respond_to? :create_locals
 
-        yield(self)
+        return yield(self)
       ensure
         @stack_depth -= 1
         @method_locals_stack.pop

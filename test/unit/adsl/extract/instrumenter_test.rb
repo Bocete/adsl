@@ -5,42 +5,36 @@ require 'adsl/util/test_helper'
 
 class ADSL::Extract::InstrumenterTest < Test::Unit::TestCase
   class Foo
-    def blah
-      [1, 2, 3]
-    end
-
-    def call_blah
-      blah
-    end
-
-    def repeat_blah(arg)
-      arg.times.map do
-        blah
-      end.to_a
-    end
-
-    def empty_method
-    end
-
-    def self.blah
-      [3, 2, 1]
-    end
-
-    def self.call_blah
-      self.blah
-    end
-
-    instance_methods(false).each do |method_name|
-      alias_method "old_#{method_name}", method_name unless method_name =~ /^old_.*$/
-    end
-    class << self
-      instance_methods(false).each do |method_name|
-        alias_method "old_#{method_name}", method_name unless method_name =~ /^old_.*$/
-      end
-    end
   end
 
   def setup
+    Foo.class_exec do
+      def blah
+        [1, 2, 3]
+      end
+
+      def call_blah
+        blah
+      end
+
+      def repeat_blah(arg)
+        arg.times.map do
+          blah
+        end.to_a
+      end
+
+      def empty_method
+      end
+
+      def self.blah
+        [3, 2, 1]
+      end
+
+      def self.call_blah
+        self.blah
+      end
+    end
+
     assert_equal [1, 2, 3], Foo.new.blah
     assert_equal nil, Foo.new.empty_method
     assert_equal [1, 2, 3], Foo.new.call_blah
@@ -48,16 +42,6 @@ class ADSL::Extract::InstrumenterTest < Test::Unit::TestCase
   end
 
   def teardown
-    Foo.class_eval do
-      instance_methods(false).each do |method_name|
-        alias_method method_name, "old_#{method_name}" unless method_name =~ /^old_.*$/
-      end
-      class << self
-        instance_methods(false).each do |method_name|
-          alias_method method_name, "old_#{method_name}" unless method_name =~ /^old_.*$/
-        end
-      end
-    end
   end
   
   def test_execute_instrumented__blank

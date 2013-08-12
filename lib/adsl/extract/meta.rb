@@ -6,9 +6,23 @@ class Object
     raise "Object #{self} of class #{self.class} does not respond to #{method_name}" unless self.respond_to? method_name, true
 
     im = self.singleton_class.instance_method(method_name)
+    
+    aliases = []
+    self.singleton_class.instance_methods.each do |other_name|
+      next if other_name == method_name
+      other = self.singleton_class.instance_method other_name
+      aliases << [other_name, other] if other == im
+    end
+
     owner = im.owner
 
     owner.class_eval source
+
+    aliases.each do |other_name, other|
+      other.owner.class_exec do
+        alias_method other_name, method_name
+      end
+    end
 
     true
   rescue Exception

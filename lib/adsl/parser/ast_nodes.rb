@@ -21,14 +21,12 @@ module ADSL
         @is_formula
       end
 
-      def self.objset_has_side_effects?
-        @objset_has_side_effects
+      def objset_has_side_effects?
+        false
       end
 
       def self.node_type(*fields)
-        options = {
-          :objset_has_side_effects => false
-        }
+        options = {}
         if fields.last.is_a? Hash
           options.merge! fields.pop
         end
@@ -41,8 +39,6 @@ module ADSL
           @is_objset = options[:types].include? :objset
           @is_formula = options[:types].include? :formula
         end
-
-        @objset_has_side_effects = options[:objset_has_side_effects]
 
         container_for *fields
         container_for :lineno
@@ -545,7 +541,7 @@ module ADSL
           end.flatten! 1
         end
         @statements.reject! do |stmt|
-          stmt.is_a?(ASTObjsetStmt) and !stmt.objset.class.objset_has_side_effects?
+          stmt.is_a?(ASTObjsetStmt) and !stmt.objset.objset_has_side_effects?
         end
         @statements.reject! do |stmt|
           stmt.is_a?(ASTEither) and stmt.blocks.inject(true){ |so_far, block| so_far && block.statements.empty? }
@@ -574,7 +570,11 @@ module ADSL
     end
 
     class ASTCreateObjset < ASTNode
-      node_type :class_name, :type => :objset, :objset_has_side_effects => true
+      node_type :class_name, :type => :objset
+      
+      def objset_has_side_effects?
+        true
+      end
 
       def typecheck_and_resolve(context)
         klass_node, klass = context.classes[@class_name.text]
@@ -778,6 +778,10 @@ module ADSL
     class ASTSubset < ASTNode
       node_type :objset, :type => :objset
 
+      def objset_has_side_effects?
+        @objset.nil? ? false : @objset.objset_has_side_effects?
+      end
+
       def typecheck_and_resolve(context)
         objset = @objset.typecheck_and_resolve context
         return ADSL::DS::DSEmptyObjset.new if objset.type.nil?
@@ -785,7 +789,7 @@ module ADSL
       end
 
       def optimize!
-        while @objset.is_a? ASTSubset
+        while @objset.is_a? set
           @objset = @objset.objset
         end
       end
@@ -793,6 +797,10 @@ module ADSL
     
     class ASTOneOf < ASTNode
       node_type :objset, :type => :objset
+      
+      def objset_has_side_effects?
+        @objset.nil? ? false : @objset.objset_has_side_effects?
+      end
 
       def typecheck_and_resolve(context)
         objset = @objset.typecheck_and_resolve context
@@ -803,6 +811,10 @@ module ADSL
 
     class ASTUnion < ASTNode
       node_type :objsets, :type => :objset
+      
+      def objset_has_side_effects?
+        @objsets.nil? ? false : @objsets.map{ |o| o.objset_has_side_effects? }.include?(true)
+      end
 
       def typecheck_and_resolve(context)
         objsets = @objsets.map{ |o| o.typecheck_and_resolve context }
@@ -825,6 +837,30 @@ module ADSL
         @objsets.delete_if{ |o| o.is_a?(ASTEmpty) }
       end
     end
+
+    class ASTOneOfObjset < ASTNode
+      node_type :objsets, :type => :objset
+      
+      def objset_has_side_effects?
+        @objsets.nil? ? false : @objsets.map{ |o| o.objset_has_side_effects? }.include?(true)
+      end
+
+      def typecheck_and_resolve(context)
+        objsets = @objsets.map{ |o| o.typecheck_and_resolve context }
+        common_type = ADSL::DS::DSClass.common_supertype objsets.reject{ |o| o.type.nil? }
+        if objsets.length == 0
+          ADSL::DS::DSEmptyObjset.new
+        elsif objsets.length == 1
+          objsets.first
+        else
+          ADSL::DS::DSOneOfObjset.new :objsets => objsets
+        end
+      end
+
+      def optimize!
+        @objsets.uniq!
+      end
+    end
     
     class ASTVariable < ASTNode
       node_type :var_name, :type => :objset
@@ -839,6 +875,10 @@ module ADSL
 
     class ASTDereference < ASTNode
       node_type :objset, :rel_name, :type => :objset
+      
+      def objset_has_side_effects?
+        @objset.nil? ? false : @objset.objset_has_side_effects?
+      end
 
       def typecheck_and_resolve(context)
         objset = @objset.typecheck_and_resolve context

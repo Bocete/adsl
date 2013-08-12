@@ -45,15 +45,20 @@ module ADSL
           @branch_choices.each do |iter_if_id, choice|
             return choice if iter_if_id == if_id
           end
-          @branch_choices << [if_id, false]
-          false
+          @branch_choices << [if_id, true]
+          true
         end
 
         def has_more_executions?
           @branch_choices.each do |if_id, choice|
-            return true if choice == false
+            return true if choice == true
           end
           false
+        end
+
+        def increment_branch_choice
+          @branch_choices.pop while !@branch_choices.empty? && @branch_choices.last[1] == false
+          @branch_choices.last[1] = false unless @branch_choices.empty?
         end
 
         def reset
@@ -66,27 +71,82 @@ module ADSL
           @stmt_frames = [[]]
         end
 
-        def increment_branch_choice
-          @branch_choices.pop while !@branch_choices.empty? && @branch_choices.last[1] == true
-          @branch_choices.last[1] = true unless @branch_choices.empty?
-        end
-
         def explore_all_choices
           while true
             reset
             increment_branch_choice
 
             return_value = yield
-            
+           
             do_return return_value unless @has_returned
             return common_return_value unless has_more_executions?
           end
         end
 
+        def common_supertype_of_objsets(values)
+          values.each do |value|
+            return false unless value.respond_to? :adsl_ast
+          end
+          adsl_asts = values.reject{ |v| v.nil? }.map(&:adsl_ast)
+          adsl_asts = adsl_asts.map{ |v| v.is_a?(ADSL::Parser::ASTObjsetStmt) ? v.objset : v }
+          adsl_asts.each do |adsl_ast|
+            return false unless adsl_ast.class.is_objset?
+            # side effects should trigger only if the selection is chosen;
+            # but the translation does not do this
+            return false if adsl_ast.objset_has_side_effects?
+          end
+
+          common_supertype = nil
+          values.each do |value|
+            if common_supertype.nil?
+              common_supertype = value.class
+            elsif value.class <= common_supertype
+              # all is fine
+            elsif common_supertype <= value.class
+              common_supertype = value.class
+            else
+              return false
+            end
+          end
+
+          common_supertype
+        end
+
+        def common_supertype_of_objset_arrays(values)
+          values.each do |value|
+            return false unless value.is_a? Array
+          end
+          
+          return_value = []
+          highest_length = values.map(&:length).max
+          highest_length.times do |index|
+            ct = compatible_types(values.map{ |v| v[index] })
+            return false unless ct
+            return_value << ct
+          end
+          return_value
+        end
+
         def common_return_value
-          uniq = @return_values.uniq
+          uniq = @return_values
+          if uniq.include? nil
+            uniq.delete_if{ |e| e.nil? }
+            uniq << nil
+          end
+
           if uniq.length == 1
             uniq.first
+          elsif ct = common_supertype_of_objsets(uniq)
+            objsets = uniq.map(&:adsl_ast).map{ |r| r.is_a?(ADSL::Parser::ASTObjsetStmt) ? r.objset : r }
+            ct.new(:adsl_ast => ADSL::Parser::ASTOneOfObjset.new(:objsets => objsets))
+          elsif ct = common_supertype_of_objset_arrays(uniq)
+            highest_length = uniq.map(&:length).max
+            combined_objsets = []
+            highest_length.times do |index|
+              objsets = uniq.map{|u| u[index]}.map(&:adsl_ast).map{ |r| r.is_a?(ADSL::Parser::ASTObjsetStmt) ? r.objset : r }
+              combined_objsets << ct[index].new(:objset => ADSL::Parser::ASTOneOfObjset.new(:objsets => objsets))
+            end
+            combined_objsets
           else
             # append all return values to root paths
             # cause they won't be returned and handled by the caller

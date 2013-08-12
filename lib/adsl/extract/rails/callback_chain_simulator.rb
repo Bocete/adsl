@@ -98,10 +98,7 @@ module ADSL
           callbacks = split_into_callbacks root_block
 
           index = callbacks.index{ |callback_name, block| callback_name == action_name } 
-          if index.nil?
-            pp callbacks
-            raise "Action `#{action_name}' block not found in instrumented execution"
-          end
+          return if index.nil?
 
           # skip the action and proceed to the most prior before block
           until index < 0

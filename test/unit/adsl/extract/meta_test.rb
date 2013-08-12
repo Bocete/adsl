@@ -52,7 +52,26 @@ class ADSL::Util::MetaTest < Test::Unit::TestCase
     assert_equal :old, Foo.new.a
     assert_equal :new, foo.a
   end
-  
+
+  def test_object__replace_method__works_on_aliases
+    eval <<-ruby
+      class Foo
+        def a; :blah; end
+        alias_method :a_copy, :a
+      end
+    ruby
+
+    foo = Foo.new
+
+    assert_equal :blah, foo.a
+    assert_equal :blah, foo.a_copy
+
+    foo.replace_method :a, "def a; :kme; end"
+
+    assert_equal :kme, foo.a
+    assert_equal :kme, foo.a_copy
+  end
+
   def test_object__replace_method__leaves_super_class_alone_if_overridden
     eval <<-ruby
       class Foo

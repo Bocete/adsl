@@ -121,14 +121,14 @@ module ADSL::Extract::Rails
       assert_equal ::ADSL::Extract::Rails::MetaUnknown, ret_value.class
     end
 
-    def test__common_return_value__ignores_duplicates
+    def test__common_return_value__ignores_duplicate_nils
       abb = ActionBlockBuilder.new
       
-      assert_equal(:a, abb.explore_all_choices do
+      assert_equal(nil, abb.explore_all_choices do
         if abb.branch_choice 1
-          abb.do_return :a
+          abb.do_return nil
         else
-          abb.do_return :a
+          abb.do_return nil
         end
       end)
     end
@@ -161,7 +161,7 @@ module ADSL::Extract::Rails
         abb << :b
       end)
     end
-
+    
     def test__adsl_ast__simple
       abb = ActionBlockBuilder.new
       abb.explore_all_choices do

@@ -755,8 +755,33 @@ module ADSL
         FOL::Or.new(@objsets.map{ |objset| objset.resolve_action_objset translation, ps, var })
       end
 
-      def resolve_invariant_objset(translation, ps, var)
-        FOL::Or.new(@objsets.map{ |objset| objset.resolve_invariant_objset translation, ps, var })
+      def resolve_invariant_objset(translation, var)
+        FOL::Or.new(@objsets.map{ |objset| objset.resolve_invariant_objset translation, var })
+      end
+    end
+
+    class DSOneOfObjset < DSNode
+      def prepare_action(translation)
+        context = translation.context
+        @objsets.each{ |objset| objset.prepare_action translation }
+        
+        @predicates = @objsets.map do |objset|
+          translation.create_predicate :one_of_subset, context.level
+        end
+        translation.reserve_names context.p_names do |ps|
+          translation.create_formula FOL::ForAll.new(ps,
+            FOL::OneOf.new(@predicates.map{ |p| p[ps] })
+          )
+        end
+      end
+
+      def resolve_action_objset(translation, ps, var)
+        context = translation.context
+        subformulae = []
+        @objsets.length.times do |index|
+          subformulae << FOL::And.new(@predicates[index][ps], @objsets[index].resolve_action_objset(translation, ps, var))
+        end
+        FOL::Or.new(subformulae)
       end
     end
 

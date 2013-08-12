@@ -43,6 +43,12 @@ class Array
   end
 end
 
+class Symbol
+  def dup
+    self
+  end
+end
+
 class Module
   def parent_module
     name.split('::')[0..-2].join('::').constantize
@@ -81,15 +87,7 @@ class Module
     container.const_set name.to_s.split('::').last, new_class
     new_class
   end
-end
-
-class Symbol
-  def dup
-    self
-  end
-end
-
-class Module
+  
   def container_for(*fields, &block)
     all_fields = Set.new(fields)
     if respond_to? :container_for_fields
