@@ -3,13 +3,15 @@ require 'sexp_processor'
 class Sexp
   def block_replace(*search_types, &block)
     options = search_types.last.is_a?(Hash) ? search_types.pop : {}
+    
+    propagate_to_children = true
     if options.include?(:unless_in)
       options[:unless_in] = Array.wrap options[:unless_in]
-      return self if options[:unless_in].include? self.sexp_type
+      propagate_to_children = false if options[:unless_in].include?(self.sexp_type)
     end
 
     new = self.map do |element|
-      if element.is_a? Sexp
+      if propagate_to_children && element.is_a?(Sexp)
         result = element.block_replace *search_types, options, &block
         result = [result] unless result.class == Array
         result
@@ -30,10 +32,11 @@ class Sexp
     end.flatten(1)
   end
 
-  def may_return?
+  def may_return_or_raise?
     return true if sexp_type == :return
+    return true if sexp_type == :call && self[2] == :raise
     sexp_body.each do |subsexp|
-      return true if subsexp.is_a?(Sexp) && subsexp.may_return?
+      return true if subsexp.is_a?(Sexp) && subsexp.may_return_or_raise?
     end
     false
   end

@@ -118,6 +118,7 @@ module ADSL
             attr_accessible :adsl_ast
 
             def initialize(attributes = {}, options = {})
+              attributes = {} if attributes.is_a?(MetaUnknown)
               super({
                 :adsl_ast => ASTCreateObjset.new(:class_name => ASTIdent.new(:text => self.class.adsl_ast_class_name))
               }.merge(attributes), options)
@@ -128,9 +129,16 @@ module ADSL
             def save!; end
             def reorder(*params);  self; end
             def order(*params);    self; end
+            def reorder(*params);  self; end
             def includes(*params); self; end
             def all(*params);      self; end
             def scope_for_create;  self; end
+
+            def count_by_group(*args); MetaUnknown.new; end
+            def size;                  MetaUnknown.new; end
+            def length;                MetaUnknown.new; end
+            def count;                 MetaUnknown.new; end
+            def map;                   MetaUnknown.new; end
 
             def take
               self.class.new :adsl_ast => ASTOneOf.new(:objset => self.adsl_ast)
@@ -142,8 +150,9 @@ module ADSL
             def where(*args)
               self.class.new :adsl_ast => ASTSubset.new(:objset => self.adsl_ast)
             end
-            alias_method :only,   :where
-            alias_method :except, :where
+            alias_method :only,     :where
+            alias_method :except,   :where
+            alias_method :paginate, :where    # will_paginate
             def merge(other)
               if other.adsl_ast.is_a? ASTAllOf
                 self
@@ -152,9 +161,9 @@ module ADSL
               elsif other.is_a? ActiveRecord::Base
                 # the scope is on the right hand side; so we can just replace all AllOfs in the right
                 # with the left hand side
-                other.adsl_ast.block_replace do |node|
-                  self if node.is_a? ASTAllOf
-                end
+                self.class.new(:adsl_ast => other.adsl_ast.block_replace{ |node|
+                  self.adsl_ast.dup if node.is_a? ASTAllOf
+                })
               else
                 self
               end
@@ -172,9 +181,6 @@ module ADSL
               self.class.new :adsl_ast => ASTUnion.new(:objsets => [self.adsl_ast, other.adsl_ast])
             end
 
-            def size
-              MetaUnknown.new
-            end
 
             def include?(other)
               other = other.adsl_ast if other.respond_to? :adsl_ast

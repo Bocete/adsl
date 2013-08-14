@@ -165,6 +165,30 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 'atat__a', statements.last.objset.var_name.text
   end
 
+  def test_action_extraction__assignments_dont_make_values_nil
+    AsdsController.class_exec do
+      def nothing
+        a = Asd.new
+        a = a.blahs
+      end
+    end
+    
+    extractor = create_rails_extractor
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    statements = ast.block.statements
+
+    assert_equal 2, statements.length
+
+    assert_equal ASTAssignment,   statements[0].class
+    assert_equal ASTCreateObjset, statements[0].objset.class
+    assert_equal 'Asd',           statements[0].objset.class_name.text
+    assert_equal 'a',             statements[0].var_name.text
+    
+    assert_equal ASTAssignment,   statements[1].class
+    assert_equal ASTDereference,  statements[1].objset.class
+    assert_equal 'a',             statements[1].var_name.text
+  end
+
   def test_invariant_extraction__works
     extractor = create_rails_extractor <<-invariants
       invariant 'what', true
@@ -484,6 +508,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
         b.delete!
       end
     end
+
     extractor = create_rails_extractor
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
     statements = ast.block.statements
@@ -505,6 +530,24 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     
     assert_equal ASTDeleteObj, statements[3].class
     assert_equal 'b', statements[3].objset.var_name.text
+  end
+  
+  def test_action_extraction__variable_assignment_in_branch
+    AsdsController.class_exec do
+      def nothing
+        if something
+          a = "asd"
+        else
+          a = "blah"
+        end
+        return a
+      end
+    end
+    
+    assert_nothing_raised do
+      extractor = create_rails_extractor
+      ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    end
   end
 
   def test_callback_lookup
@@ -827,35 +870,6 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 'Asd', blocks[0].statements[0].objset.class_name.text
   end
 
-  def test_extract_action__does_not_rescue_errors
-    AsdsController.class_exec do
-      def nothing
-        raise
-      end
-    end
-
-    assert_raise do
-      extractor = create_rails_extractor
-      ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
-    end
-  end
-
-  def test_extract_action__does_not_rescue_errors_from_callbacks
-    AsdsController.class_exec do
-      def before_nothing
-        raise
-      end
-
-      def nothing
-      end
-    end
-
-    assert_raise do
-      extractor = create_rails_extractor
-      ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
-    end
-  end
-
   def test_extract_action__instrumentation_filters_work
     AsdsController.class_exec do
       def before_nothing
@@ -877,4 +891,60 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     statements = ast.block.statements
     assert_equal 1, statements.length
   end
+  
+  def test_extract_action__raise_ignores_the_root_path
+    AsdsController.class_exec do
+      def nothing
+        Kme.new
+        raise
+      end
+    end
+    
+    extractor = create_rails_extractor
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    statements = ast.block.statements
+
+    assert_equal 0, statements.length
+  end
+
+  def test_extract_action__raise_ignores_the_root_path_in_branch
+    AsdsController.class_exec do
+      def nothing
+        if whatever
+          Asd.new
+        else
+          Kme.new
+          raise
+        end
+      end
+    end
+    
+    extractor = create_rails_extractor
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    statements = ast.block.statements
+
+    assert_equal 1, statements.length
+    assert_equal ASTObjsetStmt,   statements[0].class
+    assert_equal ASTCreateObjset, statements[0].objset.class
+    assert_equal 'Asd',           statements[0].objset.class_name.text
+  end
+  
+  def test_extract_action__exceptions_in_callbacks_stop_the_chain
+    AsdsController.class_exec do
+      def before_nothing
+        raise
+      end
+
+      def nothing
+        Asd.new
+      end
+    end
+
+    extractor = create_rails_extractor
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    statements = ast.block.statements
+
+    assert_equal 0, statements.length
+  end
+
 end

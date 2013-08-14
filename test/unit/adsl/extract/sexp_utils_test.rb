@@ -76,12 +76,15 @@ class ADSL::Extract::SexpUtilsTest < Test::Unit::TestCase
     assert_equal [s(:lit, s(:lit, 2))], s(s(:lit, s(:lit, 2)), s(:self)).find_shallowest(:lit)
   end
 
-  def test_may_return__simple
-    assert_false s(:block, s(:if, s(:true), s(:block), s(:block))).may_return?
-    assert s(:block, s(:if, s(:true), s(:block), s(:block, s(:return, s(:nil))))).may_return?
+  def test_may_return_or_raise__simple
+    assert_false s(:block, s(:if, s(:true), s(:block), s(:block))).may_return_or_raise?
+    assert s(:block, s(:if, s(:true), s(:block), s(:block, s(:return, s(:nil))))).may_return_or_raise?
+    
+    assert_false s(:block, s(:if, s(:true), s(:block), s(:block))).may_return_or_raise?
+    assert s(:block, s(:if, s(:true), s(:block), s(:block, s(:call, nil, :raise)))).may_return_or_raise?
   end
 
-  def test_may_return__deep
+  def test_may_return_or_raise__deep
     sexp = s(:if,
       s(:lasgn, :user, s(:call, s(:const, :User), :authenticate, s(:call, nil, :http_user), s(:call, nil, :http_pass))),
       s(:block,
@@ -91,7 +94,7 @@ class ADSL::Extract::SexpUtilsTest < Test::Unit::TestCase
       ),
       nil
     )
-    assert sexp.may_return?
+    assert sexp.may_return_or_raise?
   end
 
 end

@@ -256,5 +256,17 @@ module ADSL::Extract::Rails
       assert_equal ASTSubset,      Asd.asd_scope.blahs.blah_scope.adsl_ast.class
     end
 
+    def test_generate__association_scope_count_by_group_is_unknown
+      Mod::Blah.class_exec do
+        scope :some_scope, :conditions => ["id < ?", 5]
+      end
+
+      initialize_metaclasses
+
+      assert_equal Mod::Blah,   Asd.new.blahs.class
+      assert_equal Mod::Blah,   Asd.new.blahs.some_scope.class
+      assert_equal MetaUnknown, Asd.new.blahs.some_scope.count_by_group('id').class
+    end
+
   end
 end

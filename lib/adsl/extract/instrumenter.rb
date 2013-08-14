@@ -108,6 +108,7 @@ module ADSL
 
       def should_instrument?(object, method_name)
         return false if object.is_a?(Fixnum) or object.is_a?(Symbol)
+        
         method = object.singleton_class.instance_method method_name
 
         return false if method.source_location.nil?

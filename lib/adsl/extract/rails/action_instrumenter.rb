@@ -51,6 +51,8 @@ module Kernel
         "atat__#{ name.to_s[2..-1] }"
       elsif /^@[^@]+$/ =~ name.to_s
         "at__#{ name.to_s[1..-1] }"
+      elsif /^\$.*$/ =~ name.to_s
+        "global__#{ name.to_s[1..-1] }"
       else
         name.to_s
       end
@@ -85,6 +87,10 @@ module Kernel
     ::ADSL::Extract::Instrumenter.get_instance.abb.do_return *return_values
   end
 
+  def ins_do_raise
+    ::ADSL::Extract::Instrumenter.get_instance.abb.do_raise
+  end
+
   def ins_branch_choice(branch_id)
     ::ADSL::Extract::Instrumenter.get_instance.abb.branch_choice branch_id 
   end
@@ -104,29 +110,23 @@ module Kernel
       end
       instrumenter.prev_abb << ::ADSL::Parser::ASTDummyStmt.new(:type => method_name) unless method_name.nil?
     end
-
+    
     return_value
   end
 
-  def ins_if(lambda1, lambda2)
+  def ins_push_frame
     instrumenter = ::ADSL::Extract::Instrumenter.get_instance
+    instrumenter.abb.push_frame
+  end
+  
+  def ins_pop_frame
+    instrumenter = ::ADSL::Extract::Instrumenter.get_instance
+    instrumenter.abb.pop_frame
+  end
 
-    begin
-      stmts = instrumenter.abb.in_stmt_frame &lambda1
-      block1 = ::ADSL::Parser::ASTBlock.new :statements => stmts
-    rescue Exception
-      # assume that this branch was illegal in context
-      block1 = ::ADSL::Parser::ASTBlock.new :statements => []
-    end
-
-    begin
-      stmts = instrumenter.abb.in_stmt_frame &lambda2
-      block2 = ::ADSL::Parser::ASTBlock.new :statements => stmts
-    rescue Exception
-      # assume that this branch was illegal in context
-      block2 = ::ADSL::Parser::ASTBlock.new :statements => []
-    end
-    
+  def ins_if(frame1, frame2)
+    block1 = ::ADSL::Parser::ASTBlock.new :statements => frame1
+    block2 = ::ADSL::Parser::ASTBlock.new :statements => frame2
     ::ADSL::Parser::ASTEither.new :blocks => [block1, block2]
   end
 end
@@ -218,50 +218,58 @@ module ADSL
             sexp
           end
 
+          # replace raise with ins_do_raise
+          replace :call do |sexp|
+            next sexp unless sexp[2] == :raise
+            s(:call, nil, :ins_do_raise)
+          end
+
           # replace returns with ins_do_return
           replace :return do |sexp|
             s(:call, nil, :ins_do_return, *sexp.sexp_body)
           end
-
-          # instrument ||= assignments
-          replace :op_asgn_or do |sexp|
-            prepare_assignment = s(:op_asgn_or, sexp[1].dup, s(sexp[2][0], sexp[2][1], s(:nil)))
-            var_names = s(:array, s(:str, sexp[1][1].to_s))
-            values = s(:array, sexp[2][2])
-
-            s(:block,
-              prepare_assignment,
-              s(:call, nil, :ins_optional_assignment, s(:call, nil, :binding), var_names, values),
-            )
-          end
           
           # instrument assignments
-          replace :lasgn, :iasgn, :cvasgn, :masgn, :unless_in => [:args, :op_asgn_or] do |sexp|
+          replace :lasgn, :iasgn, :cvasgn, :cvdecl, :gasgn, :masgn, :op_asgn_or, :unless_in => [:args, :op_asgn_or] do |sexp|
             next sexp if sexp.length <= 2
 
-            prepare_assignment = if sexp.sexp_type == :masgn
-              nils = s(:array, *([s(:nil)] * sexp[1].sexp_body.length))
-              s(:masgn, sexp[1], nils)
-            else
-              s(sexp[0], sexp[1], s(:nil))
-            end
-            
-            var_names = if sexp.sexp_type == :masgn
-              sexp[1].sexp_body.map{ |var| s(:str, var[1].to_s) }.to_a
-            else
-              [s(:str, sexp[1].to_s)]
-            end
+            if sexp.sexp_type == :op_asgn_or
+              prepare_assignment = s(:op_asgn_or, sexp[1].dup, s(sexp[2][0], sexp[2][1], s(:nil)))
+              var_names = s(:array, s(:str, sexp[1][1].to_s))
+              values = s(:array, sexp[2][2])
 
-            values = if sexp.sexp_type == :masgn
-              sexp[2]
+              s(:block,
+                prepare_assignment,
+                s(:call, nil, :ins_optional_assignment, s(:call, nil, :binding), var_names, values),
+              )
             else
-              s(:array, sexp[2])
-            end
+              variables_and_prefixes = if sexp.sexp_type == :masgn
+                sexp[1].sexp_body.map{ |asgn_type, var| [asgn_type.to_s[0..-5], var] }
+              else
+                [[sexp[0].to_s[0..-5], sexp[1]]]
+              end
 
-            s(:block,
-              prepare_assignment,
-              s(:call, nil, :ins_multi_assignment, s(:call, nil, :binding), s(:array, *var_names), values)
-            )
+              prepare_assignments = variables_and_prefixes.map{ |prefix, var|
+                s(:op_asgn_or, s("#{prefix}var".to_sym, var), s("#{prefix}asgn".to_sym, var, s(:nil)))
+              }
+              
+              var_names = if sexp.sexp_type == :masgn
+                sexp[1].sexp_body.map{ |var| s(:str, var[1].to_s) }.to_a
+              else
+                [s(:str, sexp[1].to_s)]
+              end
+
+              values = if sexp.sexp_type == :masgn
+                sexp[2]
+              else
+                s(:array, sexp[2])
+              end
+
+              s(:block,
+                *prepare_assignments,
+                s(:call, nil, :ins_multi_assignment, s(:call, nil, :binding), s(:array, *var_names), values)
+              )
+            end
           end
 
           # prepend ins_stmt to every non-return or non-if statement
@@ -272,7 +280,8 @@ module ADSL
               when :block; 1
             end
             (first_stmt_index..sexp.length-1).each do |index|
-              unless [:if, :return].include? sexp[index].sexp_type
+              unless [:if, :return].include?(sexp[index].sexp_type) ||
+                  (sexp[index][1].nil? && [:ins_push_frame, :ins_pop_frame].include?(sexp[index][2]))
                 sexp[index] = s(:call, nil, :ins_stmt, sexp[index])
               end
             end
@@ -281,17 +290,37 @@ module ADSL
           
           # instrument branches
           replace :if do |sexp|
-            if sexp.may_return?
+            if sexp.may_return_or_raise?
               sexp[1] = s(:call, nil, :ins_branch_choice, s(:lit, @branch_index += 1))
               sexp[2] = s(:block, sexp[2]) unless sexp[2].nil? or sexp[2].sexp_type == :block
               sexp[3] = s(:block, sexp[3]) unless sexp[3].nil? or sexp[3].sexp_type == :block
               sexp
             else
-              block1 = sexp[2].nil? || sexp[2].sexp_type == :block ? sexp[2] : s(:block, sexp[2])
-              block2 = sexp[3].nil? || sexp[3].sexp_type == :block ? sexp[3] : s(:block, sexp[3])
-              s(:call, nil, :ins_if, 
-                s(:iter, s(:call, nil, :lambda), s(:args), block1),
-                s(:iter, s(:call, nil, :lambda), s(:args), block2)
+              block1 = sexp[2].nil? ? [] : [sexp[2]]
+              block2 = sexp[3].nil? ? [] : [sexp[3]]
+              s(:call, nil, :ins_if,
+                s(:rescue,
+                  s(:block,
+                    s(:call, nil, :ins_push_frame),
+                    *block1,
+                    s(:call, nil, :ins_pop_frame)
+                  ),
+                  s(:resbody,
+                    s(:array, s(:const, :Exception)),
+                    s(:call, nil, :ins_pop_frame)
+                  )
+                ),
+                s(:rescue,
+                  s(:block,
+                    s(:call, nil, :ins_push_frame),
+                    *block2,
+                    s(:call, nil, :ins_pop_frame)
+                  ),
+                  s(:resbody,
+                    s(:array, s(:const, :Exception)),
+                    s(:call, nil, :ins_pop_frame)
+                  )
+                )
               )
             end
           end

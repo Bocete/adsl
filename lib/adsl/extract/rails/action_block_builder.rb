@@ -14,14 +14,17 @@ module ADSL
           @stmt_frames = [[]]
           @branch_choices = []
           @return_values = []
-          @has_returned = false
+          @has_returned_or_raised = false
         end
 
+        def push_frame; @stmt_frames << []; end
+        def pop_frame;  @stmt_frames.pop; end
+
         def in_stmt_frame
-          @stmt_frames << []
+          push_frame
           yield
         ensure
-          return @stmt_frames.pop
+          return pop_frame
         end
 
         def included_already?(where, what)
@@ -34,7 +37,7 @@ module ADSL
         end
 
         def append_stmt(stmt, options = {})
-          return stmt if @has_returned && !options[:ignore_has_returned]
+          return stmt if @has_returned_or_raised && !options[:ignore_has_returned]
           return stmt if included_already? @stmt_frames.last, stmt
           @stmt_frames.last << stmt
           stmt
@@ -67,7 +70,7 @@ module ADSL
             @branch_choices = []
             @return_values = []
           end
-          @has_returned = false
+          @has_returned_or_raised = false
           @stmt_frames = [[]]
         end
 
@@ -78,12 +81,13 @@ module ADSL
 
             return_value = yield
            
-            do_return return_value unless @has_returned
+            do_return return_value unless @has_returned_or_raised
             return common_return_value unless has_more_executions?
           end
         end
 
         def common_supertype_of_objsets(values)
+          return false if values.empty?
           values.each do |value|
             return false unless value.respond_to? :adsl_ast
           end
@@ -113,6 +117,8 @@ module ADSL
         end
 
         def common_supertype_of_objset_arrays(values)
+          return false if values.empty?
+
           values.each do |value|
             return false unless value.is_a? Array
           end
@@ -176,12 +182,21 @@ module ADSL
         end
 
         def do_return(return_value = nil)
-          unless @has_returned
+          unless @has_returned_or_raised
             @root_paths << all_stmts_so_far
             @return_values << return_value
-            @has_returned = true
+            @has_returned_or_raised = true
           end
           return_value
+        end
+
+        def do_raise
+          unless @has_returned_or_raised
+            # appending nothing to root paths
+            @root_paths << [::ADSL::Parser::ASTDummyStmt.new(:type => :raise)]
+            @return_values << nil
+            @has_returned_or_raised = true
+          end
         end
 
         def adsl_ast

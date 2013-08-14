@@ -789,7 +789,7 @@ module ADSL
       end
 
       def optimize!
-        while @objset.is_a? set
+        while @objset.is_a? ASTSubset
           @objset = @objset.objset
         end
       end

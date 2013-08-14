@@ -70,6 +70,10 @@ module ADSL
         end
 
         def prepare_instrumentation(controller_class, action)
+          controller_class.class_exec do
+            def default_render(*args); end
+            def params; ADSL::Extract::Rails::MetaUnknown.new; end
+          end
           controller = controller_class.new
           @action_instrumenter.instrument controller, action
           callbacks(controller_class).each do |callback|
@@ -90,7 +94,7 @@ module ADSL
 
           block = @action_instrumenter.exec_within do
             @action_instrumenter.exec_within do
-              session.send(route[:request_method].to_s.downcase, route[:url], ADSL::Extract::Rails::MetaUnknown.new)
+              session.send route[:request_method].to_s.downcase, route[:url]
             end
             @action_instrumenter.abb.root_lvl_adsl_ast 
           end
