@@ -76,25 +76,37 @@ module ADSL
 
         def explore_all_choices
           while true
-            reset
-            increment_branch_choice
+            begin
+              reset
+              increment_branch_choice
 
-            return_value = yield
+              return_value = yield
            
-            do_return return_value unless @has_returned_or_raised
-            return common_return_value unless has_more_executions?
+              do_return return_value unless @has_returned_or_raised
+            rescue
+              do_raise unless @has_returned_or_raised
+            ensure
+              return common_return_value unless has_more_executions?
+            end
           end
         end
 
         def common_supertype_of_objsets(values)
           return false if values.empty?
           values.each do |value|
-            return false unless value.respond_to? :adsl_ast
+            return false unless !value.is_a?(MetaUnknown) && value.respond_to?(:adsl_ast)
           end
           adsl_asts = values.reject{ |v| v.nil? }.map(&:adsl_ast)
           adsl_asts = adsl_asts.map{ |v| v.is_a?(ADSL::Parser::ASTObjsetStmt) ? v.objset : v }
           adsl_asts.each do |adsl_ast|
-            return false unless adsl_ast.class.is_objset?
+            begin
+              return false unless adsl_ast.class.is_objset?
+            rescue Exception => e
+              puts "OPALAC"
+              pp values
+              pp adsl_ast
+              raise e
+            end
             # side effects should trigger only if the selection is chosen;
             # but the translation does not do this
             return false if adsl_ast.objset_has_side_effects?
@@ -197,6 +209,7 @@ module ADSL
             @return_values << nil
             @has_returned_or_raised = true
           end
+          nil
         end
 
         def adsl_ast

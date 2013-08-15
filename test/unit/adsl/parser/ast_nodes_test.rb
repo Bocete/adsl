@@ -45,7 +45,7 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
       ])
     ])
     
-    block.optimize!
+    block = block.optimize
 
     assert_equal 7, block.statements.length
     7.times do |i|
@@ -62,7 +62,7 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
       ASTObjsetStmt.new(:objset => ASTEmptyObjset.new)
     ])
 
-    block.optimize!
+    block = block.optimize
     
     assert_equal 3, block.statements.length
     3.times do |i|
@@ -80,7 +80,7 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
       ASTDummyStmt.new()
     ])
 
-    block.optimize!
+    block = block.optimize
     
     assert_equal 2, block.statements.length
     2.times do |i|
@@ -114,7 +114,7 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
       ]),
     ])
     
-    either.optimize!
+    either = either.optimize
 
     assert_equal 4, either.blocks.length
     assert_equal [1, 2], either.blocks[0].statements.map(&:objset)
@@ -137,7 +137,7 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
       ])
     ]))
 
-    action.optimize!
+    action = action.optimize
 
     assert_equal 1, action.block.statements.length
     either = action.block.statements.first
@@ -164,7 +164,7 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
       ])
     ]))
 
-    action.optimize!
+    action = action.optimize
 
     assert_equal 1, action.block.statements.length
     assert_equal ASTAssignment, action.block.statements.first.class
@@ -200,5 +200,40 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
     assert_equal ASTAllOf,   replaced.objset.class
     assert_equal ASTIdent,   replaced.objset.class_name.class
     assert_equal 'new_text', replaced.objset.class_name.text
+  end
+
+  def test__action_optimize__prepends_instance_and_class_variables
+    action = ASTAction.new(:block => ASTBlock.new(:statements => [
+      ASTEither.new(:blocks => [
+        ASTBlock.new(:statements => []),
+        ASTBlock.new(:statements => [
+          ASTBlock.new(:statements => [
+            ASTBlock.new(:statements => [
+              ASTAssignment.new(:objset => ASTVariable.new(:var_name => ASTIdent.new(:text => 'kme')))
+            ]),
+            ASTBlock.new(:statements => [
+              ASTAssignment.new(:objset => ASTVariable.new(:var_name => ASTIdent.new(:text => 'at__blahblah')))
+            ]),
+            ASTBlock.new(:statements => [])
+          ])
+        ]),
+        ASTBlock.new(:statements => [])
+      ])
+    ]))
+
+    action = action.optimize
+    action.prepend_global_variables_by_signatures /^at__.*$/, /^atat__.*$/
+
+    assert_equal 3, action.block.statements.length
+
+    assert_equal ASTAssignment,  action.block.statements[0].class
+    assert_equal 'at__blahblah', action.block.statements[0].var_name.text
+    assert_equal ASTEmptyObjset, action.block.statements[0].objset.class
+    
+    assert_equal ASTAssignment, action.block.statements[1].class
+    assert_equal 'kme',         action.block.statements[1].objset.var_name.text
+    
+    assert_equal ASTAssignment,  action.block.statements[2].class
+    assert_equal 'at__blahblah', action.block.statements[2].objset.var_name.text
   end
 end

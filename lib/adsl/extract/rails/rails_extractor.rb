@@ -1,4 +1,3 @@
-require 'adsl/extract/rails/active_record_extractor'
 require 'adsl/extract/rails/action_instrumenter'
 require 'adsl/extract/rails/invariant_extractor'
 require 'adsl/extract/rails/callback_chain_simulator'
@@ -13,7 +12,7 @@ module ADSL
         
         include ADSL::Extract::Rails::CallbackChainSimulator
         
-        attr_accessor :class_map, :actions, :invariants, :instrumentation_filters
+        attr_accessor :ar_classes, :actions, :invariants, :instrumentation_filters
 
         def initialize(options = {})
           options = Hash[
@@ -22,10 +21,12 @@ module ADSL
             :instrumentation_filters => []
           ].merge options
           
-          @active_record_instrumenter = ADSL::Extract::Rails::ActiveRecordExtractor.new
-          @class_map = @active_record_instrumenter.extract_static options[:ar_classes]
+          @ar_classes = options[:ar_classes].map do |ar_class|
+            generator = ActiveRecordMetaclassGenerator.new ar_class
+            generator.generate_class
+          end
           
-          ar_class_names = @class_map.keys.map{ |n| n.name.split('::').last }
+          ar_class_names = @ar_classes.map(&:adsl_ast_class_name)
           
           @invariant_extractor = ADSL::Extract::Rails::InvariantExtractor.new ar_class_names
           @invariants = @invariant_extractor.extract(options[:invariants]).map{ |inv| inv.adsl_ast }
@@ -108,15 +109,16 @@ module ADSL
             :arg_types => [],
             :block => block
           })
-          action.optimize!
+          action = action.optimize
+          action.prepend_global_variables_by_signatures /^at__.*/, /^atat__.*/
           action
         end
 
         def default_activerecord_models
           models_dir = Rails.respond_to?(:root) ? Rails.root.join('app', 'models') : Pathname.new('app/models')
-          Dir[models_dir.join '**', '*.rb'].map do |path|
+          Dir[models_dir.join '**', '*.rb'].map{ |path|
             /^#{Regexp.escape models_dir.to_s}\/(.*)\.rb$/.match(path)[1].camelize.constantize
-          end
+          }.select{ |klass| klass < ActiveRecord::Base }
         end
 
         def controller_of(route)
@@ -145,7 +147,7 @@ module ADSL
 
         def adsl_ast
           ADSL::Parser::ASTSpec.new(
-            :classes => @class_map.map{ |klass, metaklass| metaklass.adsl_ast },
+            :classes => @ar_classes.map(&:adsl_ast),
             :actions => @actions,
             :invariants => @invariants
           )

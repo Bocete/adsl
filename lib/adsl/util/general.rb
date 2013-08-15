@@ -44,9 +44,15 @@ class Array
 end
 
 class Symbol
-  def dup
-    self
-  end
+  def dup; self; end
+end
+
+class NilClass
+  def dup; self; end
+end
+
+class Fixnum
+  def dup; self; end
 end
 
 class Module
@@ -135,7 +141,6 @@ class Module
       end
       result.delete_if{ |a| a.nil? }.flatten
     end
-  
   end
 end
 
@@ -174,6 +179,14 @@ module Kernel
     end
     spawned_pids.each do |pid|
       Process.kill 'HUP', pid
+    end
+  end
+
+  def until_no_change(object)
+    loop do
+      old_object = object
+      object = yield object
+      return object if object == old_object
     end
   end
 end

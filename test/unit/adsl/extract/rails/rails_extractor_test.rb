@@ -85,7 +85,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     AsdsController.class_exec do
       def create
         a = Asd.new
-        a.save!
+        a.delete!
         respond_to
       end
     end
@@ -95,7 +95,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     statements = ast.block.statements
 
     assert_false statements.empty?
-    assert_equal 1, statements.length
+    assert_equal 2, statements.length
     assert_equal ASTAssignment, statements.first.class
     assert_equal 'a', statements.first.var_name.text
     assert_equal ASTCreateObjset, statements.first.objset.class
@@ -117,19 +117,20 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :create)
     statements = ast.block.statements
 
-    assert_false statements.empty?
     assert_equal 3, statements.length
+    
+    # all instance variables are initialized to empty
+    assert_equal ASTAssignment,   statements[0].class
+    assert_equal 'at__a',         statements[0].var_name.text
+    assert_equal ASTEmptyObjset,  statements[0].objset.class
 
-    assert_equal ASTAssignment, statements.first.class
-    assert_equal 'at__a', statements.first.var_name.text
-    assert_equal ASTCreateObjset, statements.first.objset.class
-    assert_equal 'Asd', statements.first.objset.class_name.text
+    assert_equal ASTAssignment,   statements[1].class
+    assert_equal 'at__a',         statements[1].var_name.text
+    assert_equal ASTCreateObjset, statements[1].objset.class
+    assert_equal 'Asd',           statements[1].objset.class_name.text
 
-    assert_equal ASTAssignment, statements.second.class
-    assert_equal 'a', statements.second.var_name.text
-
-    assert_equal ASTDeleteObj, statements.last.class
-    assert_equal 'at__a', statements.last.objset.var_name.text
+    assert_equal ASTDeleteObj, statements[2].class
+    assert_equal 'at__a',      statements[2].objset.var_name.text
   end
   
   def test_action_extraction__class_variable_assignment
@@ -149,20 +150,19 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     statements = ast.block.statements
 
     assert_false statements.empty?
-    assert_equal 4, statements.length
-
-    assert_equal ASTAssignment, statements.first.class
-    assert_equal 'atat__a', statements.first.var_name.text
-    assert_equal ASTCreateObjset, statements.first.objset.class
-    assert_equal 'Asd', statements.first.objset.class_name.text
-
-    assert_equal ASTAssignment, statements[1].class
-    assert_equal 'a', statements[1].var_name.text
-    assert_equal ASTAssignment, statements[2].class
-    assert_equal 'at__a', statements[2].var_name.text
+    assert_equal 3, statements.length
     
-    assert_equal ASTDeleteObj, statements.last.class
-    assert_equal 'atat__a', statements.last.objset.var_name.text
+    assert_equal ASTAssignment,   statements[0].class
+    assert_equal 'atat__a',       statements[0].var_name.text
+    assert_equal ASTEmptyObjset,  statements[0].objset.class
+    
+    assert_equal ASTAssignment,   statements[1].class
+    assert_equal 'atat__a',       statements[1].var_name.text
+    assert_equal ASTCreateObjset, statements[1].objset.class
+    assert_equal 'Asd',           statements[1].objset.class_name.text
+
+    assert_equal ASTDeleteObj, statements[2].class
+    assert_equal 'atat__a',    statements[2].objset.var_name.text
   end
 
   def test_action_extraction__assignments_dont_make_values_nil
@@ -473,6 +473,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
       def nothing
         a ||= Asd.new
         a = Kme.new
+        a.delete!
       end
     end
 
@@ -480,7 +481,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
     statements = ast.block.statements
 
-    assert_equal 2, statements.length
+    assert_equal 3, statements.length
 
     assert_equal ASTEither, statements[0].class
     assert_equal 1, statements[0].blocks[0].statements.length

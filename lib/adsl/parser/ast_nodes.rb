@@ -48,16 +48,21 @@ module ADSL
         self
       end
 
-      def optimize!
-        children = self.class.container_for_fields.map{ |field_name| send field_name }
+      def optimize
+        copy = self.dup
+        children = self.class.container_for_fields.map{ |field_name| [field_name, copy.send(field_name)] }
         until children.empty?
-          child = children.pop
-          if child.is_a? Array
-            children += child
+          child_name, child = children.pop
+          new_value = if child.is_a? Array
+            child.map{ |c| c.optimize }
+          elsif child.respond_to?(:optimize)
+            child.optimize
           else
-            child.optimize! if child.respond_to? :optimize!
+            child.respond_to?(:dup) ? child.dup : child
           end
+          copy.send "#{child_name}=", new_value unless new_value.equal? child
         end
+        copy
       end
 
       def dup
@@ -96,13 +101,27 @@ module ADSL
       end
 
       def ==(other)
-        return false unless other.is_a? self.class
+        return false unless self.class == other.class
         self.class.container_for_fields.each do |field_name|
           child1 = self.send field_name
           child2 = other.send field_name
           return false unless child1 == child2
         end
         true
+      end
+
+      def preorder_traverse(&block)
+        self.class.container_for_fields.each do |field_name|
+          field = send field_name
+          if field.is_a? Array
+            field.flatten.each do |subfield|
+              subfield.preorder_traverse &block if subfield.respond_to? :preorder_traverse
+            end
+          else
+            field.preorder_traverse &block if field.respond_to? :preorder_traverse
+          end
+        end
+        block[self]
       end
     end
 
@@ -480,28 +499,61 @@ module ADSL
         action = ADSL::DS::DSAction.new :name => @name.text, :args => arguments, :cardinalities => cardinalities, :block => block
         context.actions[action.name] = [self, action]
         return action
+      rescue Exception => e
+        #pp @block
+        new_ex = e.exception("#{e.message} in action #{@name.text}")
+        new_ex.set_backtrace e.backtrace
+        raise new_ex
       end
 
-      def optimize!
-        super
+      def optimize
+        copy = super
 
-        prev_root_stmts = nil
-        while prev_root_stmts != @block.statements
-          prev_root_stmts = @block.statements.dup
+        copy.block = until_no_change(copy.block) do |block|
+          block = block.optimize
 
-          return unless @block.statements.length == 1
-
-          if @block.statements.first.is_a? ASTEither
-            either = @block.statements.first
-            either.blocks.reject!{ |subblock| subblock.statements.empty? }
-            if either.blocks.length == 0
-              @block.statements = []
-            elsif either.blocks.length == 1
-              @block = either.blocks.first
-            end
-          elsif @block.statements.first.is_a? ASTBlock
-            @block.optimize!
+          variables_read = []
+          block.preorder_traverse do |node|
+            next unless node.is_a? ASTVariable
+            variables_read << node.var_name.text
           end
+          block.block_replace do |node|
+            next unless node.is_a? ASTAssignment
+            next if node.var_name.nil? || variables_read.include?(node.var_name.text)
+            ASTObjsetStmt.new :objset => node.objset
+          end
+
+          next block if block.statements.length != 1
+          if block.statements.first.is_a? ASTEither
+            either = block.statements.first
+            either = ASTEither.new(:blocks => either.blocks.reject{ |subblock| subblock.statements.empty? })
+            if either.blocks.length == 0
+              ASTBlock.new(:statements => [])
+            elsif either.blocks.length == 1
+              either.blocks.first
+            else
+              ASTBlock.new(:statements => [either])
+            end
+          else
+            block
+          end
+        end
+
+        copy
+      end
+
+      def prepend_global_variables_by_signatures(*regexes)
+        variable_names = []
+        preorder_traverse do |node|
+          next unless node.is_a? ASTVariable
+          name = node.var_name.text
+          variable_names << name if regexes.map{ |r| r =~ name ? true : false }.include? true
+        end
+        variable_names.each do |name|
+          @block.statements.unshift ASTAssignment.new(
+            :var_name => ASTIdent.new(:text => name),
+            :objset => ASTEmptyObjset.new
+          )
         end
       end
     end
@@ -523,28 +575,21 @@ module ADSL
         context.pop_frame if open_subcontext
       end
 
-      def optimize!
-        super
-        change = true
-        while change
-          change = false
-          @statements.map! do |stmt|
+      def optimize
+        until_no_change super do |block|
+          ASTBlock.new(:statements => block.statements.map{ |stmt|
             if stmt.is_a?(ASTBlock)
-              change = true
               stmt.statements
             elsif stmt.is_a?(ASTDummyStmt)
-              change = true
               []
             else
               [stmt]
             end
-          end.flatten! 1
-        end
-        @statements.reject! do |stmt|
-          stmt.is_a?(ASTObjsetStmt) and !stmt.objset.objset_has_side_effects?
-        end
-        @statements.reject! do |stmt|
-          stmt.is_a?(ASTEither) and stmt.blocks.inject(true){ |so_far, block| so_far && block.statements.empty? }
+          }.flatten(1).reject{ |stmt|
+            stmt.is_a?(ASTObjsetStmt) and !stmt.objset.objset_has_side_effects?
+          }.map{ |stmt|
+            stmt.optimize
+          })
         end
       end
     end
@@ -685,26 +730,18 @@ module ADSL
         @blocks.map{ block.list_entity_classes_written_to }.flatten
       end
 
-      def optimize!
-        super
-        
-        changed = true
-        while changed
-          changed = false
-          @blocks.map! do |block|
+      def optimize
+        until_no_change super do |either|
+          next either.optimize unless either.is_a?(ASTEither)
+          next ASTDummyStmt.new if either.blocks.empty?
+          next either.blocks.first if either.blocks.length == 1
+          ASTEither.new(:blocks => either.blocks.map do |block|
             if block.statements.length == 1 && block.statements.first.is_a?(ASTEither)
-              changed = true
               block.statements.first.blocks
             else
               [block]
             end
-          end.flatten! 1
-        end
-
-        if @blocks.select{ |b| b.statements.empty? }.length > 1
-          @blocks.delete_if{ |b| b.statements.empty? }
-          @blocks << ASTBlock.new(:statements => [])
-          @blocks << ASTBlock.new(:statements => []) if @blocks.length == 1
+          end.flatten(1).uniq)
         end
       end
     end
@@ -788,9 +825,9 @@ module ADSL
         return ADSL::DS::DSSubset.new :objset => objset
       end
 
-      def optimize!
-        while @objset.is_a? ASTSubset
-          @objset = @objset.objset
+      def optimize
+        until_no_change super do |subset|
+          subset.objset.is_a?(ASTSubset) ? subset.objset : subset
         end
       end
     end
@@ -806,6 +843,12 @@ module ADSL
         objset = @objset.typecheck_and_resolve context
         return ADSL::DS::DSEmptyObjset.new if objset.type.nil?
         return ADSL::DS::DSOneOf.new :objset => objset
+      end
+
+      def optimize
+        until_no_change super do |oneof|
+          oneof.objset.is_a?(ASTOneOf) ? oneof.objset : oneof
+        end
       end
     end
 
@@ -830,11 +873,14 @@ module ADSL
         return ADSL::DS::DSUnion.new :objsets => objsets
       end
 
-      def optimize!
-        @objsets = @objsets.map{ |o|
-          o.is_a?(ASTUnion) ? o.objsets : [o]
-        }.flatten(1)
-        @objsets.delete_if{ |o| o.is_a?(ASTEmpty) }
+      def optimize
+        until_no_change super do |union|
+          next ASTEmptyObjset.new if union.objsets.empty?
+          next union.objsets.first if union.objsets.length == 1
+          ASTUnion.new(:objsets => union.objsets.map{ |objset|
+            objset.is_a?(ASTUnion) ? objset.objsets : [objset]
+          }.flatten(1).reject{ |o| o.is_a? ASTEmptyObjset })
+        end
       end
     end
 
@@ -857,8 +903,12 @@ module ADSL
         end
       end
 
-      def optimize!
-        @objsets.uniq!
+      def optimize
+        until_no_change super do |o|
+          ASTEmpty.new if o.empty?
+          o.objsets.first if o.objects.length == 1
+          ASTOneOfObjset.new(:objsets => o.objsets.uniq)
+        end
       end
     end
     

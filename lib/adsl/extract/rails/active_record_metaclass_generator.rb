@@ -305,6 +305,8 @@ module ADSL
               :relations => adsl_ast_relations
             )
           end
+
+          @ar_class
         end
 
       end
