@@ -188,6 +188,9 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
       ASTAnd.new(:subformulae => [1, 2, 3, nil, ASTIdent.new(:text => '')]) ==
       ASTAnd.new(:subformulae => [1, 2, 3, nil, ASTIdent.new])
     )
+    assert ASTDeleteObj.new == ASTDeleteObj.new
+    assert ASTDeleteObj.new.eql?(ASTDeleteObj.new)
+    assert ASTDeleteObj.new.hash == ASTDeleteObj.new.hash
   end
 
   def test__block_replace__replaces_the_instance
@@ -235,5 +238,24 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
     
     assert_equal ASTAssignment,  action.block.statements[2].class
     assert_equal 'at__blahblah', action.block.statements[2].objset.var_name.text
+  end
+
+  def test__either_optimize__unique_paths
+    either = ASTEither.new(:blocks => [
+      ASTBlock.new(:statements => []),
+      ASTBlock.new(:statements => []),
+      ASTBlock.new(:statements => [ASTDeleteObj.new(:objset => 1)]),
+      ASTBlock.new(:statements => [ASTDeleteObj.new(:objset => 1)]),
+      ASTBlock.new(:statements => [])
+    ])
+
+    either = either.optimize
+
+    assert_equal 2, either.blocks.length
+
+    assert_equal 0, either.blocks[0].statements.length
+    assert_equal 1, either.blocks[1].statements.length
+    assert_equal ASTDeleteObj, either.blocks[1].statements[0].class
+    assert_equal 1,            either.blocks[1].statements[0].objset
   end
 end

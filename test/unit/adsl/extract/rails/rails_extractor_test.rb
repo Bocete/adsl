@@ -299,7 +299,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
         if anything
           return Asd.new
         else
-          return Asd.new
+          return Kme.new
         end
         Asd.new
       end
@@ -316,7 +316,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 'Asd',           statements.first.blocks[0].statements.first.objset.class_name.text
     assert_equal 1,               statements.first.blocks[1].statements.length
     assert_equal ASTCreateObjset, statements.first.blocks[1].statements.first.objset.class
-    assert_equal 'Asd',           statements.first.blocks[1].statements.first.objset.class_name.text
+    assert_equal 'Kme',           statements.first.blocks[1].statements.first.objset.class_name.text
   end
   
   def test_action_extraction__calls_of_method_with_multiple_paths
@@ -698,7 +698,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
         if whatever
           Kme.new
         else
-          return Kme.new
+          return Mod::Blah.new
         end
       end
 
@@ -717,7 +717,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
 
     assert_equal 3, statements.length
 
-    expected_classnames = ['Asd', 'Kme', 'Mod_Blah']
+    expected_classnames = ['Asd', 'Mod_Blah', 'Mod_Blah']
     3.times do |index|
       assert_equal ASTEither, statements[index].class
       blocks =                statements[index].blocks

@@ -18,6 +18,10 @@ class String
   def dyslexicize
     gsub(/(\w)(\w+)(\w)/) { |match| ([$1] + $2.chars.to_a.shuffle + [$3]).join('') }
   end
+
+  def adsl_indent
+    split("\n", -1).map{ |s| "  #{s}" }.join("\n")[0..-3]
+  end
 end
 
 class Time
@@ -40,6 +44,10 @@ class Array
         changed = true if task != new_value
       end
     end
+  end
+
+  def adsl_indent
+    map(&:adsl_indent)
   end
 end
 

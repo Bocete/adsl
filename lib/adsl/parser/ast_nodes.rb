@@ -109,6 +109,11 @@ module ADSL
         end
         true
       end
+      alias_method :eql?, :==
+
+      def hash
+        [self.class, *self.class.container_for_fields.map{ |field_name| send field_name }].hash
+      end
 
       def preorder_traverse(&block)
         self.class.container_for_fields.each do |field_name|
@@ -227,6 +232,10 @@ module ADSL
           :invariants => context.invariants.dup
         )
       end
+
+      def to_adsl
+        "#{ @classes.map(&:to_adsl).join }\n#{ @actions.map(&:to_adsl).join }\n#{ @invariants.map(&:to_adsl).join }"
+      end
     end
     
     class ASTClass < ASTNode
@@ -267,10 +276,21 @@ module ADSL
           end
         end
       end
+
+      def to_adsl
+        par_name = @parent_name.nil? ? "" : "extends #{@parent_name.text} "
+        "class #{ @name.text } #{ par_name }{#{ @relations.map(&:to_adsl).adsl_indent.join }}\n"
+      end
     end
     
     class ASTRelation < ASTNode
       node_type :cardinality, :to_class_name, :name, :inverse_of_name
+
+      def to_adsl
+        card_str = cardinality[1] == Float::INFINITY ? "#{cardinality[0]}+" : "#{cardinality[0]}..#{cardinality[1]}"
+        inv_str = inverse_of_name.nil? ? "" : " inverseof #{inverse_of_name.text}"
+        "#{ card_str } #{ @to_class_name.text } #{ @name.text }#{ inv_str }\n"
+      end
     end
 
     class ASTIdent < ASTNode
@@ -556,6 +576,19 @@ module ADSL
           )
         end
       end
+
+      def to_adsl
+        args = []
+        @arg_cardinalities.length.times do |index|
+          card = @arg_cardinalities[index]
+          type = @arg_types[index].text
+          name = @arg_names[index].text
+
+          card_str = card[1] == Float::INFINITY ? "#{card[0]}+" : "#{card[0]}..#{card[1]}"
+          args << "#{card_str} #{type} #{name}"
+        end
+        "action #{@name.text} (#{ args.join ', ' }) {\n#{ @block.to_adsl.adsl_indent }}\n"
+      end
     end
 
     class ASTBlock < ASTNode
@@ -592,6 +625,10 @@ module ADSL
           })
         end
       end
+
+      def to_adsl
+        @statements.map(&:to_adsl).join
+      end
     end
 
     class ASTAssignment < ASTNode
@@ -603,6 +640,10 @@ module ADSL
         context.redefine_var @var, @var_name
         return ADSL::DS::DSAssignment.new :var => @var, :objset => objset
       end
+
+      def to_adsl
+        "#{ @var_name.text } = #{ @objset.to_adsl }\n"
+      end
     end
 
     class ASTObjsetStmt < ASTNode
@@ -611,6 +652,10 @@ module ADSL
       def typecheck_and_resolve(context)
         @objset.typecheck_and_resolve(context)
         return nil
+      end
+
+      def to_adsl
+        "#{ @objset.to_adsl }\n"
       end
     end
 
@@ -627,6 +672,10 @@ module ADSL
         create_obj = ADSL::DS::DSCreateObj.new :klass => klass
         context.pre_stmts << create_obj
         ADSL::DS::DSCreateObjset.new :createobj => create_obj
+      end
+
+      def to_adsl
+        "create(#{ @class_name.text })"
       end
     end
 
@@ -689,6 +738,10 @@ module ADSL
       def list_creations
         @block.list_creations
       end
+
+      def to_adsl
+        "foreach #{ @var_name.text } : #{ @objset.to_adsl } {\n#{ @block.to_adsl.adsl_indent }}\n"
+      end
     end
 
     class ASTEither < ASTNode
@@ -735,14 +788,18 @@ module ADSL
           next either.optimize unless either.is_a?(ASTEither)
           next ASTDummyStmt.new if either.blocks.empty?
           next either.blocks.first if either.blocks.length == 1
-          ASTEither.new(:blocks => either.blocks.map do |block|
+          ASTEither.new(:blocks => either.blocks.map{ |block|
             if block.statements.length == 1 && block.statements.first.is_a?(ASTEither)
               block.statements.first.blocks
             else
               [block]
             end
-          end.flatten(1).uniq)
+          }.flatten(1).uniq)
         end
+      end
+
+      def to_adsl
+        "either #{ @blocks.map{ |b| "{\n#{ b.to_adsl.adsl_indent }}" }.join " or " }\n"
       end
     end
 
@@ -753,6 +810,11 @@ module ADSL
         objset = @objset.typecheck_and_resolve context
         return [] if objset.type.nil?
         return ADSL::DS::DSDeleteObj.new :objset => objset
+      end
+
+
+      def to_adsl
+        "delete #{ @objset.to_adsl }\n"
       end
     end
 
@@ -767,6 +829,10 @@ module ADSL
         relation = context.find_relation objset1.type, @rel_name.text, @rel_name.lineno, objset2.type
         return ADSL::DS::DSCreateTup.new :objset1 => objset1, :relation => relation, :objset2 => objset2
       end
+
+      def to_adsl
+        "#{ @objset1.to_adsl }.#{ @rel_name.text } += #{ @objset2.to_adsl }"
+      end
     end
 
     class ASTDeleteTup < ASTNode
@@ -779,6 +845,10 @@ module ADSL
         return [] if objset2.type.nil?
         relation = context.find_relation objset1.type, @rel_name.text, @rel_name.lineno, objset2.type 
         return ADSL::DS::DSDeleteTup.new :objset1 => objset1, :relation => relation, :objset2 => objset2
+      end
+
+      def to_adsl
+        "#{ @objset1.to_adsl }.#{ @rel_name.text } -= #{ @objset2.to_adsl }"
       end
     end
 
@@ -796,6 +866,10 @@ module ADSL
           ADSL::DS::DSCreateTup.new(:objset1 => objset1, :relation => relation, :objset2 => objset2)
         ]
       end
+
+      def to_adsl
+        "#{ @objset1.to_adsl }.#{ @rel_name.text } = #{ @objset2.to_adsl }"
+      end
     end
 
     class ASTAllOf < ASTNode
@@ -809,6 +883,10 @@ module ADSL
 
       def list_entity_classes_read
         Set[context.classes[@class_name.text]]
+      end
+
+      def to_adsl
+        "allof(#{@class_name.text})"
       end
     end
 
@@ -830,6 +908,10 @@ module ADSL
           subset.objset.is_a?(ASTSubset) ? subset.objset : subset
         end
       end
+
+      def to_adsl
+        "subset(#{ @objset.to_adsl })"
+      end
     end
     
     class ASTOneOf < ASTNode
@@ -849,6 +931,10 @@ module ADSL
         until_no_change super do |oneof|
           oneof.objset.is_a?(ASTOneOf) ? oneof.objset : oneof
         end
+      end
+
+      def to_adsl
+        "oneof(#{ @objset.to_adsl })"
       end
     end
 
@@ -882,6 +968,10 @@ module ADSL
           }.flatten(1).reject{ |o| o.is_a? ASTEmptyObjset })
         end
       end
+
+      def to_adsl
+        "union(#{ @objsets.map(&:to_adsl).join(', ') })"
+      end
     end
 
     class ASTOneOfObjset < ASTNode
@@ -910,6 +1000,10 @@ module ADSL
           ASTOneOfObjset.new(:objsets => o.objsets.uniq)
         end
       end
+
+      def to_adsl
+        "any_of(#{ @objsets.map(&:to_adsl).join ', ' })"
+      end
     end
     
     class ASTVariable < ASTNode
@@ -920,6 +1014,10 @@ module ADSL
         raise ADSLError, "Undefined variable #{@var_name.text} on line #{@var_name.lineno}" if var.nil?
         return ADSL::DS::DSEmptyObjset.new if var.type.nil?
         return var
+      end
+
+      def to_adsl
+        @var_name.text
       end
     end
 
@@ -937,6 +1035,10 @@ module ADSL
         relation = context.find_relation objset.type, @rel_name.text, @rel_name.lineno
         return ADSL::DS::DSDereference.new :objset => objset, :relation => relation
       end
+
+      def to_adsl
+        "#{ @objset.to_adsl }.#{ rel_name.text }"
+      end
     end
 
     class ASTEmptyObjset < ASTNode
@@ -944,6 +1046,10 @@ module ADSL
 
       def typecheck_and_resolve(context)
         return ADSL::DS::DSEmptyObjset.new
+      end
+
+      def to_adsl
+        "empty"
       end
     end
 
@@ -955,6 +1061,11 @@ module ADSL
         name = @name.nil? ? nil : @name.text
         return ADSL::DS::DSInvariant.new :name => name, :formula => formula
       end
+
+      def to_adsl
+        n = @name.nil? ? "" : "#{ @name.text }: "
+        "invariant #{n}#{ @formula.to_adsl }\n"
+      end
     end
 
     class ASTBoolean < ASTNode
@@ -963,6 +1074,10 @@ module ADSL
       def typecheck_and_resolve(context)
         return ADSL::DS::DSBoolean::TRUE if @bool_value
         return ADSL::DS::DSBoolean::FALSE
+      end
+
+      def to_adsl
+        "#{ @bool_value }"
       end
     end
 
@@ -986,6 +1101,11 @@ module ADSL
           return ADSL::DS::DSForAll.new :vars => vars, :objsets => objsets, :subformula => subformula
         end
       end
+
+      def to_adsl
+        v = @vars.map{ |var, objset| "#{ var.text } in #{ objset.to_adsl }" }.join ", " 
+        "forall #{v}: #{ @subformula.to_adsl }"
+      end
     end
 
     class ASTExists < ASTNode
@@ -1008,6 +1128,11 @@ module ADSL
           return ADSL::DS::DSExists.new :vars => vars, :objsets => objsets, :subformula => subformula
         end
       end
+      
+      def to_adsl
+        v = @vars.map{ |var, objset| "#{ var.text } in #{ objset.to_adsl }" }.join ", " 
+        "exists #{v}: #{ @subformula.to_adsl }"
+      end
     end
 
     class ASTNot < ASTNode
@@ -1018,6 +1143,10 @@ module ADSL
         raise "Substatement not a formula on line #{@subformula.lineno}" unless subformula.type == :formula
         return subformula.subformula if subformula.is_a? ADSL::DS::DSNot
         return ADSL::DS::DSNot.new :subformula => subformula
+      end
+
+      def to_adsl
+        "not(#{ @subformula.to_adsl })"
       end
     end
 
@@ -1039,6 +1168,10 @@ module ADSL
         end
         return ADSL::DS::DSAnd.new :subformulae => flattened_subformulae
       end
+
+      def to_adsl
+        "and(#{ @subformulae.map(&:to_adsl).join ", " })"
+      end
     end
     
     class ASTOr < ASTNode
@@ -1059,6 +1192,10 @@ module ADSL
         end
         return ADSL::DS::DSOr.new :subformulae => flattened_subformulae
       end
+
+      def to_adsl
+        "or(#{ @subformulae.map(&:to_adsl).join ", " })"
+      end
     end
 
     class ASTEquiv < ASTNode
@@ -1070,6 +1207,10 @@ module ADSL
           raise "Substatement not a formula on line #{subformula.lineno}" unless subformula.type == :formula  
         end
         return ADSL::DS::DSEquiv.new :subformulae => subformulae
+      end
+
+      def to_adsl
+        "equiv(#{ @subformulae.map(&:to_adsl).join ", " })"
       end
     end
 
@@ -1085,6 +1226,10 @@ module ADSL
         end
         return ADSL::DS::DSImplies.new :subformula1 => subformula1, :subformula2 => subformula2
       end
+
+      def to_adsl
+        "implies(#{ @subformula1.to_adsl }, #{ @subformula2.to_adsl })"
+      end
     end
 
     class ASTEqual < ASTNode
@@ -1098,6 +1243,10 @@ module ADSL
         ADSL::DS::DSClass.common_supertype(types)
           
         return ADSL::DS::DSEqual.new :objsets => objsets
+      end
+      
+      def to_adsl
+        "equal(#{ @objsets.map(&:to_adsl).join ", " })"
       end
     end
 
@@ -1114,6 +1263,10 @@ module ADSL
         raise ADSLError, "Object sets are not of compatible types: #{objset1.type.name}, #{objset2.type.name}" unless objset2.type.superclass_of? objset1.type
         return ADSL::DS::DSIn.new :objset1 => objset1, :objset2 => objset2
       end
+      
+      def to_adsl
+        "#{ @objset1.to_adsl } in #{ @objset2.to_adsl }"
+      end
     end
     
     class ASTEmpty < ASTNode
@@ -1123,6 +1276,10 @@ module ADSL
         objset = @objset.typecheck_and_resolve context
         return ADSL::DS::Boolean::TRUE if objset.type.nil?
         return ADSL::DS::DSEmpty.new :objset => objset
+      end
+
+      def to_adsl
+        "empty(#{ @objset.to_adsl })"
       end
     end
   end

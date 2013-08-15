@@ -46,6 +46,16 @@ module ADSL
 
         verify_spass :verify_options => verify_options
       end
+
+      desc 'Translate Rails app into ADSL'
+      task :adsl_translate => :environment do
+        verify_options = {}
+        
+        actions = extract_actions_param_from_args
+        verify_options[:actions] = actions unless actions.nil?
+
+        adsl_translate :verify_options => verify_options
+      end
     end
   end
 end
