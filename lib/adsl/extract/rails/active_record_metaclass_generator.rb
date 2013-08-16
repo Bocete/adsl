@@ -2,6 +2,7 @@ require 'active_record'
 require 'active_support'
 require 'adsl/parser/ast_nodes'
 require 'adsl/extract/rails/other_meta'
+require 'adsl/util/test_helper'
 
 module ADSL
   module Extract
@@ -181,6 +182,21 @@ module ADSL
               self.class.new :adsl_ast => ASTUnion.new(:objsets => [self.adsl_ast, other.adsl_ast])
             end
 
+            def each(&block)
+              instrumenter = ::ADSL::Extract::Instrumenter.get_instance
+              var_name = ASTIdent.new(:text => block.parameters.first[1].to_s)
+              var = self.class.new(:adsl_ast => ADSL::Parser::ASTVariable.new(:var_name => var_name))
+
+              substmts = instrumenter.abb.in_stmt_frame do
+                block[var]
+              end
+
+              ASTForEach.new(
+                :objset => self.adsl_ast,
+                :var_name => var_name.dup,
+                :block => ASTBlock.new(:statements => substmts)
+              )
+            end
 
             def include?(other)
               other = other.adsl_ast if other.respond_to? :adsl_ast
@@ -276,6 +292,14 @@ module ADSL
               result.adsl_ast = ASTSubset.new(:objset => result.adsl_ast) if assoc.options.include? :conditions
               result
             end
+
+            @ar_class.new.replace_method "#{assoc.name}=" do |other|
+              ASTSetTup.new(
+                :objset1 => self.adsl_ast,
+                :rel_name => ASTIdent.new(:text => assoc.name.to_s),
+                :objset2 => other.adsl_ast
+              )
+            end
           end
           reflections(:polymorphic => false, :through => true).each do |assoc|
             @ar_class.new.replace_method assoc.name do
@@ -287,6 +311,47 @@ module ADSL
 
               result.adsl_ast = ASTSubset.new(:objset => result.adsl_ast) if assoc.options.include? :conditions
               result
+            end
+
+            @ar_class.new.replace_method "#{assoc.name}=" do |other|
+              # delete the join objects originating from this, not invoking callbacks
+              # create new ones
+              # connect this with all the join objects, and each join object with a corresponding other
+              through_assoc = assoc.through_reflection
+              source_assoc = assoc.source_reflection
+              join_class_name = through_assoc.class_name.constantize.adsl_ast_class_name
+              origin_name = ASTIdent.new :text => "#{self.class.name.underscore}__#{through_assoc.name}__origin"
+              target_name = ASTIdent.new :text => "#{self.class.name.underscore}__#{through_assoc.name}__target"
+              iter_name   = ASTIdent.new :text => "#{self.class.name.underscore}__#{through_assoc.name}__iterator"
+              join_name   = ASTIdent.new :text => "#{self.class.name.underscore}__#{through_assoc.name}__join_object"
+              [
+                ASTAssignment.new(:var_name => origin_name.dup, :objset => self.adsl_ast),
+                ASTAssignment.new(:var_name => target_name.dup, :objset => other.adsl_ast),
+                ASTDeleteObj.new(:objset => ASTDereference.new(
+                  :objset => ASTVariable.new(:var_name => origin_name.dup),
+                  :rel_name => ASTIdent.new(:text => through_assoc.name.to_s)
+                )),
+                ASTForEach.new(
+                  :var_name => iter_name,
+                  :objset => ASTVariable.new(:var_name => target_name.dup),
+                  :block => ASTBlock.new(:statements => [
+                    ASTAssignment.new(
+                      :var_name => join_name,
+                      :objset => ASTCreateObjset.new(:class_name => ASTIdent.new(:text => join_class_name))
+                    ),
+                    ASTCreateTup.new(
+                      :objset1  => ASTVariable.new(:var_name => origin_name.dup),
+                      :rel_name => ASTIdent.new(:text => through_assoc.name.to_s),
+                      :objset2  => ASTVariable.new(:var_name => join_name.dup)
+                    ),
+                    ASTCreateTup.new(
+                      :objset1  => ASTVariable.new(:var_name => join_name.dup),
+                      :rel_name => ASTIdent.new(:text => source_assoc.name.to_s),
+                      :objset2  => ASTVariable.new(:var_name => iter_name.dup)
+                    )
+                  ])
+                )
+              ]
             end
           end
           reflections(:polymorphic => true).each do |assoc|

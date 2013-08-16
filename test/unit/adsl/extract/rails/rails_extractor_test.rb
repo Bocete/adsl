@@ -948,4 +948,122 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 0, statements.length
   end
 
+  def test_extract_action__foreach_basic
+    AsdsController.class_exec do
+      def nothing
+        Kme.all.each do |asd|
+          a = asd
+          a.delete!
+        end
+      end
+    end
+
+    extractor = create_rails_extractor
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    statements = ast.block.statements
+
+    assert_equal 1, statements.length
+
+    foreach = statements.first
+    assert_equal ASTForEach, foreach.class
+    assert_equal 'asd',      foreach.var_name.text
+    assert_equal ASTAllOf,   foreach.objset.class
+    assert_equal 'Kme',      foreach.objset.class_name.text
+    assert_equal ASTBlock,   foreach.block.class
+
+    block_stmts = foreach.block.statements
+    assert_equal 2,             block_stmts.length
+    assert_equal ASTAssignment, block_stmts[0].class
+    assert_equal ASTVariable,   block_stmts[0].objset.class
+    assert_equal 'asd',         block_stmts[0].objset.var_name.text
+    assert_equal 'a',           block_stmts[0].var_name.text
+    assert_equal ASTDeleteObj,  block_stmts[1].class
+    assert_equal 'a',           block_stmts[1].objset.var_name.text
+  end
+
+  def test_extract_action__association_setter_direct
+    AsdsController.class_exec do
+      def nothing
+        Kme.new.blah = Mod::Blah.new
+      end
+    end
+
+    extractor = create_rails_extractor
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    statements = ast.block.statements
+    
+    assert_equal 1, statements.length
+
+    assert_equal ASTSetTup,       statements[0].class
+    assert_equal ASTCreateObjset, statements[0].objset1.class
+    assert_equal 'Kme',           statements[0].objset1.class_name.text
+    assert_equal 'blah',          statements[0].rel_name.text
+    assert_equal ASTSetTup,       statements[0].class
+    assert_equal ASTCreateObjset, statements[0].objset2.class
+    assert_equal 'Mod_Blah',      statements[0].objset2.class_name.text
+  end
+
+  def test_extract_action__association_setter_through
+    AsdsController.class_exec do
+      def nothing
+        Asd.find.kmes = Kme.new
+      end
+    end
+
+    extractor = create_rails_extractor
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    statements = ast.block.statements
+    
+    assert_equal 4, statements.length
+
+    assert_equal ASTAssignment, statements[0].class
+    origin_name =               statements[0].var_name.text
+    assert_equal ASTOneOf,      statements[0].objset.class
+    assert_equal ASTAllOf,      statements[0].objset.objset.class
+    assert_equal 'Asd',         statements[0].objset.objset.class_name.text
+    
+    assert_equal ASTAssignment,   statements[1].class
+    target_name =                 statements[1].var_name.text
+    assert_equal ASTCreateObjset, statements[1].objset.class
+    assert_equal 'Kme',           statements[1].objset.class_name.text
+
+    assert_equal ASTDeleteObj,   statements[2].class
+    assert_equal ASTDereference, statements[2].objset.class
+    assert_equal ASTVariable,    statements[2].objset.objset.class
+    assert_equal origin_name,    statements[2].objset.objset.var_name.text
+    assert_equal 'blahs',        statements[2].objset.rel_name.text
+
+    assert_equal ASTForEach,  statements[3].class
+    iter_name =               statements[3].var_name.text
+    assert_equal ASTVariable, statements[3].objset.class
+    assert_equal target_name, statements[3].objset.var_name.text
+    block =                   statements[3].block
+
+    assert_equal 3, block.statements.length
+
+    assert_equal ASTAssignment,   block.statements[0].class
+    temp_name =                   block.statements[0].var_name.text
+    assert_equal ASTCreateObjset, block.statements[0].objset.class
+    assert_equal 'Mod_Blah',      block.statements[0].objset.class_name.text
+
+    assert_equal ASTCreateTup, block.statements[1].class
+    assert_equal ASTVariable,  block.statements[1].objset1.class
+    assert_equal origin_name,  block.statements[1].objset1.var_name.text
+    assert_equal 'blahs',      block.statements[1].rel_name.text
+    assert_equal ASTVariable,  block.statements[1].objset2.class
+    assert_equal temp_name,    block.statements[1].objset2.var_name.text
+
+    assert_equal ASTCreateTup, block.statements[2].class
+    assert_equal ASTVariable,  block.statements[2].objset1.class
+    assert_equal temp_name,    block.statements[2].objset1.var_name.text
+    assert_equal 'kme12',      block.statements[2].rel_name.text
+    assert_equal ASTVariable,  block.statements[2].objset2.class
+    assert_equal iter_name,    block.statements[2].objset2.var_name.text
+
+    assert_equal 4, [origin_name, target_name, temp_name, iter_name].uniq.length
+    assert origin_name.is_a? String
+    assert target_name.is_a? String
+    assert temp_name.is_a? String
+    assert iter_name.is_a? String
+  end
 end

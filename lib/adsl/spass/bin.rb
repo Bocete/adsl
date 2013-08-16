@@ -12,6 +12,17 @@ module ADSL
     module Bin
       include Spass::Util
 
+      def default_options
+        {
+          :halt_on_error => false,
+          :check_satisfiability => true,
+          :timeout => 120,
+          :output => :terminal,
+          :actions => nil,
+          :invariants => nil
+        }
+      end
+
       def output(term_msg, csv)
         if @verification_output == :terminal
           if term_msg
@@ -28,7 +39,7 @@ module ADSL
 
       def filter_by_name(elems, names)
         return elems if names.nil?
-        filtered = elems.select{ |elem| names.map{ |name| elem.name.include? name}.include? true }
+        elems.select{ |elem| names.map{ |name| elem.name.include? name}.include? true }
       end
 
       def verify(input, options={})
@@ -39,6 +50,7 @@ module ADSL
         elsif input.is_a? ADSL::DS::DSSpec
           input
         end
+        options = default_options.merge options
 
         stop_on_incorrect = options[:halt_on_error]
         check_satisfiability = options[:check_satisfiability]
@@ -50,7 +62,7 @@ module ADSL
 
         options[:output] = options[:output].to_sym unless options[:output].nil?
         raise "Unknown verification format `#{options[:output]}'" unless [nil, :terminal, :csv, :silent].include? options[:output]
-        @verification_output = options[:output] || :terminal
+        @verification_output = options[:output]
         do_stats = @verification_output == :csv
         
         if check_satisfiability
@@ -112,9 +124,6 @@ module ADSL
               else
                 raise "Unknown exec_spass result: #{result}"
               end
-            rescue => e
-              # puts translation
-              raise e
             ensure
               output "\n", nil
             end

@@ -4,9 +4,6 @@ module ADSL
   module Verification
     module RailsVerification
 
-      def extract_ast(options = {})
-      end
-
       def verify_spass(options = {})
         ast = extract_ast options
         spec = ast.typecheck_and_resolve

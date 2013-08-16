@@ -325,6 +325,11 @@ module ADSL
             end
           end
 
+          # change attrasgn into a normal call
+          replace :attrasgn do |sexp|
+            s(:call, *sexp.sexp_body)
+          end
+
           # make the implicit return explicit
           replace :defn, :defs do |sexp|
             make_returns_explicit sexp

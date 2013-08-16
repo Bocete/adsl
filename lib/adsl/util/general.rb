@@ -20,7 +20,8 @@ class String
   end
 
   def adsl_indent
-    split("\n", -1).map{ |s| "  #{s}" }.join("\n")[0..-3]
+    indented = "  " + gsub("\n", "\n  ")
+    (/  $/ =~ indented) ? indented[0..-3] : indented
   end
 end
 
@@ -47,7 +48,7 @@ class Array
   end
 
   def adsl_indent
-    map(&:adsl_indent)
+    join("").adsl_indent
   end
 end
 

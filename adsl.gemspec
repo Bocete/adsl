@@ -19,7 +19,6 @@ Gem::Specification.new do |s|
   s.require_path = 'lib'
 
   s.add_development_dependency 'rake'
-  s.add_development_dependency 'test-unit'
   s.add_development_dependency 'rails', '~> 3'
   s.add_development_dependency 'sqlite3'
 
@@ -33,5 +32,7 @@ Gem::Specification.new do |s|
   s.add_dependency 'ruby2ruby'
   s.add_dependency 'backports'
   s.add_dependency 'activerecord', '~> 3' # used for code extraction only
+  s.add_dependency 'activerecord-tableless'
+  s.add_dependency 'test-unit' # not a development dependency as there is an issue with test-unit vs minitest gem inclusion
 end
 

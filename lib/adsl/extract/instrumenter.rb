@@ -78,7 +78,7 @@ module ADSL
             first_stmt[1] == Instrumenter.to_sexp and
             first_stmt[2] == :instrumented)
       rescue MethodSource::SourceNotFoundError
-        return nil
+        return
       end
 
       def initialize(instrument_domain = Dir.pwd)

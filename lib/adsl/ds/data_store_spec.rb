@@ -87,7 +87,7 @@ module ADSL
       container_for :cardinality, :from_class, :to_class, :name, :inverse_of
 
       def to_s
-        "#{from}.#{name}"
+        "#{from_class.name}.#{name}"
       end
     end
 

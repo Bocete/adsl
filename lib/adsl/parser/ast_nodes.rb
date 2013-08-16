@@ -138,6 +138,10 @@ module ADSL
       def typecheck_and_resolve(context)
         self
       end
+
+      def to_adsl
+        "DummyObjset(#{ @type })"
+      end
     end
 
     class ASTDummyStmt < ASTNode
@@ -145,6 +149,10 @@ module ADSL
 
       def typecheck_and_resolve(context)
         self
+      end
+
+      def to_adsl
+        "DummyStmt(#{ @type })\n"
       end
     end
 
@@ -279,7 +287,7 @@ module ADSL
 
       def to_adsl
         par_name = @parent_name.nil? ? "" : "extends #{@parent_name.text} "
-        "class #{ @name.text } #{ par_name }{#{ @relations.map(&:to_adsl).adsl_indent.join }}\n"
+        "class #{ @name.text } #{ par_name }{\n#{ @relations.map(&:to_adsl).adsl_indent }}\n"
       end
     end
     
@@ -587,7 +595,7 @@ module ADSL
           card_str = card[1] == Float::INFINITY ? "#{card[0]}+" : "#{card[0]}..#{card[1]}"
           args << "#{card_str} #{type} #{name}"
         end
-        "action #{@name.text} (#{ args.join ', ' }) {\n#{ @block.to_adsl.adsl_indent }}\n"
+        "action #{@name.text}(#{ args.join ', ' }) {\n#{ @block.to_adsl.adsl_indent }}\n"
       end
     end
 
@@ -1063,7 +1071,7 @@ module ADSL
       end
 
       def to_adsl
-        n = @name.nil? ? "" : "#{ @name.text }: "
+        n = @name.nil? ? "" : "#{ @name.gsub(/\s/, '_').text }: "
         "invariant #{n}#{ @formula.to_adsl }\n"
       end
     end
@@ -1104,7 +1112,7 @@ module ADSL
 
       def to_adsl
         v = @vars.map{ |var, objset| "#{ var.text } in #{ objset.to_adsl }" }.join ", " 
-        "forall #{v}: #{ @subformula.to_adsl }"
+        "forall(#{v}: #{ @subformula.to_adsl })"
       end
     end
 
@@ -1131,7 +1139,7 @@ module ADSL
       
       def to_adsl
         v = @vars.map{ |var, objset| "#{ var.text } in #{ objset.to_adsl }" }.join ", " 
-        "exists #{v}: #{ @subformula.to_adsl }"
+        "exists(#{v}: #{ @subformula.to_adsl })"
       end
     end
 

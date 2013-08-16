@@ -112,6 +112,8 @@ module ADSL
           action = action.optimize
           action.prepend_global_variables_by_signatures /^at__.*/, /^atat__.*/
           action
+
+          action
         end
 
         def default_activerecord_models

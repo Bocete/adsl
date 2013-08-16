@@ -29,7 +29,5 @@ class Object
     end
 
     true
-  rescue Exception
-    raise
   end
 end
