@@ -20,9 +20,9 @@ module ADSL
         def push_frame; @stmt_frames << []; end
         def pop_frame;  @stmt_frames.pop; end
 
-        def in_stmt_frame
+        def in_stmt_frame(*args)
           push_frame
-          yield
+          yield *args
         ensure
           return pop_frame
         end

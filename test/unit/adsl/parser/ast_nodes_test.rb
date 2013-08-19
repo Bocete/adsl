@@ -221,23 +221,29 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
           ])
         ]),
         ASTBlock.new(:statements => [])
-      ])
+      ]),
+      ASTDeleteObj.new
     ]))
 
     action = action.optimize
     action.prepend_global_variables_by_signatures /^at__.*$/, /^atat__.*$/
-
     assert_equal 3, action.block.statements.length
 
     assert_equal ASTAssignment,  action.block.statements[0].class
     assert_equal 'at__blahblah', action.block.statements[0].var_name.text
     assert_equal ASTEmptyObjset, action.block.statements[0].objset.class
+   
+    assert_equal ASTEither,     action.block.statements[1].class
+    blocks = action.block.statements[1].blocks
+
+    assert_equal 0,              blocks.first.statements.length
+    assert_equal 2,              blocks.second.statements.length
+    assert_equal ASTAssignment,  blocks.second.statements[0].class
+    assert_equal 'kme',          blocks.second.statements[0].objset.var_name.text
+    assert_equal ASTAssignment,  blocks.second.statements[1].class
+    assert_equal 'at__blahblah', blocks.second.statements[1].objset.var_name.text
     
-    assert_equal ASTAssignment, action.block.statements[1].class
-    assert_equal 'kme',         action.block.statements[1].objset.var_name.text
-    
-    assert_equal ASTAssignment,  action.block.statements[2].class
-    assert_equal 'at__blahblah', action.block.statements[2].objset.var_name.text
+    assert_equal ASTDeleteObj,   action.block.statements[2].class
   end
 
   def test__either_optimize__unique_paths
@@ -257,5 +263,37 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
     assert_equal 1, either.blocks[1].statements.length
     assert_equal ASTDeleteObj, either.blocks[1].statements[0].class
     assert_equal 1,            either.blocks[1].statements[0].objset
+  end
+
+  def test__block_optimize__removes_last_stmts_without_sideeffects
+    action = ASTAction.new(:block => ASTBlock.new(:statements => [
+      ASTAssignment.new(:var_name => ASTIdent.new(:text => 'at_asdf')),
+      ASTEither.new(:blocks => [
+        ASTBlock.new(:statements => []),
+        ASTBlock.new(:statements => [
+          ASTEither.new(:blocks => [
+            ASTBlock.new(:statements => [
+              ASTAssignment.new(:var_name => ASTIdent.new(:text => 'at_asdf'), :objset => ASTDummyObjset.new)
+            ]),
+            ASTBlock.new(:statements => [
+              ASTAssignment.new(:var_name => ASTIdent.new(:text => 'at_asdf'), :objset => ASTDummyObjset.new)
+            ])
+          ])
+        ]),
+        ASTBlock.new(:statements => [
+          ASTAssignment.new(:var_name => ASTIdent.new(:text => 'at_asdf'), :objset => ASTDummyObjset.new)
+        ]),
+        ASTBlock.new(:statements => [
+          ASTAssignment.new(:var_name => ASTIdent.new(:text => 'at_asdf'), :objset => ASTCreateObjset.new)
+        ])
+      ])
+    ]))
+
+    action = action.optimize
+
+    stmts = action.block.statements
+    assert_equal 1,               stmts.length
+    assert_equal ASTObjsetStmt,   stmts.first.class
+    assert_equal ASTCreateObjset, stmts.first.objset.class
   end
 end

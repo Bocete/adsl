@@ -5,6 +5,14 @@ require 'set'
 require 'adsl/ds/data_store_spec'
 require 'adsl/util/general'
 
+class Array
+  def optimize
+    map do |e|
+      e.respond_to?(:optimize) ? e.optimize : e
+    end
+  end
+end
+
 module ADSL
   module Parser
    
@@ -53,13 +61,7 @@ module ADSL
         children = self.class.container_for_fields.map{ |field_name| [field_name, copy.send(field_name)] }
         until children.empty?
           child_name, child = children.pop
-          new_value = if child.is_a? Array
-            child.map{ |c| c.optimize }
-          elsif child.respond_to?(:optimize)
-            child.optimize
-          else
-            child.respond_to?(:dup) ? child.dup : child
-          end
+          new_value = child.respond_to?(:optimize) ? child.optimize : child.dup
           copy.send "#{child_name}=", new_value unless new_value.equal? child
         end
         copy
@@ -535,10 +537,10 @@ module ADSL
       end
 
       def optimize
-        copy = super
+        copy = dup
 
         copy.block = until_no_change(copy.block) do |block|
-          block = block.optimize
+          block = block.optimize(true)
 
           variables_read = []
           block.preorder_traverse do |node|
@@ -616,9 +618,9 @@ module ADSL
         context.pop_frame if open_subcontext
       end
 
-      def optimize
-        until_no_change super do |block|
-          ASTBlock.new(:statements => block.statements.map{ |stmt|
+      def optimize(last_stmt = false)
+        until_no_change super() do |block|
+          statements = block.statements.map{ |stmt|
             if stmt.is_a?(ASTBlock)
               stmt.statements
             elsif stmt.is_a?(ASTDummyStmt)
@@ -627,10 +629,25 @@ module ADSL
               [stmt]
             end
           }.flatten(1).reject{ |stmt|
-            stmt.is_a?(ASTObjsetStmt) and !stmt.objset.objset_has_side_effects?
+            stmt.is_a?(ASTObjsetStmt) && (stmt.objset.nil? || !stmt.objset.objset_has_side_effects?)
           }.map{ |stmt|
             stmt.optimize
-          })
+          }
+
+          if last_stmt
+            statements = until_no_change statements do |stats|
+              if stats.last.is_a?(ASTAssignment) && stats.last.objset.is_a?(ASTNode) && !stats.last.objset.objset_has_side_effects?
+                stats.pop 
+              elsif stats.last.is_a?(ASTEither)
+                stats.last.blocks.map!{ |b| b.optimize true }
+              elsif stats.last.is_a?(ASTBlock)
+                stats[-1] = stats.last.optimize true
+              end
+              stats
+            end
+          end
+
+          ASTBlock.new :statements => statements
         end
       end
 
@@ -670,16 +687,16 @@ module ADSL
     class ASTCreateObjset < ASTNode
       node_type :class_name, :type => :objset
       
-      def objset_has_side_effects?
-        true
-      end
+      def objset_has_side_effects?; true; end
 
       def typecheck_and_resolve(context)
         klass_node, klass = context.classes[@class_name.text]
         raise ADSLError, "Undefined class #{@class_name.text} referred to at line #{@class_name.lineno}" if klass.nil?
-        create_obj = ADSL::DS::DSCreateObj.new :klass => klass
-        context.pre_stmts << create_obj
-        ADSL::DS::DSCreateObjset.new :createobj => create_obj
+        if @create_obj.nil?
+          @create_obj = ADSL::DS::DSCreateObj.new :klass => klass
+          context.pre_stmts << @create_obj
+        end
+        ADSL::DS::DSCreateObjset.new :createobj => @create_obj
       end
 
       def to_adsl
@@ -1049,6 +1066,36 @@ module ADSL
       end
     end
 
+    class ASTDereferenceCreate < ASTNode
+      node_type :objset, :rel_name, :empty_first, :type => :objset
+
+      def objset_has_side_effects?; true; end
+
+      def typecheck_and_resolve(context)
+        objset = @objset.typecheck_and_resolve context
+        klass = objset.type
+        raise ADSLError, 'Cannot create an object on an empty objset' if klass.nil?
+        relation = context.find_relation klass, @rel_name.text, @rel_name.lineno
+       
+        create_objset = ASTCreateObjset.new(
+          :class_name => ASTIdent.new(:text => relation.to_class.name)
+        )
+        
+        assoc_builder = (@empty_first ? ASTSetTup : ASTCreateTup).new(
+          :objset1 => @objset,
+          :rel_name => @rel_name,
+          :objset2 => create_objset
+        )
+        context.pre_stmts << assoc_builder.typecheck_and_resolve(context)
+
+        create_objset.typecheck_and_resolve(context)
+      end
+
+      def to_adsl
+        "derefcreate(#{@objset.to_adsl}.#{@rel_name.text})"
+      end
+    end
+
     class ASTEmptyObjset < ASTNode
       node_type
 
@@ -1071,7 +1118,7 @@ module ADSL
       end
 
       def to_adsl
-        n = @name.nil? ? "" : "#{ @name.gsub(/\s/, '_').text }: "
+        n = @name.nil? ? "" : "#{ @name.text.gsub(/\s/, '_') }: "
         "invariant #{n}#{ @formula.to_adsl }\n"
       end
     end

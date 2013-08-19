@@ -67,7 +67,10 @@ rule
         | subset '(' objset ')'  { return ASTSubset.new :lineno => val[0], :objset => val[2] }
         | oneof '(' objset ')'   { return ASTOneOf.new :lineno => val[0], :objset => val[2] }
         | allof '(' IDENT ')'    { return ASTAllOf.new :lineno => val[0], :class_name => val[2] }
-        | create_objset          { return val[0] } 
+        | create_objset          { return val[0] }
+        | create '(' objset '.' IDENT ')' {
+            return ASTDereferenceBuild.new :lineno => val[0].lineno, :objset => val[2], :rel_name => val[4]
+          }
         | objset '.' IDENT       { return ASTDereference.new :lineno => val[0].lineno, :objset => val[0], :rel_name => val[2] }
         | empty                  { return ASTEmptyObjset.new :lineno => val[0] }
   

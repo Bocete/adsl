@@ -55,7 +55,9 @@ module ADSL
             !route[:url].nil? &&
             !route[:request_method].nil? &&
             route[:controller].action_methods.include?(route[:action].to_s)
-          }.uniq{ |a| [a[:controller], a[:action]] }
+          }.uniq{ |a|
+            [a[:controller], a[:action]]
+          }.sort{ |a, b| [a[:controller].to_s, a[:action]] <=> [b[:controller].to_s, b[:action]] }
         end
 
         def route_for(controller, action)

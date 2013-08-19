@@ -273,10 +273,11 @@ module ADSL
           end
 
           # prepend ins_stmt to every non-return or non-if statement
-          replace :defn, :defs, :block do |sexp|
+          replace :defn, :defs, :block, :iter do |sexp|
             first_stmt_index = case sexp.sexp_type
               when :defn; 3
               when :defs; 4
+              when :iter; 3
               when :block; 1
             end
             (first_stmt_index..sexp.length-1).each do |index|

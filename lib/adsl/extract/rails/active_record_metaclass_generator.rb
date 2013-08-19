@@ -23,6 +23,10 @@ module ADSL
           end
         end
 
+        def self.remove_by_from_method(method)
+          method.to_s.match(/^([^_]+)_.*/)[1].to_sym if /^[^_]+_by_.*$/ =~ method.to_s
+        end
+
         def reflection_to_adsl_ast(reflection)
           assoc_name = reflection.name
           target_class = reflection.class_name
@@ -80,34 +84,44 @@ module ADSL
           refls = reflections :this_class => nil
           new_class.send :define_method, :destroy do
             stmts = []
+            object = if self.adsl_ast.objset_has_side_effects?
+              var_name = ASTIdent.new(:text => "__delete_#{ self.class.adsl_ast_class_name }_temp_var")
+              stmts << ASTAssignment.new(:var_name => var_name.dup, :objset => self.adsl_ast)
+              ASTVariable.new(:var_name => var_name.dup)
+            else
+              self
+            end
             
             refls.each do |refl|
               next unless [:delete, :delete_all, :destroy, :destroy_all].include? refl.options[:dependent]
                 
               if refl.options[:dependent] == :destroy or refl.options[:dependent] == :destroy_all
                 if refl.through_reflection.nil?
-                  stmts += self.send(refl.name).destroy
+                  stmts += object.send(refl.name).destroy
                 else
-                  stmts += self.send(refl.through_reflection.name).destroy
+                  stmts += object.send(refl.through_reflection.name).destroy
                 end
               else
                 if refl.through_reflection.nil?
-                  stmts += self.send(refl.name).delete
+                  stmts += object.send(refl.name).delete
                 else
-                  stmts += self.send(refl.through_reflection.name).delete
+                  stmts += object.send(refl.through_reflection.name).delete
                 end
               end
             end
 
-            stmts << ASTDeleteObj.new(:objset => self.adsl_ast)
+            stmts << ASTDeleteObj.new(:objset => object.adsl_ast)
             stmts
           end
-          new_class.send :alias_method, :destroy!, :destroy
+          new_class.send :alias_method, :destroy!,    :destroy
+          new_class.send :alias_method, :destroy_all, :destroy
 
           new_class.send :define_method, :delete do
             [ASTDeleteObj.new(:objset => self.adsl_ast)]
           end
-          new_class.send :alias_method, :delete!, :delete
+          new_class.send :alias_method, :delete!,    :delete
+          new_class.send :alias_method, :delete_all, :delete
+          new_class.send :alias_method, :clear,      :delete
         end
 
         def generate_class
@@ -141,12 +155,13 @@ module ADSL
             def count;                 MetaUnknown.new; end
             def map;                   MetaUnknown.new; end
 
-            def take
+            def take(*params)
               self.class.new :adsl_ast => ASTOneOf.new(:objset => self.adsl_ast)
             end
             alias_method :take!, :take
             alias_method :first, :take
             alias_method :last,  :take
+            alias_method :find,  :take
 
             def where(*args)
               self.class.new :adsl_ast => ASTSubset.new(:objset => self.adsl_ast)
@@ -187,9 +202,7 @@ module ADSL
               var_name = ASTIdent.new(:text => block.parameters.first[1].to_s)
               var = self.class.new(:adsl_ast => ADSL::Parser::ASTVariable.new(:var_name => var_name))
 
-              substmts = instrumenter.abb.in_stmt_frame do
-                block[var]
-              end
+              substmts = instrumenter.abb.in_stmt_frame var, &block
 
               ASTForEach.new(
                 :objset => self.adsl_ast,
@@ -209,9 +222,29 @@ module ADSL
             def <=(other); other.include? self; end
             alias_method :>=, :include?
 
+            def ==(other)
+              other = other.adsl_ast if other.respond_to? :adsl_ast
+              if other.is_a? ASTNode and other.class.is_objset?
+                ASTEqual.new :objsets => [self.adsl_ast, other]
+              else
+                super
+              end
+            end
+
+            def !=(other)
+              other = other.adsl_ast if other.respond_to? :adsl_ast
+              if other.is_a? ASTNode and other.class.is_objset?
+                ASTNot.new(:subformula => ASTEqual.new(:objsets => [self.adsl_ast, other]))
+              else
+                super
+              end
+            end
+
             def method_missing(method, *args, &block)
               # maybe this is a scope invocation?
-              if self.class.respond_to? method
+              if without_by = ActiveRecordMetaclassGenerator.remove_by_from_method(method)
+                self.send(without_by)
+              elsif self.class.respond_to? method
                 begin
                   prev_scoped = self.class.scoped
                   self.class.scoped = self
@@ -226,8 +259,20 @@ module ADSL
 
             def respond_to?(method, include_all = false)
               # maybe this is a scope invocation? hard to say
-              super || self.class.respond_to?(method)
+              super || ActiveRecordMetaclassGenerator.remove_by_from_method(method) || self.class.respond_to?(method)
             end
+
+            # note that this build method does not apply to objsets
+            # acquired using :through associations
+            def build(*params)
+              return self unless self.adsl_ast.is_a?(ASTDereference)
+              self.class.new(:adsl_ast => ASTDereferenceCreate.new(
+                :objset => self.adsl_ast.objset,
+                :rel_name => self.adsl_ast.rel_name
+              ))
+            end
+            alias_method :create, :build
+            alias_method :create!, :build
 
             class << self
               include ADSL::Parser
@@ -310,6 +355,18 @@ module ADSL
               result = first_step.send source_assoc.name
 
               result.adsl_ast = ASTSubset.new(:objset => result.adsl_ast) if assoc.options.include? :conditions
+              result.singleton_class.class_exec do
+                def build(*args)
+                  # does not support composite :through associations
+                  self.class.new(:adsl_ast => ASTDereferenceCreate.new(
+                    :rel_name => self.adsl_ast.rel_name,
+                    :objset => ASTDereferenceCreate.new(
+                      :objset => self.adsl_ast.objset.objset,
+                      :rel_name => self.adsl_ast.objset.rel_name
+                    )
+                  ))
+                end
+              end
               result
             end
 
@@ -354,6 +411,7 @@ module ADSL
               ]
             end
           end
+
           reflections(:polymorphic => true).each do |assoc|
             @ar_class.new.replace_method assoc.name do
               ADSL::Extract::Rails::MetaUnknown.new

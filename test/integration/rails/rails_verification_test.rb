@@ -25,6 +25,12 @@ class ADSL::Verification::RailsVerificationTest < ADSL::Extract::Rails::RailsIns
   end
   
   def test_verify_spass__false
+    AsdsController.class_exec do
+      def create
+        Asd.new
+      end
+    end
+    
     ast = create_rails_extractor(<<-ruby).adsl_ast
       invariant self.not(exists{|asd|})
     ruby
@@ -83,5 +89,99 @@ class ADSL::Verification::RailsVerificationTest < ADSL::Extract::Rails::RailsIns
     ruby
 
     assert_false verify_spass :ast => ast, :verify_options => verify_options_for('AsdsController__nothing')
+  end
+  
+  def test_verify_spass__foreach
+    AsdsController.class_exec do
+      def nothing
+        Asd.all.each do |asd|
+          asd.blahs.each do |blah|
+            blah.delete
+          end
+        end
+      end
+    end
+
+    ast = create_rails_extractor(<<-ruby).adsl_ast
+      invariant forall{ |asd| asd.blahs.empty? }
+    ruby
+
+    assert verify_spass :ast => ast, :verify_options => verify_options_for('AsdsController__nothing')
+  end
+
+  def test_verify_spass__foreach_through
+    AsdsController.class_exec do
+      def nothing
+        Asd.all.each do |asd|
+          asd.kmes.each do |kme|
+            kme.delete
+          end
+        end
+      end
+    end
+
+    ast = create_rails_extractor(<<-ruby).adsl_ast
+      invariant forall{ |asd| asd.kmes.empty? }
+    ruby
+
+    assert verify_spass :ast => ast, :verify_options => verify_options_for('AsdsController__nothing')
+  end
+
+  def test_verify_spass__association_build__simple
+    AsdsController.class_exec do
+      def nothing
+        Asd.find.blahs.build
+      end
+    end
+
+    ast = create_rails_extractor(<<-ruby).adsl_ast
+      invariant forall{ |asd| asd.blahs.empty? }
+    ruby
+
+    assert_false verify_spass :ast => ast, :verify_options => verify_options_for('AsdsController__nothing')
+  end
+  
+  def test_verify_spass__association_build__can_be_used
+    AsdsController.class_exec do
+      def nothing
+        Asd.find.blahs.build.delete
+      end
+    end
+
+    ast = create_rails_extractor(<<-ruby).adsl_ast
+      invariant forall{ |asd| asd.blahs.empty? }
+    ruby
+
+    assert verify_spass :ast => ast, :verify_options => verify_options_for('AsdsController__nothing')
+  end
+  
+  def test_verify_spass__association_build__through_creates_join_objects
+    AsdsController.class_exec do
+      def nothing
+        Asd.find.kmes.build
+      end
+    end
+
+    ast = create_rails_extractor(<<-ruby).adsl_ast
+      invariant forall{ |asd| asd.blahs.empty? }
+    ruby
+
+    assert_false verify_spass :ast => ast, :verify_options => verify_options_for('AsdsController__nothing')
+  end
+
+  def test_verify_spass__union_of_objsets
+    AsdsController.class_exec do
+      def nothing
+        a = Asd.find
+        a.blahs = Mod::Blah.new + Mod::Blah.new
+        a.blahs.find.delete
+      end
+    end
+    
+    ast = create_rails_extractor(<<-ruby).adsl_ast
+      invariant forall(:blah1 => Mod::Blah, :blah2 => Mod::Blah){ |asd, blah1, blah2|
+        self.and(blah1 <= asd.blahs, blah2 <= asd.blahs).implies[blah1 == blah2]
+      }
+    ruby
   end
 end

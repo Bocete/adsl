@@ -105,38 +105,43 @@ module ADSL::Extract::Rails
     def test_generate__destroy_propagates_to_delete_but_not_further
       initialize_metaclasses
 
-      asd_delete = Mod::Blah.new(:adsl_ast => :blah).destroy
+      asd_delete = Mod::Blah.new(:adsl_ast => ASTDummyObjset.new(:type => :blah)).destroy
       assert_equal 2, asd_delete.length
 
-      assert_equal ASTDeleteObj, asd_delete.first.class
+      assert_equal ASTDeleteObj,   asd_delete.first.class
       assert_equal ASTDereference, asd_delete.first.objset.class
-      assert_equal 'kme12', asd_delete.first.objset.rel_name.text
-      assert_equal :blah, asd_delete.first.objset.objset
+      assert_equal 'kme12',        asd_delete.first.objset.rel_name.text
+      assert_equal ASTDummyObjset, asd_delete.first.objset.objset.class
+      assert_equal :blah,          asd_delete.first.objset.objset.type
 
-      assert_equal ASTDeleteObj, asd_delete.last.class
-      assert_equal :blah, asd_delete.last.objset
+      assert_equal ASTDeleteObj,   asd_delete.last.class
+      assert_equal ASTDummyObjset, asd_delete.last.objset.class
+      assert_equal :blah,          asd_delete.last.objset.type
     end
     
     def test_generate__destroy_through_destroys_the_join_object
       initialize_metaclasses
 
-      asd_delete = Asd.new(:adsl_ast => :blah).destroy
+      asd_delete = Asd.new(:adsl_ast => ASTDummyObjset.new(:type => :blah)).destroy
       assert_equal 3, asd_delete.length
       
-      assert_equal ASTDeleteObj, asd_delete[0].class
+      assert_equal ASTDeleteObj,   asd_delete[0].class
       assert_equal ASTDereference, asd_delete[0].objset.class
       assert_equal ASTDereference, asd_delete[0].objset.objset.class
-      assert_equal 'kme12', asd_delete[0].objset.rel_name.text
-      assert_equal 'blahs', asd_delete[0].objset.objset.rel_name.text
-      assert_equal :blah, asd_delete[0].objset.objset.objset
+      assert_equal 'kme12',        asd_delete[0].objset.rel_name.text
+      assert_equal 'blahs',        asd_delete[0].objset.objset.rel_name.text
+      assert_equal ASTDummyObjset, asd_delete[0].objset.objset.objset.class
+      assert_equal :blah,          asd_delete[0].objset.objset.objset.type
 
-      assert_equal ASTDeleteObj, asd_delete[1].class
+      assert_equal ASTDeleteObj,   asd_delete[1].class
       assert_equal ASTDereference, asd_delete[1].objset.class
-      assert_equal 'blahs', asd_delete[1].objset.rel_name.text
-      assert_equal :blah, asd_delete[1].objset.objset
+      assert_equal 'blahs',        asd_delete[1].objset.rel_name.text
+      assert_equal ASTDummyObjset, asd_delete[1].objset.objset.class
+      assert_equal :blah,          asd_delete[1].objset.objset.type
       
-      assert_equal ASTDeleteObj, asd_delete[2].class
-      assert_equal :blah, asd_delete[2].objset
+      assert_equal ASTDeleteObj,   asd_delete[2].class
+      assert_equal ASTDummyObjset, asd_delete[2].objset.class
+      assert_equal :blah,          asd_delete[2].objset.type
     end
   
     def test_generate__include_subset_ops
@@ -266,6 +271,34 @@ module ADSL::Extract::Rails
       assert_equal Mod::Blah,   Asd.new.blahs.class
       assert_equal Mod::Blah,   Asd.new.blahs.some_scope.class
       assert_equal MetaUnknown, Asd.new.blahs.some_scope.count_by_group('id').class
+    end
+
+    def test_generate__association_build_direct
+      initialize_metaclasses
+
+      new = Asd.find.blahs.build
+
+      assert_equal Mod::Blah,            new.class
+      assert_equal ASTDereferenceCreate, new.adsl_ast.class
+      assert_equal ASTOneOf,             new.adsl_ast.objset.class
+      assert_equal ASTAllOf,             new.adsl_ast.objset.objset.class
+      assert_equal 'Asd',                new.adsl_ast.objset.objset.class_name.text
+      assert_equal 'blahs',              new.adsl_ast.rel_name.text
+    end
+    
+    def test_generate__association_build_through
+      initialize_metaclasses
+
+      new = Asd.find.kmes.build
+
+      assert_equal Kme,                  new.class
+      assert_equal ASTDereferenceCreate, new.adsl_ast.class
+      assert_equal 'kme12',              new.adsl_ast.rel_name.text
+      assert_equal ASTDereferenceCreate, new.adsl_ast.objset.class
+      assert_equal 'blahs',              new.adsl_ast.objset.rel_name.text
+      assert_equal ASTOneOf,             new.adsl_ast.objset.objset.class
+      assert_equal ASTAllOf,             new.adsl_ast.objset.objset.objset.class
+      assert_equal 'Asd',                new.adsl_ast.objset.objset.objset.class_name.text
     end
 
   end

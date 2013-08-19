@@ -169,7 +169,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     AsdsController.class_exec do
       def nothing
         a = Asd.new
-        a = a.blahs
+        a.blahs.delete_all
       end
     end
     
@@ -184,9 +184,11 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 'Asd',           statements[0].objset.class_name.text
     assert_equal 'a',             statements[0].var_name.text
     
-    assert_equal ASTAssignment,   statements[1].class
+    assert_equal ASTDeleteObj,    statements[1].class
     assert_equal ASTDereference,  statements[1].objset.class
-    assert_equal 'a',             statements[1].var_name.text
+    assert_equal 'blahs',         statements[1].objset.rel_name.text
+    assert_equal ASTVariable,     statements[1].objset.objset.class
+    assert_equal 'a',             statements[1].objset.objset.var_name.text
   end
 
   def test_invariant_extraction__works
@@ -1065,5 +1067,45 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert target_name.is_a? String
     assert temp_name.is_a? String
     assert iter_name.is_a? String
+  end
+
+  def test_extract_action__nested_foreachs
+    AsdsController.class_exec do
+      def nothing
+        Asd.all.each do |asd|
+          asd.blahs.each do |blah|
+            blah.delete
+          end
+        end
+      end
+    end
+
+    extractor = create_rails_extractor
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    statements = ast.block.statements
+    
+    assert_equal 1, statements.length
+
+    assert_equal ASTForEach, statements.first.class
+    assert_equal ASTAllOf,   statements.first.objset.class
+    assert_equal 'Asd',      statements.first.objset.class_name.text
+    assert_equal 'asd',      statements.first.var_name.text
+
+    block_stmts = statements.first.block.statements
+
+    assert_equal 1,              block_stmts.length
+    assert_equal ASTForEach,     block_stmts.first.class
+    assert_equal ASTDereference, block_stmts.first.objset.class
+    assert_equal ASTVariable,    block_stmts.first.objset.objset.class
+    assert_equal 'asd',          block_stmts.first.objset.objset.var_name.text
+    assert_equal 'blahs',        block_stmts.first.objset.rel_name.text
+    assert_equal 'blah',         block_stmts.first.var_name.text
+
+    final_block_stmts = block_stmts.first.block.statements
+
+    assert_equal 1,            final_block_stmts.length
+    assert_equal ASTDeleteObj, final_block_stmts.first.class
+    assert_equal ASTVariable,  final_block_stmts.first.objset.class
+    assert_equal 'blah',       final_block_stmts.first.objset.var_name.text
   end
 end

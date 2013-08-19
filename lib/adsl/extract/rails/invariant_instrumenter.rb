@@ -56,6 +56,8 @@ module ADSL
         end
 
         def should_instrument?(object, method_name)
+          return false unless super
+
           klass = object.class != Class ? object.class : object
           method = object.method method_name
           

@@ -64,6 +64,14 @@ class Fixnum
   def dup; self; end
 end
 
+class TrueClass
+  def dup; self; end
+end
+
+class FalseClass
+  def dup; self; end
+end
+
 class Module
   def parent_module
     name.split('::')[0..-2].join('::').constantize

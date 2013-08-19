@@ -93,6 +93,13 @@ module ADSL
         end
       end
 
+      def [](formula)
+        in_formula_builder do |fb|
+          formula = formula.adsl_ast if formula.respond_to? :adsl_ast
+          fb.adsl_stack << formula
+        end
+      end
+
       def binary_op_with_any_number_of_params(op, klass, params)
         in_formula_builder do |fb|
           if params.empty?
@@ -194,7 +201,9 @@ module ADSL
 
       def adsl_ast
         elements = gather_adsl_asts
-        raise "Unknown operators #{elements.select{ |a| a.is_a? Symbol}.map(&:to_s).join(", ")}" if elements.length > 1
+        if elements.length != 1
+          raise "Invalid formula/operator stack state [#{ elements.map{ |e| e.respond_to?(:to_adsl) ? e.to_adsl : e }.join(', ') }]"
+        end
         elements.first
       end
     end
@@ -215,4 +224,8 @@ class FalseClass
   def adsl_ast
     ASTBoolean.new(:bool_value => self)
   end
+end
+
+class ADSL::Parser::ASTNode
+  include ADSL::Verification::FormulaGenerators
 end
