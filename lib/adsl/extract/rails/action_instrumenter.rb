@@ -91,7 +91,8 @@ module Kernel
     ::ADSL::Extract::Instrumenter.get_instance.abb.do_raise
   end
 
-  def ins_branch_choice(branch_id)
+  def ins_branch_choice(condition, branch_id)
+    ins_stmt condition
     ::ADSL::Extract::Instrumenter.get_instance.abb.branch_choice branch_id 
   end
 
@@ -124,7 +125,8 @@ module Kernel
     instrumenter.abb.pop_frame
   end
 
-  def ins_if(frame1, frame2)
+  def ins_if(condition, frame1, frame2)
+    ins_stmt condition
     block1 = ::ADSL::Parser::ASTBlock.new :statements => frame1
     block2 = ::ADSL::Parser::ASTBlock.new :statements => frame2
     ::ADSL::Parser::ASTEither.new :blocks => [block1, block2]
@@ -292,7 +294,7 @@ module ADSL
           # instrument branches
           replace :if do |sexp|
             if sexp.may_return_or_raise?
-              sexp[1] = s(:call, nil, :ins_branch_choice, s(:lit, @branch_index += 1))
+              sexp[1] = s(:call, nil, :ins_branch_choice, sexp[1], s(:lit, @branch_index += 1))
               sexp[2] = s(:block, sexp[2]) unless sexp[2].nil? or sexp[2].sexp_type == :block
               sexp[3] = s(:block, sexp[3]) unless sexp[3].nil? or sexp[3].sexp_type == :block
               sexp
@@ -300,6 +302,7 @@ module ADSL
               block1 = sexp[2].nil? ? [] : [sexp[2]]
               block2 = sexp[3].nil? ? [] : [sexp[3]]
               s(:call, nil, :ins_if,
+                sexp[1],
                 s(:rescue,
                   s(:block,
                     s(:call, nil, :ins_push_frame),
