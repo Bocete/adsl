@@ -205,7 +205,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
   def test_action_extraction__nonreturning_branches
     AsdsController.class_exec do
       def nothing
-        if 'asd'
+        if true
           Asd.new
         else
           Asd.find.delete!
@@ -232,7 +232,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
   def test_action_extraction__one_returning_branch
     AsdsController.class_exec do
       def nothing
-        if 'asd'
+        if true
           return Asd.new
         else
           Asd.build
@@ -261,7 +261,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
   def test_action_extraction__one_returning_branch_other_empty
     AsdsController.class_exec do
       def nothing
-        if 'asd'
+        if true
           return Asd.new
         else
         end
@@ -298,7 +298,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
   def test_action_extraction__statements_after_return_in_branches_are_ignored
     AsdsController.class_exec do
       def nothing
-        if 'asd'
+        if true
           return Asd.new
         else
           return Kme.new
@@ -324,7 +324,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
   def test_action_extraction__calls_of_method_with_multiple_paths
     AsdsController.class_exec do
       def something
-        if 'asd'
+        if true
           return Asd.new
         else
           Asd.find.delete!
@@ -357,7 +357,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
   def test_action_extraction__calls_of_method_with_compatible_return_values_but_sideeffects
     AsdsController.class_exec do
       def something
-        if 'asd'
+        if true
           Asd.new
         else
           Asd.find
@@ -538,7 +538,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
   def test_action_extraction__variable_assignment_in_branch
     AsdsController.class_exec do
       def nothing
-        if 'asd'
+        if true
           a = "asd"
         else
           a = "blah"
@@ -604,7 +604,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
   def test_before_callbacks__can_have_branches_normally
     AsdsController.class_exec do
       def before
-        if 'asd'
+        if true
           return Kme.new
         else
           Asd.new
@@ -612,7 +612,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
       end
       
       def before2
-        if 'asd'
+        if true
           Kme.new
         else
         end
@@ -658,7 +658,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
       end
       
       def after
-        if 'asd'
+        if true
           Kme.new
         else
           return Asd.new
@@ -689,7 +689,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
   def test_callbacks__multiple_branched_callbacks
     AsdsController.class_exec do
       def before_nothing
-        if 'asd'
+        if true
           return Kme.new
         else
           Asd.new
@@ -697,7 +697,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
       end
 
       def nothing
-        if 'asd'
+        if true
           Kme.new
         else
           return Mod::Blah.new
@@ -705,7 +705,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
       end
 
       def after_nothing
-        if 'asd'
+        if true
           return Kme.new
         else
           Mod::Blah.new
@@ -758,7 +758,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
   def test_before_callbacks__halt_callback_chain_when_rendering_sometimes
     AsdsController.class_exec do
       def before
-        if 'asd'
+        if true
           render :text => 'blah'
         end
         Asd.new
@@ -797,7 +797,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
   def test_before_callbacks__affect_after
     AsdsController.class_exec do
       def before_nothing
-        if 'asd'
+        if true
           render
         end
         Asd.new
@@ -836,7 +836,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
   def test_before_callbacks__render_in_action_does_not_halt_after
     AsdsController.class_exec do
       def before_nothing
-        if 'asd'
+        if true
           render
         end
         Asd.new
@@ -913,7 +913,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
   def test_extract_action__raise_ignores_the_root_path_in_branch
     AsdsController.class_exec do
       def nothing
-        if 'asd'
+        if true
           Asd.new
         else
           Kme.new

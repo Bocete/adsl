@@ -121,7 +121,19 @@ module ADSL
         def default_activerecord_models
           models_dir = Rails.respond_to?(:root) ? Rails.root.join('app', 'models') : Pathname.new('app/models')
           Dir[models_dir.join '**', '*.rb'].map{ |path|
-            /^#{Regexp.escape models_dir.to_s}\/(.*)\.rb$/.match(path)[1].camelize.constantize
+            relative_path = /^#{Regexp.escape models_dir.to_s}\/(.*)\.rb$/.match(path)[1]
+            klass = nil
+            while klass.nil? && !relative_path.empty?
+              begin
+                klass = relative_path.camelize.constantize
+              rescue NameError, LoadError
+              end
+              if klass.nil?
+                relative_path = /^[^\/]+\/(.*)$/.match(relative_path)[1]
+              end
+            end
+            raise "Could not find class corresponding to path #{path}" if klass.nil?
+            klass
           }.select{ |klass| klass < ActiveRecord::Base }
         end
 

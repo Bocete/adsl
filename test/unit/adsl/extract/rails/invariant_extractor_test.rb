@@ -88,6 +88,5 @@ module ADSL::Extract::Rails
       assert_equal ASTBoolean, ie.invariants[0].formula.subformulae[1].class
       assert_equal false, ie.invariants[0].formula.subformulae[1].bool_value
     end
-
   end
 end
