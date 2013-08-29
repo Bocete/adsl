@@ -273,6 +273,21 @@ module ADSL
             end
             alias_method :create, :build
             alias_method :create!, :build
+            
+            # note that this method does not apply to objsets
+            # acquired using :through associations
+            def <<(param)
+              return self unless self.adsl_ast.is_a?(ASTDereference)
+              return super unless param.respond_to? :adsl_ast
+              raise "Invalid type added on dereference: #{param.class.name} to #{self.class.name}" unless param.class <= self.class
+              ASTCreateTup.new(
+                :objset1 => self.adsl_ast.objset.dup,
+                :rel_name => self.adsl_ast.rel_name.dup,
+                :objset2 => param.adsl_ast.dup
+              )
+            end
+            alias_method :add, :<<
+
 
             class << self
               include ADSL::Parser
@@ -366,6 +381,21 @@ module ADSL
                     )
                   ))
                 end
+
+                def <<(param)
+                  target = param.adsl_ast
+                  intermed_deref = self.adsl_ast
+                  source_deref = self.adsl_ast.objset
+                  ASTCreateTup.new(
+                    :objset1 => ASTDereferenceCreate.new(
+                      :objset => source_deref.objset,
+                      :rel_name => source_deref.rel_name,
+                    ),
+                    :rel_name => intermed_deref.rel_name,
+                    :objset2 => target.dup
+                  )
+                end
+                alias_method :add, :<<
               end
               result
             end

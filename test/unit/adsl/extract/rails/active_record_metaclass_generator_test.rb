@@ -301,5 +301,36 @@ module ADSL::Extract::Rails
       assert_equal 'Asd',                new.adsl_ast.objset.objset.objset.class_name.text
     end
 
+    def test_generate__add_direct
+      initialize_metaclasses
+
+      new = (Asd.find.blahs.add(Mod::Blah.find))
+
+      assert_equal ASTCreateTup, new.class
+      assert_equal ASTOneOf,     new.objset1.class
+      assert_equal ASTAllOf,     new.objset1.objset.class
+      assert_equal 'Asd',        new.objset1.objset.class_name.text
+      assert_equal 'blahs',      new.rel_name.text
+      assert_equal ASTOneOf,     new.objset2.class
+      assert_equal ASTAllOf,     new.objset2.objset.class
+      assert_equal 'Mod_Blah',   new.objset2.objset.class_name.text
+    end
+
+    def test_generate__add_through
+      initialize_metaclasses
+
+      new = (Asd.find.kmes.add(Kme.find))
+
+      assert_equal ASTCreateTup,         new.class
+      assert_equal ASTDereferenceCreate, new.objset1.class
+      assert_equal ASTOneOf,             new.objset1.objset.class
+      assert_equal ASTAllOf,             new.objset1.objset.objset.class
+      assert_equal 'Asd',                new.objset1.objset.objset.class_name.text
+      assert_equal 'blahs',              new.objset1.rel_name.text
+      assert_equal 'kme12',              new.rel_name.text
+      assert_equal ASTOneOf,             new.objset2.class
+      assert_equal ASTAllOf,             new.objset2.objset.class
+      assert_equal 'Kme',                new.objset2.objset.class_name.text
+    end
   end
 end
