@@ -27,7 +27,7 @@ Gem::Specification.new do |s|
   s.add_dependency 'activesupport', '~> 3'
   s.add_dependency 'i18n' # activesupport crashes without it
   s.add_dependency 'colorize'
-  s.add_dependency 'method_source'
+  s.add_dependency 'method_source', '~> 0.8'
   s.add_dependency 'ruby_parser', '~> 3.1'
   s.add_dependency 'ruby2ruby'
   s.add_dependency 'backports'

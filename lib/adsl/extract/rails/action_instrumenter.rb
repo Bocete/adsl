@@ -109,7 +109,7 @@ module Kernel
         adsl_ast = ::ADSL::Extract::Rails::ActionInstrumenter.extract_stmt_from_expr final_return
         block_adsl_ast.statements << adsl_ast if !adsl_ast.nil? and adsl_ast.class.is_statement?
       end
-      instrumenter.prev_abb << ::ADSL::Parser::ASTDummyStmt.new(:type => method_name) unless method_name.nil?
+      instrumenter.prev_abb << ::ADSL::Parser::ASTDummyStmt.new(:type => method_name)
     end
     
     return_value
@@ -192,29 +192,25 @@ module ADSL
           @branch_index = 0
 
           # remove respond_to and render
-          [:respond_to, :render, :redirect_to].each do |stmt|
-            replacer = lambda{ |sexp|
-              next sexp unless sexp.length >= 3 and sexp[0] == :call and sexp[1].nil? and sexp[2] == stmt
-              s(:call, nil, :ins_mark_render_statement)
-            }
-
-            replace :iter, &replacer
-            replace :call, &replacer
+          render_stmts = [:respond_to, :render, :redirect_to, :respond_with]
+          replace :call do |sexp|
+            next sexp unless sexp.length >= 3 and sexp[1].nil? and render_stmts.include?(sexp[2])
+            s(:call, nil, :ins_mark_render_statement)
+          end
+          replace :iter do |sexp|
+            next sexp unless sexp[1].length >= 3 and sexp[1][0] == :call and sexp[1][1].nil? and render_stmts.include?(sexp[1][2])
+            s(:call, nil, :ins_mark_render_statement)
           end
 
           # surround the entire method with a call to abb.explore_all_choices
           replace :defn, :defs do |sexp|
             header_elem_count = sexp.sexp_type == :defn ? 3 : 4
             stmts = sexp.pop(sexp.length - header_elem_count)
+            
             single_stmt = stmts.length > 1 ? s(:block, *stmts) : stmts.first
 
             explore_all = s(:iter, s(:call, nil, :ins_explore_all), s(:args), single_stmt)
-            
-            if @stack_depth == 0
-              explore_all[1] << s(:lit, sexp[header_elem_count - 2])
-              # ins_stmt explore_all on root call, since the caller will not handle it
-              # explore_all = s(:call, nil, :ins_root_lvl_push_expr, explore_all)
-            end
+            explore_all[1] << s(:lit, sexp[header_elem_count - 2]) if @stack_depth == 0
             
             sexp.push explore_all
             sexp

@@ -19,8 +19,12 @@ module ADSL
           if @ar_class.superclass == ActiveRecord::Base
             nil
           else
-            ASTIdent.new :text => @ar_class.superclass.adsl_ast_class_name
+            ASTIdent.new :text => ActiveRecordMetaclassGenerator.adsl_ast_class_name(@ar_class.superclass)
           end
+        end
+
+        def self.adsl_ast_class_name(klass)
+          klass.name.sub('::', '_')
         end
 
         def self.remove_by_from_method(method)
@@ -28,15 +32,31 @@ module ADSL
         end
 
         def reflection_to_adsl_ast(reflection)
-          assoc_name = reflection.name
+          assoc_name = reflection.name.to_s
           target_class = reflection.class_name
           cardinality = reflection.collection? ? [0, 1.0/0.0] : [0, 1]
           inverse_of = case reflection.macro
           when :belongs_to; nil
           when :has_one, :has_many
-            reflection.has_inverse? ? reflection.inverse_of : reflection.foreign_key[0..-4]
+            inverse_of_col_name = reflection.has_inverse? ? reflection.inverse_of : reflection.foreign_key
+            candidates = target_class.constantize.reflections.values.select do |r|
+              r.macro == :belongs_to && r.foreign_key.to_sym == inverse_of_col_name.to_sym
+            end
+            if candidates.empty?
+              # just dont treat it as an inverse
+              nil
+            else
+              raise "Multiple opposite relations found for #{reflection}: #{canditates}" if candidates.length > 1
+              candidates.first.name.to_s
+            end
           when :has_and_belongs_to_many
-            foreign_name = reflection.has_inverse? ? reflection.inverse_of : reflection.foreign_key[0..-4]
+            join_table = reflection.options[:join_table]
+            candidates = target_class.constantize.reflections.values.select do |r|
+              r.macro == :has_and_belongs_to_many && r.options[:join_table] == join_table
+            end
+            raise "No inverse relations found for #{reflection}" if candidates.empty?
+            raise "Multiple opposite relations found for #{reflection}: #{canditates}" if candidates.length > 1
+            foreign_name = candidates.first.name.to_s
             assoc_name < foreign_name ? nil : foreign_name
           else
             raise "Unknown association macro `#{reflection.macro}' on #{reflection}"
@@ -140,14 +160,14 @@ module ADSL
             end
 
             # no-ops
-            def save;  end
-            def save!; end
-            def reorder(*params);  self; end
-            def order(*params);    self; end
-            def reorder(*params);  self; end
-            def includes(*params); self; end
-            def all(*params);      self; end
-            def scope_for_create;  self; end
+            def save(*args);  end
+            def save!(*args); end
+            def reorder(*args);   self; end
+            def order(*args);     self; end
+            def reorder(*args);   self; end
+            def includes(*args);  self; end
+            def all(*args);       self; end
+            def scope_for_create; self; end
 
             def count_by_group(*args); MetaUnknown.new; end
             def size;                  MetaUnknown.new; end
@@ -168,6 +188,7 @@ module ADSL
             end
             alias_method :only,     :where
             alias_method :except,   :where
+            alias_method :my,       :where
             alias_method :paginate, :where    # will_paginate
             def merge(other)
               if other.adsl_ast.is_a? ASTAllOf
@@ -241,9 +262,9 @@ module ADSL
             end
 
             def method_missing(method, *args, &block)
-              # maybe this is a scope invocation?
               if without_by = ActiveRecordMetaclassGenerator.remove_by_from_method(method)
                 self.send(without_by)
+              # maybe this is a scope invocation?
               elsif self.class.respond_to? method
                 begin
                   prev_scoped = self.class.scoped
@@ -297,7 +318,7 @@ module ADSL
               end
 
               def adsl_ast_class_name
-                name.sub('::', '_')
+                ActiveRecordMetaclassGenerator.adsl_ast_class_name(self)
               end
 
               def all(*params)
@@ -318,6 +339,7 @@ module ADSL
               end
               alias_method :only,   :where
               alias_method :except, :where
+              alias_method :my,     :where
 
               def build(*args)
                 new(*args)

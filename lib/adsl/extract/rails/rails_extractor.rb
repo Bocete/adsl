@@ -1,8 +1,10 @@
 require 'adsl/extract/rails/action_instrumenter'
 require 'adsl/extract/rails/invariant_extractor'
 require 'adsl/extract/rails/callback_chain_simulator'
+require 'adsl/extract/rails/rails_special_gem_instrumentation'
 require 'adsl/extract/rails/other_meta'
 require 'adsl/parser/ast_nodes'
+require 'adsl/util/general'
 require 'pathname'
 
 module ADSL
@@ -11,6 +13,7 @@ module ADSL
       class RailsExtractor
         
         include ADSL::Extract::Rails::CallbackChainSimulator
+        include ADSL::Extract::Rails::RailsSpecialGemInstrumentation
         
         attr_accessor :ar_classes, :actions, :invariants, :instrumentation_filters
 
@@ -37,7 +40,8 @@ module ADSL
           @action_instrumenter.instrumentation_filters = @instrumentation_filters
           @actions = []
           all_routes.each do |route|
-            @actions << action_to_adsl_ast(route)
+            translation = action_to_adsl_ast(route)
+            @actions << translation unless translation.nil?
           end
         end
 
@@ -73,18 +77,33 @@ module ADSL
         end
 
         def prepare_instrumentation(controller_class, action)
-          controller_class.class_exec do
+          controller_class.class_eval <<-ruby
             def default_render(*args); end
-            def params; ADSL::Extract::Rails::MetaUnknown.new; end
-          end
+            def params
+              ADSL::Extract::Rails::PartiallyUnknownHash.new(
+                :controller => '#{ controller_class.controller_name }',
+                :action => '#{ action }'
+              )
+            end
+          ruby
+
+          instrument_gems controller_class, action
+          
           controller = controller_class.new
           @action_instrumenter.instrument controller, action
           callbacks(controller_class).each do |callback|
-            @action_instrumenter.instrument controller, callback.filter
+            next if callback.filter.is_a?(String)
+            
+            @action_instrumenter.instrument controller, callback.filter 
           end
         end
 
         def action_to_adsl_ast(route)
+          instrumentation_allows = @instrumentation_filters.map do |f|
+            f.allow_instrumentation? route[:controller].new, route[:action]
+          end
+          return nil if instrumentation_allows.include? false
+
           action_name = action_name_for route
           potential_adsl_asts = @actions.select{ |action| action.name.text == action_name }
           raise "Multiple actions with identical names" if potential_adsl_asts.length > 1
@@ -120,7 +139,7 @@ module ADSL
 
         def default_activerecord_models
           models_dir = Rails.respond_to?(:root) ? Rails.root.join('app', 'models') : Pathname.new('app/models')
-          Dir[models_dir.join '**', '*.rb'].map{ |path|
+          classes = Dir[models_dir.join '**', '*.rb'].map{ |path|
             relative_path = /^#{Regexp.escape models_dir.to_s}\/(.*)\.rb$/.match(path)[1]
             klass = nil
             while klass.nil? && !relative_path.empty?
@@ -135,6 +154,13 @@ module ADSL
             raise "Could not find class corresponding to path #{path}" if klass.nil?
             klass
           }.select{ |klass| klass < ActiveRecord::Base }
+          until_no_change(classes) do |classes|
+            all = classes.dup
+            classes.each do |c|
+              all << c.superclass unless classes.include?(c.superclass) || c.superclass == ActiveRecord::Base
+            end
+            all
+          end
         end
 
         def controller_of(route)

@@ -42,6 +42,15 @@ module ADSL
         elems.select{ |elem| names.map{ |name| elem.name.include? name}.include? true }
       end
 
+      def remove_empty_actions(actions)
+        empty, valid = actions.split{ |a| a.block.statements.empty? }
+        if @verification_output == :terminal && !empty.empty?
+          puts 'Actions with empty bodies trivially preserve invariants.'
+          puts "The following actions are empty: #{ empty.map(&:name).join ', ' }"
+        end
+        actions.set_to valid
+      end
+
       def verify(input, options={})
         ds_spec = if input.is_a? String
           ADSL::Parser::ADSLParser.new.parse input
@@ -64,6 +73,8 @@ module ADSL
         raise "Unknown verification format `#{options[:output]}'" unless [nil, :terminal, :csv, :silent].include? options[:output]
         @verification_output = options[:output]
         do_stats = @verification_output == :csv
+        
+        actions = remove_empty_actions actions
         
         if check_satisfiability
           begin

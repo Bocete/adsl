@@ -50,6 +50,25 @@ class Array
   def adsl_indent
     join("").adsl_indent
   end
+
+  def split
+    arr1 = []
+    arr2 = []
+    self.each do |e|
+      if yield e
+        arr1 << e
+      else
+        arr2 << e
+      end
+    end
+    return arr1, arr2
+  end
+
+  def set_to(array)
+    self.clear
+    array.each{ |e| self << e }
+    self
+  end
 end
 
 class Symbol
