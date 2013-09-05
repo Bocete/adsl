@@ -41,7 +41,7 @@ module ADSL
           paths = { :will_halt => [], :will_not_halt => [] }
           block.statements.each do |stmt|
             if stmt.is_a?(ASTBlock) && halting_status_of(stmt, is_action_body).nil?
-              possibilities = split_into_paths_that_will_or_will_not_halt stmt
+              possibilities = split_into_paths_that_will_or_will_not_halt stmt, is_action_body
 
               paths[:will_halt]     << possibilities[:will_halt]
               paths[:will_not_halt] << possibilities[:will_not_halt]

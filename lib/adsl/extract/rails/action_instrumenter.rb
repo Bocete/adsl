@@ -96,7 +96,7 @@ module Kernel
     ::ADSL::Extract::Instrumenter.get_instance.abb.branch_choice branch_id 
   end
 
-  def ins_explore_all(method_name = nil, &block)
+  def ins_explore_all(method_name, &block)
     instrumenter = ::ADSL::Extract::Instrumenter.get_instance
 
     return_value = instrumenter.abb.explore_all_choices &block
@@ -104,7 +104,8 @@ module Kernel
     block_adsl_ast = instrumenter.abb.adsl_ast
     instrumenter.prev_abb << block_adsl_ast
 
-    unless method_name.nil?
+    # are we at the root level? if so, wrap everything around in an action/callback
+    if instrumenter.stack_depth == 2
       Array.wrap(return_value).each do |final_return|
         adsl_ast = ::ADSL::Extract::Rails::ActionInstrumenter.extract_stmt_from_expr final_return
         block_adsl_ast.statements << adsl_ast if !adsl_ast.nil? and adsl_ast.class.is_statement?
@@ -243,8 +244,10 @@ module ADSL
             
             single_stmt = stmts.length > 1 ? s(:block, *stmts) : stmts.first
 
-            explore_all = s(:iter, s(:call, nil, :ins_explore_all), s(:args), single_stmt)
-            explore_all[1] << s(:lit, sexp[header_elem_count - 2]) if @stack_depth == 0
+            explore_all = s(:iter,
+                s(:call, nil, :ins_explore_all, s(:lit, sexp[header_elem_count - 2])),
+                s(:args),
+                single_stmt)
             
             sexp.push explore_all
             sexp

@@ -1217,4 +1217,35 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal ASTVariable,  statements[1].objset.class
     assert_equal 'a',          statements[1].objset.var_name.text
   end
+
+  def test_extract_action__action_may_call_action
+    AsdsController.class_exec do
+      def nothing
+        Asd.new
+      end
+
+      def create
+        Kme.new
+        nothing
+        Mod::Blah.new
+      end
+    end
+    
+    extractor = create_rails_extractor
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :create)
+    statements = ast.block.statements
+
+    assert_equal 3, statements.length
+
+    assert_equal ASTObjsetStmt,   statements[0].class
+    assert_equal ASTCreateObjset, statements[0].objset.class
+    assert_equal 'Kme',           statements[0].objset.class_name.text
+    assert_equal ASTObjsetStmt,   statements[1].class
+    assert_equal ASTCreateObjset, statements[1].objset.class
+    assert_equal 'Asd',           statements[1].objset.class_name.text
+    assert_equal ASTObjsetStmt,   statements[2].class
+    assert_equal ASTCreateObjset, statements[2].objset.class
+    assert_equal 'Mod_Blah',      statements[2].objset.class_name.text
+  end
 end

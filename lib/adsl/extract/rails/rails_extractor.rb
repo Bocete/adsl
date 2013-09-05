@@ -121,6 +121,7 @@ module ADSL
             end
             @action_instrumenter.abb.root_lvl_adsl_ast 
           end
+
           interrupt_callback_chain_on_render block, route[:action]
 
           action = ADSL::Parser::ASTAction.new({
