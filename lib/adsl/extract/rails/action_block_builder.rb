@@ -107,6 +107,7 @@ module ADSL
 
           common_supertype = nil
           values.each do |value|
+            next if value.nil?
             if common_supertype.nil?
               common_supertype = value.class
             elsif value.class <= common_supertype
@@ -139,8 +140,9 @@ module ADSL
         end
 
         def common_return_value
-          uniq = @return_values
-          if uniq.include? nil
+          uniq = @return_values.dup
+          # avoid include? because it uses :== and metaobjects override the == operator
+          if uniq.map(&:nil?).include? true
             uniq.delete_if{ |e| e.nil? }
             uniq << nil
           end
@@ -195,14 +197,14 @@ module ADSL
           return_value
         end
 
-        def do_raise
+        def do_raise(*args)
           unless @has_returned_or_raised
             # appending nothing to root paths
             @root_paths << [::ADSL::Parser::ASTDummyStmt.new(:type => :raise)]
             @return_values << nil
             @has_returned_or_raised = true
           end
-          nil
+          return *args
         end
 
         def adsl_ast

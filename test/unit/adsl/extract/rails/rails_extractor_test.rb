@@ -1112,10 +1112,10 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
   def test_extract_action__assignment_in_branch_condition
     AsdsController.class_exec do
       def nothing
-        if blah = Asd.new
-          blah.delete
+        if asd = Asd.new
+          asd.delete
         end
-        blah.delete
+        asd.delete
       end
     end
 
@@ -1126,7 +1126,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 3, statements.length
 
     assert_equal ASTAssignment,   statements[0].class
-    assert_equal 'blah',          statements[0].var_name.text
+    assert_equal 'asd',           statements[0].var_name.text
     assert_equal ASTCreateObjset, statements[0].objset.class
     assert_equal 'Asd',           statements[0].objset.class_name.text
 
@@ -1135,11 +1135,86 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 1,               statements[1].blocks[0].statements.length
     assert_equal ASTDeleteObj,    statements[1].blocks[0].statements[0].class
     assert_equal ASTVariable,     statements[1].blocks[0].statements[0].objset.class
-    assert_equal 'blah',          statements[1].blocks[0].statements[0].objset.var_name.text
+    assert_equal 'asd',           statements[1].blocks[0].statements[0].objset.var_name.text
     assert_equal 0,               statements[1].blocks[1].statements.length
 
     assert_equal ASTDeleteObj,    statements[2].class
     assert_equal ASTVariable,     statements[2].objset.class
-    assert_equal 'blah',          statements[2].objset.var_name.text
+    assert_equal 'asd',           statements[2].objset.var_name.text
+  end
+
+  def test_extract_action__assignment_of_branch
+    AsdsController.class_exec do
+      def nothing
+        a = if true; Asd.all; else; nil; end
+        a.delete
+      end
+    end
+
+    extractor = create_rails_extractor
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    statements = ast.block.statements
+
+    assert_equal 2, statements.length
+
+    assert_equal ASTAssignment,  statements[0].class
+    assert_equal 'a',            statements[0].var_name.text
+    assert_equal ASTOneOfObjset, statements[0].objset.class
+    assert_equal ASTAllOf,       statements[0].objset.objsets[0].class
+    assert_equal ASTEmptyObjset, statements[0].objset.objsets[1].class
+
+    assert_equal ASTDeleteObj, statements[1].class
+    assert_equal ASTVariable,  statements[1].objset.class
+    assert_equal 'a',          statements[1].objset.var_name.text
+  end
+  
+  def test_extract_action__assignment_of_trinary
+    AsdsController.class_exec do
+      def nothing
+        a = true ? Asd.all : nil
+        a.delete
+      end
+    end
+
+    extractor = create_rails_extractor
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    statements = ast.block.statements
+
+    assert_equal 2, statements.length
+
+    assert_equal ASTAssignment,  statements[0].class
+    assert_equal 'a',            statements[0].var_name.text
+    assert_equal ASTOneOfObjset, statements[0].objset.class
+    assert_equal ASTAllOf,       statements[0].objset.objsets[0].class
+    assert_equal ASTEmptyObjset, statements[0].objset.objsets[1].class
+
+    assert_equal ASTDeleteObj, statements[1].class
+    assert_equal ASTVariable,  statements[1].objset.class
+    assert_equal 'a',          statements[1].objset.var_name.text
+  end
+  
+  def test_extract_action__rescue_stmt_modifier
+    AsdsController.class_exec do
+      def nothing
+        a = Asd.all rescue nil
+        a.delete
+      end
+    end
+
+    extractor = create_rails_extractor
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    statements = ast.block.statements
+
+    assert_equal 2, statements.length
+
+    assert_equal ASTAssignment,  statements[0].class
+    assert_equal 'a',            statements[0].var_name.text
+    assert_equal ASTOneOfObjset, statements[0].objset.class
+    assert_equal ASTAllOf,       statements[0].objset.objsets[0].class
+    assert_equal ASTEmptyObjset, statements[0].objset.objsets[1].class
+
+    assert_equal ASTDeleteObj, statements[1].class
+    assert_equal ASTVariable,  statements[1].objset.class
+    assert_equal 'a',          statements[1].objset.var_name.text
   end
 end

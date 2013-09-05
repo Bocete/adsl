@@ -1020,9 +1020,15 @@ module ADSL
 
       def optimize
         until_no_change super do |o|
-          ASTEmpty.new if o.empty?
-          o.objsets.first if o.objects.length == 1
-          ASTOneOfObjset.new(:objsets => o.objsets.uniq)
+          if !o.is_a?(ASTOneOfObjset)
+            o
+          elsif o.objsets.empty?
+            ASTEmptyObjset.new
+          elsif o.objsets.length == 1
+            o.objsets.first
+          else
+            ASTOneOfObjset.new(:objsets => o.objsets.uniq)
+          end
         end
       end
 
@@ -1097,7 +1103,7 @@ module ADSL
     end
 
     class ASTEmptyObjset < ASTNode
-      node_type
+      node_type :type => :objset
 
       def typecheck_and_resolve(context)
         return ADSL::DS::DSEmptyObjset.new

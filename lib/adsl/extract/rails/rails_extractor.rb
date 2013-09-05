@@ -23,7 +23,7 @@ module ADSL
             :invariants => Dir['invariants/**/*_invs.rb'],
             :instrumentation_filters => []
           ].merge options
-          
+         
           @ar_classes = options[:ar_classes].map do |ar_class|
             generator = ActiveRecordMetaclassGenerator.new ar_class
             generator.generate_class
@@ -77,8 +77,9 @@ module ADSL
         end
 
         def prepare_instrumentation(controller_class, action)
-          controller_class.class_eval <<-ruby
+          controller_class.class_eval <<-ruby, __FILE__, __LINE__ + 1
             def default_render(*args); end
+            def verify_authenticity_token; end
             def params
               ADSL::Extract::Rails::PartiallyUnknownHash.new(
                 :controller => '#{ controller_class.controller_name }',
@@ -93,7 +94,6 @@ module ADSL
           @action_instrumenter.instrument controller, action
           callbacks(controller_class).each do |callback|
             next if callback.filter.is_a?(String)
-            
             @action_instrumenter.instrument controller, callback.filter 
           end
         end
@@ -116,11 +116,11 @@ module ADSL
 
           block = @action_instrumenter.exec_within do
             @action_instrumenter.exec_within do
-              session.send route[:request_method].to_s.downcase, route[:url]
+              request_method = route[:request_method].to_s.downcase.split('|').first
+              session.send request_method, route[:url]
             end
             @action_instrumenter.abb.root_lvl_adsl_ast 
           end
-
           interrupt_callback_chain_on_render block, route[:action]
 
           action = ADSL::Parser::ASTAction.new({

@@ -87,8 +87,8 @@ module Kernel
     ::ADSL::Extract::Instrumenter.get_instance.abb.do_return *return_values
   end
 
-  def ins_do_raise
-    ::ADSL::Extract::Instrumenter.get_instance.abb.do_raise
+  def ins_do_raise(*args)
+    ::ADSL::Extract::Instrumenter.get_instance.abb.do_raise *args
   end
 
   def ins_branch_choice(condition, branch_id)
@@ -125,11 +125,45 @@ module Kernel
     instrumenter.abb.pop_frame
   end
 
-  def ins_if(condition, frame1, frame2)
+  def ins_if(condition, arg1, arg2)
     ins_stmt condition
-    block1 = ::ADSL::Parser::ASTBlock.new :statements => frame1
-    block2 = ::ADSL::Parser::ASTBlock.new :statements => frame2
-    ::ADSL::Parser::ASTEither.new :blocks => [block1, block2]
+    push_frame_expr1, frame1_ret_value, frame1_stmts = arg1
+    push_frame_expr2, frame2_ret_value, frame2_stmts = arg2
+
+    if frame1_stmts.length <= 1 && frame2_stmts.length <= 1 &&
+        frame1_ret_value.respond_to?(:adsl_ast) && frame1_ret_value.adsl_ast.class.is_objset? &&
+        frame2_ret_value.respond_to?(:adsl_ast) && frame2_ret_value.adsl_ast.class.is_objset?
+
+      return nil if frame1_ret_value.nil? && frame2_ret_value.nil?
+      
+      result_type = if frame1_ret_value.nil?
+        frame2_ret_value.class
+      elsif frame2_ret_value.nil?
+        frame1_ret_value.class
+      elsif frame1_ret_value.class <= frame2_ret_value.class
+        frame2_ret_value.class
+      elsif frame2_ret_value.class <= frame1_ret_value.class
+        frame1_ret_value.class
+      else
+        # objset types are incompatible
+        # but MRI cannot parse return statements inside an if that's being assigned
+        nil
+      end
+
+      if result_type.nil?
+        block1 = ::ADSL::Parser::ASTBlock.new :statements => frame1_stmts
+        block2 = ::ADSL::Parser::ASTBlock.new :statements => frame2_stmts
+        return ::ADSL::Parser::ASTEither.new :blocks => [block1, block2]
+      end
+
+      result_type.new(:adsl_ast => ::ADSL::Parser::ASTOneOfObjset.new(
+        :objsets => [frame1_ret_value.adsl_ast, frame2_ret_value.adsl_ast]
+      ))
+    else
+      block1 = ::ADSL::Parser::ASTBlock.new :statements => frame1_stmts
+      block2 = ::ADSL::Parser::ASTBlock.new :statements => frame2_stmts
+      ::ADSL::Parser::ASTEither.new :blocks => [block1, block2]
+    end
   end
 end
 
@@ -295,34 +329,43 @@ module ADSL
               sexp[3] = s(:block, sexp[3]) unless sexp[3].nil? or sexp[3].sexp_type == :block
               sexp
             else
-              block1 = sexp[2].nil? ? [] : [sexp[2]]
-              block2 = sexp[3].nil? ? [] : [sexp[3]]
+              block1_sexp = sexp[2] || s(:nil)
+              block1 = block1_sexp.sexp_type == :block ? block1_sexp : s(:block, block1_sexp)
+              block2_sexp = sexp[3] || s(:nil)
+              block2 = block2_sexp.sexp_type == :block ? block2_sexp : s(:block, block2_sexp)
               s(:call, nil, :ins_if,
                 sexp[1],
-                s(:rescue,
-                  s(:block,
-                    s(:call, nil, :ins_push_frame),
-                    *block1,
-                    s(:call, nil, :ins_pop_frame)
-                  ),
-                  s(:resbody,
-                    s(:array, s(:const, :Exception)),
-                    s(:call, nil, :ins_pop_frame)
-                  )
+                s(:array,
+                  s(:call, nil, :ins_push_frame),
+                  s(:splat, s(:rescue,
+                    s(:array, block1, s(:call, nil, :ins_pop_frame)),
+                    s(:resbody,
+                      s(:array, s(:const, :Exception)),
+                      s(:array, s(:nil), s(:call, nil, :ins_pop_frame))
+                    )
+                  ))
                 ),
-                s(:rescue,
-                  s(:block,
-                    s(:call, nil, :ins_push_frame),
-                    *block2,
-                    s(:call, nil, :ins_pop_frame)
-                  ),
-                  s(:resbody,
-                    s(:array, s(:const, :Exception)),
-                    s(:call, nil, :ins_pop_frame)
-                  )
+                s(:array,
+                  s(:call, nil, :ins_push_frame),
+                  s(:splat, s(:rescue,
+                    s(:array, block2, s(:call, nil, :ins_pop_frame)),
+                    s(:resbody,
+                      s(:array, s(:const, :Exception)),
+                      s(:array, s(:nil), s(:call, nil, :ins_pop_frame))
+                    )
+                  ))
                 )
               )
             end
+          end
+
+          # change rescue into a branch statement
+          replace :rescue do |sexp|
+            resbody = sexp.sexp_body.select{ |a| a.sexp_type == :resbody }.first
+            exception_type_array = s(:array, *resbody[1].sexp_body)
+            res_block = resbody[2..-1]
+            res_block = res_block.length > 1 ? s(:block, *res_block) : res_block.first
+            s(:if, s(:nil), sexp[1], res_block)
           end
 
           # change attrasgn into a normal call
@@ -334,6 +377,17 @@ module ADSL
           replace :defn, :defs do |sexp|
             make_returns_explicit sexp
             sexp
+          end
+
+          # replace calls to collection_action, member_action or page_action with a def
+          # these represent code sugar for defining actions with the activeadmin gem
+          replace :iter do |sexp|
+            next sexp unless (
+              sexp[1].sexp_type == :call &&
+              sexp[1][1] == nil &&
+              [:collection_action, :member_action, :page_action].include?(sexp[1][2])
+            )
+            s(:defn, sexp[1][3][1], sexp[2], sexp[3])
           end
         end
 

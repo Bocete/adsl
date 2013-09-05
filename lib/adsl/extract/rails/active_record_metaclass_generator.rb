@@ -96,7 +96,7 @@ module ADSL
           when true;  refs.select!{ |ref| ref.through_reflection }
           when false; refs.select!{ |ref| ref.through_reflection.nil? }
           end
-
+          
           refs
         end
 
@@ -322,13 +322,22 @@ module ADSL
               end
 
               def all(*params)
-                new :adsl_ast => ASTAllOf.new(:class_name => ASTIdent.new(:text => adsl_ast_class_name))
+                self.new :adsl_ast => ASTAllOf.new(:class_name => ASTIdent.new(:text => adsl_ast_class_name))
               end
               def scope_for_create;  self; end
               def scope_attributes?; false; end
               def scoped; @scoped || all; end
               def scoped=(scoped); @scoped = scoped; end
               alias_method :order,  :all
+
+              # calculations
+              def calculate(*args); ADSL::Extract::MetaUnknown.new; end
+              alias_method :count,   :calculate
+              alias_method :average, :calculate
+              alias_method :minimum, :calculate
+              alias_method :maximum, :calculate
+              alias_method :sum,     :calculate
+              alias_method :pluck,   :calculate
 
               def find(*args)
                 self.all.take
@@ -464,6 +473,7 @@ module ADSL
             end
           end
 
+
           reflections(:polymorphic => true).each do |assoc|
             @ar_class.new.replace_method assoc.name do
               ADSL::Extract::Rails::MetaUnknown.new
@@ -471,6 +481,7 @@ module ADSL
           end
 
           adsl_ast_parent_name = parent_classname
+
           adsl_ast_relations = reflections(:polymorphic => false, :through => false).map{ |ref| reflection_to_adsl_ast ref }
 
           @ar_class.singleton_class.send :define_method, :adsl_ast do

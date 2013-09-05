@@ -91,10 +91,27 @@ module ADSL
           end
         end
 
+        def instrument_gem_devise(controller_class, action)
+          return unless Object.lookup_const('Devise')
+          
+          Devise.mappings.values.each do |mapping|
+            role = mapping.singular
+            role_class = mapping.class_name
+            controller_class.class_eval <<-ruby
+              def authenticate_#{role}!; end
+              def #{role}_signed_in?; true; end
+              def current_#{role}; #{role_class}.find(-1); end
+              def #{role}_session; ::ADSL::Extract::MetaUnknown.new; end
+              def only_render_implemented_actions; end
+            ruby
+          end
+        end
+
         def instrument_gems(controller_class, action)
           instrument_gem_cancan controller_class, action
           instrument_gem_ransack controller_class, action
           instrument_gem_authlogic controller_class, action
+          instrument_gem_devise controller_class, action
         end
 
       end
