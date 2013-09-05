@@ -73,7 +73,7 @@ module ADSL
         end
 
         def callbacks(controller)
-          controller._process_action_callbacks
+          controller.respond_to?(:_process_action_callbacks) ? controller._process_action_callbacks : []
         end
 
         def prepare_instrumentation(controller_class, action)
