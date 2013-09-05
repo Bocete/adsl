@@ -107,7 +107,7 @@ module ADSL
             object = if self.adsl_ast.objset_has_side_effects?
               var_name = ASTIdent.new(:text => "__delete_#{ self.class.adsl_ast_class_name }_temp_var")
               stmts << ASTAssignment.new(:var_name => var_name.dup, :objset => self.adsl_ast)
-              ASTVariable.new(:var_name => var_name.dup)
+              self.class.new :adsl_ast => ASTVariable.new(:var_name => var_name.dup)
             else
               self
             end
@@ -131,6 +131,7 @@ module ADSL
             end
 
             stmts << ASTDeleteObj.new(:objset => object.adsl_ast)
+
             stmts
           end
           new_class.send :alias_method, :destroy!,    :destroy

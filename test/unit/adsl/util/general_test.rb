@@ -278,4 +278,26 @@ class ADSL::Util::GeneralTest < Test::Unit::TestCase
     assert_equal ADSL::Util::GeneralTest, Foo.parent_module
     assert_equal ADSL::Util::GeneralTest::Foo, Foo::Foo2.parent_module
   end
+
+  def test_array__split_simple
+    array = [-1, 3, 12, -5, 20, 0, 45]
+
+    accepted, rejected = array.select_reject{ |i| i > 0 }
+    assert_equal [3, 12, 20, 45], accepted
+    assert_equal [-1, -5, 0], rejected
+  end
+
+  def test_array__split_cornercases
+    accepted, rejected = [1, 2, 3, 4, 5].select_reject{ |i| i > 0 }
+    assert_equal [1, 2, 3, 4, 5], accepted
+    assert_equal [], rejected
+   
+    accepted, rejected = [1, 2, 3, 4, 5].select_reject{ |i| i < 0 }
+    assert_equal [], accepted
+    assert_equal [1, 2, 3, 4, 5], rejected
+
+    accepted, rejected = [].select_reject{ |i| i < 0 }
+    assert_equal [], accepted
+    assert_equal [], rejected
+  end
 end

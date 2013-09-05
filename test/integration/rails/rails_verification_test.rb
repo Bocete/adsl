@@ -155,6 +155,20 @@ class ADSL::Verification::RailsVerificationTest < ADSL::Extract::Rails::RailsIns
     assert verify_spass :ast => ast, :verify_options => verify_options_for('AsdsController__nothing')
   end
   
+  def test_verify_spass__association_build__can_be_used_2
+    AsdsController.class_exec do
+      def nothing
+        Asd.find.blahs.build.delete
+      end
+    end
+
+    ast = create_rails_extractor(<<-ruby).adsl_ast
+      invariant Mod::Blah.all.empty?
+    ruby
+
+    assert verify_spass :ast => ast, :verify_options => verify_options_for('AsdsController__nothing')
+  end
+  
   def test_verify_spass__association_build__through_creates_join_objects
     AsdsController.class_exec do
       def nothing

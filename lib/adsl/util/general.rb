@@ -51,7 +51,7 @@ class Array
     join("").adsl_indent
   end
 
-  def split
+  def select_reject
     arr1 = []
     arr2 = []
     self.each do |e|

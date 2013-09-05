@@ -102,6 +102,7 @@ module Kernel
     return_value = instrumenter.abb.explore_all_choices &block
 
     block_adsl_ast = instrumenter.abb.adsl_ast
+
     instrumenter.prev_abb << block_adsl_ast
 
     # are we at the root level? if so, wrap everything around in an action/callback
@@ -133,7 +134,8 @@ module Kernel
 
     if frame1_stmts.length <= 1 && frame2_stmts.length <= 1 &&
         frame1_ret_value.respond_to?(:adsl_ast) && frame1_ret_value.adsl_ast.class.is_objset? &&
-        frame2_ret_value.respond_to?(:adsl_ast) && frame2_ret_value.adsl_ast.class.is_objset?
+        frame2_ret_value.respond_to?(:adsl_ast) && frame2_ret_value.adsl_ast.class.is_objset? &&
+        !frame1_ret_value.adsl_ast.objset_has_side_effects? && !frame2_ret_value.adsl_ast.objset_has_side_effects?
 
       return nil if frame1_ret_value.nil? && frame2_ret_value.nil?
       

@@ -1124,7 +1124,7 @@ module ADSL
       end
 
       def to_adsl
-        n = @name.nil? ? "" : "#{ @name.text.gsub(/\s/, '_') }: "
+        n = (@name.nil? || @name.text.nil?) ? "" : "#{ @name.text.gsub(/\s/, '_') }: "
         "invariant #{n}#{ @formula.to_adsl }\n"
       end
     end

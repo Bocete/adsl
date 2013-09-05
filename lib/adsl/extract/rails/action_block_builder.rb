@@ -83,7 +83,9 @@ module ADSL
               return_value = yield
            
               do_return return_value unless @has_returned_or_raised
-            rescue Exception
+            rescue Exception => e
+              puts "Exception: #{e}"
+              puts caller.first 20
               do_raise unless @has_returned_or_raised
             ensure
               return common_return_value unless has_more_executions?

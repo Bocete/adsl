@@ -19,7 +19,7 @@ class ADSL::Verification::RailsVerificationTest < ADSL::Extract::Rails::RailsIns
   def test_verify_spass__branch_no_return
     AsdsController.class_exec do
       def nothing
-        if whatever
+        if true
           Asd.new
         else
           Asd.build
@@ -37,7 +37,7 @@ class ADSL::Verification::RailsVerificationTest < ADSL::Extract::Rails::RailsIns
   def test_verify_spass__branch_with_return__matters
     AsdsController.class_exec do
       def nothing
-        if whatever
+        if true
           return Asd.new
         else
           return Asd.build
@@ -56,7 +56,7 @@ class ADSL::Verification::RailsVerificationTest < ADSL::Extract::Rails::RailsIns
   def test_verify_spass__branch_with_return__may_create_but_will_delete
     AsdsController.class_exec do
       def nothing
-        if whatever
+        if true
         else
           Asd.build
         end
@@ -74,7 +74,7 @@ class ADSL::Verification::RailsVerificationTest < ADSL::Extract::Rails::RailsIns
   def test_verify_spass__branch_with_return__may_create_or_delete
     AsdsController.class_exec do
       def nothing
-        if whatever
+        if true
         else
           return Asd.build
         end
@@ -88,13 +88,12 @@ class ADSL::Verification::RailsVerificationTest < ADSL::Extract::Rails::RailsIns
     
     assert_false verify_spass :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing)
   end
-  
-  
+   
   def test_verify_spass__variable_assignments
     AsdsController.class_exec do
       def nothing
         a = nil
-        if whatever
+        if true
           a = Asd.new
         else
           a = Asd.build

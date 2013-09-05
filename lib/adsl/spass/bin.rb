@@ -43,7 +43,7 @@ module ADSL
       end
 
       def remove_empty_actions(actions)
-        empty, valid = actions.split{ |a| a.block.statements.empty? }
+        empty, valid = actions.select_reject{ |a| a.block.statements.empty? }
         if @verification_output == :terminal && !empty.empty?
           puts 'Actions with empty bodies trivially preserve invariants.'
           puts "The following actions are empty: #{ empty.map(&:name).join ', ' }"
