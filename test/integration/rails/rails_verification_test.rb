@@ -135,12 +135,28 @@ class ADSL::Verification::RailsVerificationTest < ADSL::Extract::Rails::RailsIns
     end
 
     ast = create_rails_extractor(<<-ruby).adsl_ast
-      invariant forall{ |asd| asd.blahs.empty? }
+      invariant forall{ |asd| not asd.blahs.empty? }
     ruby
 
-    assert_false verify_spass :ast => ast, :verify_options => verify_options_for('AsdsController__nothing')
+    assert verify_spass :ast => ast, :verify_options => verify_options_for('AsdsController__nothing')
   end
   
+  def test_verify_spass__association_build__inverse
+    AsdsController.class_exec do
+      def nothing
+        b = Mod::Blah.new
+        Asd.find.blahs << b
+      end
+    end
+
+    ast = create_rails_extractor(<<-ruby).adsl_ast
+      invariant forall(:blah => Mod::Blah){ |blah| not blah.asd.empty? }
+      invariant exists{ |asd| }
+    ruby
+
+    assert verify_spass :ast => ast, :verify_options => verify_options_for('AsdsController__nothing')
+  end
+
   def test_verify_spass__association_build__can_be_used
     AsdsController.class_exec do
       def nothing

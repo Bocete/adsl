@@ -1248,4 +1248,40 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal ASTCreateObjset, statements[2].objset.class
     assert_equal 'Mod_Blah',      statements[2].objset.class_name.text
   end
+
+  def test_extract_action__foreign_key_reads_and_writes_propagate_kinda
+    AsdsController.class_exec do
+      def nothing
+        blah = Mod::Blah.find
+        asd = Asd.find
+
+        blah.asd_id = asd.id
+      end
+    end
+    
+    extractor = create_rails_extractor
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    statements = ast.block.statements
+
+    assert_equal 3, statements.length
+
+    assert_equal ASTAssignment, statements[0].class
+    assert_equal 'blah',        statements[0].var_name.text
+    assert_equal ASTOneOf,      statements[0].objset.class
+    assert_equal ASTAllOf,      statements[0].objset.objset.class
+    assert_equal 'Mod_Blah',    statements[0].objset.objset.class_name.text
+
+    assert_equal ASTAssignment, statements[1].class
+    assert_equal 'asd',         statements[1].var_name.text
+    assert_equal ASTOneOf,      statements[1].objset.class
+    assert_equal ASTAllOf,      statements[1].objset.objset.class
+    assert_equal 'Asd',         statements[1].objset.objset.class_name.text
+
+    assert_equal ASTSetTup,     statements[2].class
+    assert_equal ASTVariable,   statements[2].objset1.class
+    assert_equal 'blah',        statements[2].objset1.var_name.text
+    assert_equal 'asd',         statements[2].rel_name.text
+    assert_equal ASTVariable,   statements[2].objset2.class
+    assert_equal 'asd',         statements[2].objset2.var_name.text
+  end
 end

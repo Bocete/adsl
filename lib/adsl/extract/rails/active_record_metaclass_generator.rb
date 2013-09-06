@@ -169,6 +169,7 @@ module ADSL
             def includes(*args);  self; end
             def all(*args);       self; end
             def scope_for_create; self; end
+            def id; self; end   # used to allow foreign key assignment
 
             def count_by_group(*args); MetaUnknown.new; end
             def size;                  MetaUnknown.new; end
@@ -391,6 +392,13 @@ module ADSL
                 :rel_name => ASTIdent.new(:text => assoc.name.to_s),
                 :objset2 => other.adsl_ast
               )
+            end
+
+            if assoc.macro == :belongs_to
+              @ar_class.class_eval <<-ruby
+                alias_method :#{assoc.foreign_key},  :#{assoc.name}
+                alias_method :#{assoc.foreign_key}=, :#{assoc.name}=
+              ruby
             end
           end
           reflections(:polymorphic => false, :through => true).each do |assoc|

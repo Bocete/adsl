@@ -59,6 +59,7 @@ module ADSL
         elsif input.is_a? ADSL::DS::DSSpec
           input
         end
+
         options = default_options.merge options
 
         stop_on_incorrect = options[:halt_on_error]
