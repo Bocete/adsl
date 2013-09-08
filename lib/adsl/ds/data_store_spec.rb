@@ -68,6 +68,7 @@ module ADSL
 
       def self.common_supertype(classes)
         types = classes.uniq
+        types.delete nil
         while types.length > 1
           type1 = types.pop
           type2 = types.pop

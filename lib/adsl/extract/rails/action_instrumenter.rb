@@ -26,21 +26,6 @@ module Kernel
     ::ADSL::Parser::ASTDummyStmt.new :type => :render
   end
 
-  def ins_optional_assignment(outer_binding, names, values)
-    result = ins_multi_assignment(outer_binding, names, values, '||=')
-    mapped = result.map do |return_value|
-      if return_value.is_a? ::ADSL::Parser::ASTNode
-        ::ADSL::Parser::ASTEither.new :blocks => [
-          ::ADSL::Parser::ASTBlock.new(:statements => [return_value]),
-          ::ADSL::Parser::ASTBlock.new(:statements => [])
-        ]
-      else
-        return_value
-      end
-    end
-    mapped
-  end
-
   def ins_multi_assignment(outer_binding, names, values, operator = '=')
     values_to_be_returned = []
     names.length.times do |index|
@@ -57,30 +42,37 @@ module Kernel
         name.to_s
       end
       
-      if value.nil?
-        outer_binding.eval "#{name} #{operator} nil"
-        
-        values_to_be_returned << ::ADSL::Parser::ASTAssignment.new(
-          :var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name),
-          :objset => ::ADSL::Parser::ASTEmptyObjset.new
-        )
-      elsif value.is_a? ActiveRecord::Base
-        variable = value.class.new(:adsl_ast =>
-          ::ADSL::Parser::ASTVariable.new(:var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name))
-        )
-        str = "#{name} #{operator} ObjectSpace._id2ref(#{variable.object_id})"
-        outer_binding.eval str
-        
-        values_to_be_returned << ::ADSL::Parser::ASTAssignment.new(
+      if value.respond_to?(:adsl_ast) && value.adsl_ast.class.is_objset?
+        assignment = ::ADSL::Parser::ASTAssignment.new(
           :var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name),
           :objset => value.adsl_ast
         )
+        if operator == '||='
+          old_value = outer_binding.eval name rescue nil
+          if old_value.respond_to?(:adsl_ast) && old_value.adsl_ast.class.is_objset?
+            assignment = [
+              ::ADSL::Parser::ASTDeclareVar.new(:var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name.dup)),
+              ::ADSL::Parser::ASTEither.new(:blocks => [
+                ::ADSL::Parser::ASTBlock.new(:statements => []),
+                ::ADSL::Parser::ASTBlock.new(:statements => [assignment])
+              ])
+            ]
+          end
+        end
+        ins_stmt assignment
+
+        variable = value.nil? ? nil : value.class.new(
+          :adsl_ast => ::ADSL::Parser::ASTVariable.new(:var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name)
+        ))
+        outer_binding.eval "#{name} #{operator} ObjectSpace._id2ref(#{variable.object_id})"
+        
+        values_to_be_returned << variable
       else
         outer_binding.eval "#{name} #{operator} ObjectSpace._id2ref(#{value.object_id})"
         values_to_be_returned << value
       end
     end
-    values_to_be_returned
+    names.length == 1 ? values_to_be_returned.first : values_to_be_returned
   end
 
   def ins_do_return(*return_values)
@@ -270,43 +262,40 @@ module ADSL
           replace :lasgn, :iasgn, :cvasgn, :cvdecl, :gasgn, :masgn, :op_asgn_or, :unless_in => [:args, :op_asgn_or] do |sexp|
             next sexp if sexp.length <= 2
 
-            if sexp.sexp_type == :op_asgn_or
-              prepare_assignment = s(:op_asgn_or, sexp[1].dup, s(sexp[2][0], sexp[2][1], s(:nil)))
-              var_names = s(:array, s(:str, sexp[1][1].to_s))
-              values = s(:array, sexp[2][2])
-
-              s(:block,
-                prepare_assignment,
-                s(:call, nil, :ins_optional_assignment, s(:call, nil, :binding), var_names, values),
-              )
+            variables_and_prefixes = if sexp.sexp_type == :masgn
+              sexp[1].sexp_body.map{ |asgn_type, var| [asgn_type.to_s[0..-5], var] }
+            elsif sexp.sexp_type == :op_asgn_or
+              []
             else
-              variables_and_prefixes = if sexp.sexp_type == :masgn
-                sexp[1].sexp_body.map{ |asgn_type, var| [asgn_type.to_s[0..-5], var] }
-              else
-                [[sexp[0].to_s[0..-5], sexp[1]]]
-              end
-
-              prepare_assignments = variables_and_prefixes.map{ |prefix, var|
-                s(:op_asgn_or, s("#{prefix}var".to_sym, var), s("#{prefix}asgn".to_sym, var, s(:nil)))
-              }
-              
-              var_names = if sexp.sexp_type == :masgn
-                sexp[1].sexp_body.map{ |var| s(:str, var[1].to_s) }.to_a
-              else
-                [s(:str, sexp[1].to_s)]
-              end
-
-              values = if sexp.sexp_type == :masgn
-                sexp[2]
-              else
-                s(:array, sexp[2])
-              end
-
-              s(:block,
-                *prepare_assignments,
-                s(:call, nil, :ins_multi_assignment, s(:call, nil, :binding), s(:array, *var_names), values)
-              )
+              [[sexp[0].to_s[0..-5], sexp[1]]]
             end
+
+            prepare_assignments = variables_and_prefixes.map{ |prefix, var|
+              s(:op_asgn_or, s("#{prefix}var".to_sym, var), s("#{prefix}asgn".to_sym, var, s(:nil)))
+            }
+            
+            var_names = if sexp.sexp_type == :masgn
+              sexp[1].sexp_body.map{ |var| s(:str, var[1].to_s) }.to_a
+            elsif sexp.sexp_type == :op_asgn_or
+              [s(:str, sexp[1][1].to_s)]
+            else
+              [s(:str, sexp[1].to_s)]
+            end
+
+            values = if sexp.sexp_type == :masgn
+              sexp[2]
+            elsif sexp.sexp_type == :op_asgn_or
+              s(:array, sexp[2][2])
+            else
+              s(:array, sexp[2])
+            end
+
+            operator = sexp.sexp_type == :op_asgn_or ? s(:str, '||=') : s(:str, '=')
+
+            s(:block,
+              *prepare_assignments,
+              s(:call, nil, :ins_multi_assignment, s(:call, nil, :binding), s(:array, *var_names), values, operator)
+            )
           end
 
           # prepend ins_stmt to every non-return or non-if statement

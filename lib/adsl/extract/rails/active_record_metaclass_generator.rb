@@ -102,7 +102,7 @@ module ADSL
 
         def create_destroys(new_class)
           refls = reflections :this_class => nil
-          new_class.send :define_method, :destroy do
+          new_class.send :define_method, :destroy do |*args|
             stmts = []
             object = if self.adsl_ast.objset_has_side_effects?
               var_name = ASTIdent.new(:text => "__delete_#{ self.class.adsl_ast_class_name }_temp_var")
@@ -134,15 +134,15 @@ module ADSL
 
             stmts
           end
-          new_class.send :alias_method, :destroy!,    :destroy
-          new_class.send :alias_method, :destroy_all, :destroy
+          new_class.send(:define_method, :destroy!    ){ |*args| destroy args }
+          new_class.send(:define_method, :destroy_all ){ |*args| destroy args }
 
-          new_class.send :define_method, :delete do
-            [ASTDeleteObj.new(:objset => self.adsl_ast)]
+          new_class.send :define_method, :delete do |*args|
+            [ASTDeleteObj.new(:objset => adsl_ast)]
           end
-          new_class.send :alias_method, :delete!,    :delete
-          new_class.send :alias_method, :delete_all, :delete
-          new_class.send :alias_method, :clear,      :delete
+          new_class.send(:define_method, :delete!   ){ |*args| delete args }
+          new_class.send(:define_method, :delete_all){ |*args| delete args }
+          new_class.send(:define_method, :clear     ){ |*args| delete args }
         end
 
         def generate_class
@@ -169,13 +169,14 @@ module ADSL
             def includes(*args);  self; end
             def all(*args);       self; end
             def scope_for_create; self; end
-            def id; self; end   # used to allow foreign key assignment
+            def id;               self; end   # used to allow foreign key assignment
 
             def count_by_group(*args); MetaUnknown.new; end
             def size;                  MetaUnknown.new; end
             def length;                MetaUnknown.new; end
             def count;                 MetaUnknown.new; end
             def map;                   MetaUnknown.new; end
+            def valid?(*args);         MetaUnknown.new; end
 
             def take(*params)
               self.class.new :adsl_ast => ASTOneOf.new(:objset => self.adsl_ast)
@@ -377,12 +378,41 @@ module ADSL
 
           reflections(:polymorphic => false, :through => false).each do |assoc|
             @ar_class.new.replace_method assoc.name do
+              self_adsl_ast = self.adsl_ast
               target_class = assoc.class_name.constantize
               result = target_class.new :adsl_ast => ASTDereference.new(
-                :objset => self.adsl_ast,
+                :objset => self_adsl_ast.dup,
                 :rel_name => ASTIdent.new(:text => assoc.name.to_s)
               )
               result.adsl_ast = ASTSubset.new(:objset => result.adsl_ast) if assoc.options.include? :conditions
+
+              if assoc.macro == :has_many
+                result.singleton_class.send :define_method, :delete do |*args|
+                  # has_many association.delete(ids)
+                  subset_method = args.length == 1 ? :find : :where
+                  if [:delete, :delete_all].include? assoc.options[:dependent]
+                    self.send(subset_method).delete
+                  elsif [:destroy, :destroy_all].include? assoc.options[:dependent]
+                    self.send(subset_method).destroy
+                  else
+                    [ASTDeleteTup.new(
+                      :objset1 => self_adsl_ast.dup,
+                      :rel_name => ASTIdent.new(:text => assoc.name.to_s),
+                      :objset2 => send(subset_method).adsl_ast
+                    )]
+                  end
+                end
+              elsif assoc.macro == :has_and_belongs_to_many
+                result.singleton_class.send :define_method, :delete do |*args|
+                  subset_method = args.length == 1 ? :find : :where
+                  [ASTDeleteTup.new(
+                    :objset1 => self_adsl_ast.dup,
+                    :rel_name => ASTIdent.new(:text => assoc.name.to_s),
+                    :objset2 => send(subset_method).adsl_ast
+                  )]
+                end
+              end
+
               result
             end
 

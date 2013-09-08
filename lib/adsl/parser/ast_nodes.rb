@@ -671,6 +671,23 @@ module ADSL
       end
     end
 
+    class ASTDeclareVar < ASTNode
+      node_type :var_name, :type => :statement
+
+      def typecheck_and_resolve(context)
+        var = context.lookup_var @var_name.text, false
+        if var.nil?
+          return ASTAssignment.new(:var_name => @var_name.dup, :objset => ASTEmptyObjset.new).typecheck_and_resolve(context)
+        else
+          []
+        end
+      end
+
+      def to_adsl
+        "define #{ @var_name.text }"
+      end
+    end
+
     class ASTObjsetStmt < ASTNode
       node_type :objset, :type => :statement
 
@@ -794,7 +811,8 @@ module ADSL
         lambdas = []
 
         ASTTypecheckResolveContext::context_vars_that_differ(*contexts).each do |var_name, vars|
-          var = ADSL::DS::DSVariable.new :name => var_name, :type => vars.first.type
+          common_type = ADSL::DS::DSClass.common_supertype(vars.map(&:type))
+          var = ADSL::DS::DSVariable.new :name => var_name, :type => common_type
           objset = ADSL::DS::DSEitherLambdaObjset.new :either => either, :vars => vars
           assignment = ADSL::DS::DSAssignment.new :var => var, :objset => objset
           context.redefine_var var, nil
@@ -856,7 +874,7 @@ module ADSL
       end
 
       def to_adsl
-        "#{ @objset1.to_adsl }.#{ @rel_name.text } += #{ @objset2.to_adsl }"
+        "#{ @objset1.to_adsl }.#{ @rel_name.text } += #{ @objset2.to_adsl }\n"
       end
     end
 
@@ -873,7 +891,7 @@ module ADSL
       end
 
       def to_adsl
-        "#{ @objset1.to_adsl }.#{ @rel_name.text } -= #{ @objset2.to_adsl }"
+        "#{ @objset1.to_adsl }.#{ @rel_name.text } -= #{ @objset2.to_adsl }\n"
       end
     end
 
@@ -893,7 +911,7 @@ module ADSL
       end
 
       def to_adsl
-        "#{ @objset1.to_adsl }.#{ @rel_name.text } = #{ @objset2.to_adsl }"
+        "#{ @objset1.to_adsl }.#{ @rel_name.text } = #{ @objset2.to_adsl }\n"
       end
     end
 
@@ -972,7 +990,7 @@ module ADSL
 
       def typecheck_and_resolve(context)
         objsets = @objsets.map{ |o| o.typecheck_and_resolve context }
-        @objsets.reject!{ |o| o.type.nil? }
+        objsets.reject!{ |o| o.type.nil? }
 
         return ADSL::DS::DSEmptyObjset.new if objsets.length == 0
         return objsets.first if objsets.length == 1
@@ -1043,7 +1061,6 @@ module ADSL
       def typecheck_and_resolve(context)
         var_node, var = context.lookup_var @var_name.text
         raise ADSLError, "Undefined variable #{@var_name.text} on line #{@var_name.lineno}" if var.nil?
-        return ADSL::DS::DSEmptyObjset.new if var.type.nil?
         return var
       end
 

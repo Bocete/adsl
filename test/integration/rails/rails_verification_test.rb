@@ -199,19 +199,55 @@ class ADSL::Verification::RailsVerificationTest < ADSL::Extract::Rails::RailsIns
     assert_false verify_spass :ast => ast, :verify_options => verify_options_for('AsdsController__nothing')
   end
 
-  def test_verify_spass__union_of_objsets
+  def test_verify_spass__union_of_objsets_overestimate
     AsdsController.class_exec do
       def nothing
         a = Asd.find
         a.blahs = Mod::Blah.new + Mod::Blah.new
-        a.blahs.find.delete
+        Mod::Blah.find.delete
+        Mod::Blah.find.delete
       end
     end
     
     ast = create_rails_extractor(<<-ruby).adsl_ast
-      invariant forall(:blah1 => Mod::Blah, :blah2 => Mod::Blah){ |asd, blah1, blah2|
-        self.and(blah1 <= asd.blahs, blah2 <= asd.blahs).implies[blah1 == blah2]
-      }
+      invariant Mod::Blah.all.empty?
     ruby
+
+    assert verify_spass :ast => ast, :verify_options => verify_options_for('AsdsController__nothing')
+  end
+  
+  def test_verify_spass__union_of_objsets_underestimate
+    AsdsController.class_exec do
+      def nothing
+        a = Asd.find
+        a.blahs = Mod::Blah.new + Mod::Blah.new
+        Mod::Blah.find.delete
+        Mod::Blah.find.delete
+      end
+    end
+    
+    ast = create_rails_extractor(<<-ruby).adsl_ast
+      invariant !Mod::Blah.all.empty?
+    ruby
+
+    assert verify_spass :ast => ast, :verify_options => verify_options_for('AsdsController__nothing')
+  end
+  
+  def test_verify_spass__call_of_optional_assignment
+    AsdsController.class_exec do
+      def asd
+        @asd ||= Asd.find
+      end
+
+      def nothing
+        asd.blahs.build
+      end
+    end
+    
+    ast = create_rails_extractor(<<-ruby).adsl_ast
+      invariant forall(:blah => Mod::Blah){ |blah| !blah.asd.empty? }
+    ruby
+
+    assert_false verify_spass :ast => ast, :verify_options => verify_options_for('AsdsController__nothing')
   end
 end

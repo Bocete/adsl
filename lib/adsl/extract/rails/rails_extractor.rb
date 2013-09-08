@@ -166,7 +166,17 @@ module ADSL
 
         def controller_of(route)
           return nil unless route.defaults.include? :controller
-          "#{route.defaults[:controller].camelize}Controller".constantize
+          possible_names = [
+            "#{route.defaults[:controller].pluralize}_controller".camelize,
+            "#{route.defaults[:controller]}_controller".camelize, 
+          ]
+          possible_names.each do |name|
+            begin
+              return name.constantize
+            rescue NameError
+            end
+          end
+          raise "No controller class found for #{route.defaults}; attempted class names are #{possible_names}"
         end
 
         def action_of(route)

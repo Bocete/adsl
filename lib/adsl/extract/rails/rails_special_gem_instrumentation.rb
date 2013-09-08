@@ -98,11 +98,11 @@ module ADSL
             role = mapping.singular
             role_class = mapping.class_name
             controller_class.class_eval <<-ruby
-              def authenticate_#{role}!; end
-              def #{role}_signed_in?; true; end
-              def current_#{role}; #{role_class}.find(-1); end
-              def #{role}_session; ::ADSL::Extract::MetaUnknown.new; end
-              def only_render_implemented_actions; end
+              def authenticate_#{role}!(*args); end
+              def #{role}_signed_in?(*args); true; end
+              def current_#{role}(*args); #{role_class}.find(-1); end
+              def #{role}_session(*args); ::ADSL::Extract::MetaUnknown.new; end
+              def only_render_implemented_actions(*args); end
             ruby
           end
         end
