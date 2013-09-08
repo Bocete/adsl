@@ -153,6 +153,8 @@ module ADSL
         self
       end
 
+      def optimize; nil; end
+
       def to_adsl
         "DummyStmt(#{ @type })\n"
       end
@@ -620,24 +622,18 @@ module ADSL
 
       def optimize(last_stmt = false)
         until_no_change super() do |block|
-          statements = block.statements.map{ |stmt|
-            if stmt.is_a?(ASTBlock)
-              stmt.statements
-            elsif stmt.is_a?(ASTDummyStmt)
-              []
-            else
-              [stmt]
-            end
-          }.flatten(1).reject{ |stmt|
-            stmt.is_a?(ASTObjsetStmt) && (stmt.objset.nil? || !stmt.objset.objset_has_side_effects?)
-          }.map{ |stmt|
-            stmt.optimize
-          }
+          statements = block.statements.reject(&:nil?).map(&:optimize).reject(&:nil?).map{ |stmt|
+            stmt.is_a?(ASTBlock) ? stmt.statements : [stmt]
+          }.flatten(1)
 
           if last_stmt
             statements = until_no_change statements do |stats|
-              if stats.last.is_a?(ASTAssignment) && stats.last.objset.is_a?(ASTNode) && !stats.last.objset.objset_has_side_effects?
-                stats.pop 
+              if stats.last.is_a?(ASTAssignment)
+                if stats.last.objset.objset_has_side_effects?
+                  stats[-1] = ASTObjsetStmt.new(:objset => stats.last.objset)
+                else
+                  stats.pop
+                end
               elsif stats.last.is_a?(ASTEither)
                 stats.last.blocks.map!{ |b| b.optimize true }
               elsif stats.last.is_a?(ASTBlock)
@@ -647,7 +643,7 @@ module ADSL
             end
           end
 
-          ASTBlock.new :statements => statements
+          ASTBlock.new :statements => statements.reject(&:nil?)
         end
       end
 
@@ -684,7 +680,7 @@ module ADSL
       end
 
       def to_adsl
-        "define #{ @var_name.text }"
+        "declare #{ @var_name.text }\n"
       end
     end
 
@@ -694,6 +690,10 @@ module ADSL
       def typecheck_and_resolve(context)
         @objset.typecheck_and_resolve(context)
         return nil
+      end
+
+      def optimize(last_stmt = false)
+        @objset.objset_has_side_effects? ? self : nil
       end
 
       def to_adsl

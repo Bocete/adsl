@@ -129,8 +129,8 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
         ASTBlock.new(:statements => []),
         ASTBlock.new(:statements => [
           ASTEither.new(:blocks => [
-            ASTBlock.new(:statements => [ASTAssignment.new(:objset => 1)]),
-            ASTBlock.new(:statements => [ASTAssignment.new(:objset => 2)])
+            ASTBlock.new(:statements => [ASTDeleteObj.new(:objset => 1)]),
+            ASTBlock.new(:statements => [ASTDeleteObj.new(:objset => 2)])
           ])
         ]),
         ASTBlock.new(:statements => [])
@@ -156,7 +156,7 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
         ASTBlock.new(:statements => []),
         ASTBlock.new(:statements => [
           ASTEither.new(:blocks => [
-            ASTBlock.new(:statements => [ASTAssignment.new(:objset => 1)]),
+            ASTBlock.new(:statements => [ASTDeleteObj.new(:objset => ASTDummyObjset.new(:type => 1))]),
             ASTBlock.new(:statements => [])
           ])
         ]),
@@ -167,7 +167,7 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
     action = action.optimize
 
     assert_equal 1, action.block.statements.length
-    assert_equal ASTAssignment, action.block.statements.first.class
+    assert_equal ASTDeleteObj, action.block.statements.first.class
   end
 
   def test__equality
@@ -267,7 +267,7 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
 
   def test__block_optimize__removes_last_stmts_without_sideeffects
     action = ASTAction.new(:block => ASTBlock.new(:statements => [
-      ASTAssignment.new(:var_name => ASTIdent.new(:text => 'at_asdf')),
+      ASTAssignment.new(:var_name => ASTIdent.new(:text => 'at_asdf'), :objset => ASTEmptyObjset.new),
       ASTEither.new(:blocks => [
         ASTBlock.new(:statements => []),
         ASTBlock.new(:statements => [
