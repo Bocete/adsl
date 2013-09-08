@@ -44,9 +44,18 @@ module ADSL
 
       def remove_empty_actions(actions)
         empty, valid = actions.select_reject{ |a| a.block.statements.empty? }
-        if @verification_output == :terminal && !empty.empty?
-          puts 'Actions with empty bodies trivially preserve invariants.'
-          puts "The following actions are empty: #{ empty.map(&:name).join ', ' }"
+        unless empty.empty?
+          if @verification_output == :terminal
+            puts 'Actions with empty bodies trivially preserve invariants.'
+            puts "The following actions are empty: #{ empty.map(&:name).join ', ' }"
+          elsif @verification_output == :csv
+            empty.each do |empty_action|
+              @csv_output << {
+                :action => empty_action.name,
+                :result => 'trivially correct'
+              }
+            end
+          end
         end
         actions.set_to valid
       end
@@ -91,6 +100,7 @@ module ADSL
               stats[:translation_time] = translation_time
               stats[:action] = '<unsatisfiability>'
               stats[:result] = result.to_s
+              stats[:adsl_ast_size] = input.adsl_ast_size if input.is_a? ADSL::Parser::ASTNode
             end
 
             if result == :correct
@@ -143,7 +153,7 @@ module ADSL
         end
         return all_correct
       ensure
-        puts @csv_output.to_s if @verification_output == :csv
+        puts @csv_output.sort!(:action, :invariant).to_s if @verification_output == :csv
         @csv_output = nil
       end
 
@@ -175,7 +185,12 @@ module ADSL
       def pack_stats(spass_code, spass_output)
         spass_output = spass_output.split("\n").last(10).join("\n")
         stats = {}
-        stats[:translation_time] = nil # should be set externally
+
+        # should be set externally
+        stats[:translation_time] = nil
+        stats[:action] = nil
+        stats[:invariant] = nil
+        stats[:result] = nil
 
         identifiers = /predicates\s*\[([^\]]*)\]/.match(spass_code)[1].scan(/\w+/)
         stats[:spass_predicate_count] = identifiers.length

@@ -86,7 +86,7 @@ module ADSL
             rescue Exception => e
               #puts "Exception: #{e}"
               #puts e.backtrace.first 20
-              do_raise unless @has_returned_or_raised
+              #do_raise unless @has_returned_or_raised
             ensure
               return common_return_value unless has_more_executions?
             end

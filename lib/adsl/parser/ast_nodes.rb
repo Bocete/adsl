@@ -130,6 +130,22 @@ module ADSL
         end
         block[self]
       end
+
+      # used for statistics
+      def adsl_ast_size
+        sum = 0
+        self.class.container_for_fields.each do |field_name|
+          field = send field_name
+          if field.is_a? Array
+            field.flatten.each do |subfield|
+              sum += subfield.adsl_ast_size if subfield.respond_to? :adsl_ast_size
+            end
+          else
+            sum += field.adsl_ast_size if subfield.respond_to? :adsl_ast_size
+          end
+        end
+        sum
+      end
     end
 
     class ADSLError < StandardError; end

@@ -41,8 +41,14 @@ module ADSL
       desc 'Verify Rails app logic'
       task :verify => :environment do
         verify_options = {}
+
         actions = extract_actions_param_from_args
         verify_options[:actions] = actions unless actions.nil?
+        
+        output = extract_arg('OUTPUT_FORMAT')
+        unless output.nil? || output.strip.empty?
+          verify_options[:output] = output.strip.downcase.to_sym
+        end
 
         verify_spass :verify_options => verify_options
       end

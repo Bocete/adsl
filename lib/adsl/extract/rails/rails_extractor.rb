@@ -131,9 +131,9 @@ module ADSL
             :arg_types => [],
             :block => block
           })
+
           action = action.optimize
           action.prepend_global_variables_by_signatures /^at__.*/, /^atat__.*/
-          action
 
           action
         end

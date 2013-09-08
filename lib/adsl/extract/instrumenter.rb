@@ -126,12 +126,8 @@ module ADSL
         # sometimes this happens because the method_source gem bugs out with evals etc
         return false
       rescue NameError => e
-        # maybe it's a ghost method?
-        if object.respond_to? method_name
-          return false
-        else
-          raise e
-        end
+        # ghost method with no available source
+        return false
       end
 
       def replace(*types, &block)

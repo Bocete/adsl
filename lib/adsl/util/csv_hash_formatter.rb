@@ -10,7 +10,7 @@ require 'set'
 module ADSL
   module Util
     class CSVHashFormatter
-      def escape(obj)
+      def escape_str(obj)
         "\"#{obj.to_s.gsub('"', '""')}\""
       end
      
@@ -22,7 +22,14 @@ module ADSL
         end
       end
 
+      def prepare_for_csv(row)
+        row.keys.each do |col|
+          row[col] = row[col].to_s if row[col].is_a? Symbol
+        end
+      end
+
       def add_row(row)
+        prepare_for_csv row
         @row_hashes << row
         row.keys.each do |key|
           add_column key unless @columns.include? key
@@ -36,11 +43,49 @@ module ADSL
 
       alias_method :<<, :add_row
 
+      def column_type(col)
+        type = nil
+        @row_hashes.each do |row|
+          next if row[col].nil?
+          if row[col].is_a?(Numeric) && type.nil?
+            type = Numeric
+          elsif row[col].is_a?(String) || row[col].is_a?(Symbol)
+            type = String
+          end
+        end
+        type
+      end
+
+      def infer_column_types
+        types = {}
+        @columns.each do |col|
+          types[col] = column_type col
+        end
+        types
+      end
+
+      def sort!(*columns)
+        types = infer_column_types
+        @row_hashes.sort_by! do |row|
+          columns.map do |col|
+            if types[col] == nil
+              nil
+            elsif types[col] == Numeric
+              row[col] || -Float::INFINITY
+            else
+              row[col] || ''
+            end
+          end.to_a
+        end
+        self
+      end
+
       def to_s
         return '' if @columns.empty?
-        output = @columns.map{ |c| escape(c) }.join(',') + "\n"
+        output = @columns.map{ |c| escape_str(c) }.join(',') + "\n"
+        types = infer_column_types
         @row_hashes.each do |row|
-          output = output + @columns.map{ |c| escape(row[c] || '') }.join(',') + "\n"
+          output += @columns.map{ |c| types[c] == Numeric ? (row[c] || '') : escape_str(row[c] || '') }.join(',') + "\n"
         end
         output
       end
