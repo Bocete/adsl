@@ -185,7 +185,6 @@ module ADSL
               instrumented_sexp = instrument_sexp sexp
               
               new_code = Ruby2Ruby.new.process instrumented_sexp
-              puts new_code if method_name == :require_user
 
               object.replace_method method_name, new_code
               
