@@ -84,8 +84,8 @@ module ADSL
            
               do_return return_value unless @has_returned_or_raised
             rescue Exception => e
-              puts "Exception: #{e}"
-              puts caller.first 20
+              #puts "Exception: #{e}"
+              #puts e.backtrace.first 20
               do_raise unless @has_returned_or_raised
             ensure
               return common_return_value unless has_more_executions?
@@ -96,7 +96,7 @@ module ADSL
         def common_supertype_of_objsets(values)
           return false if values.empty?
           values.each do |value|
-            return false unless !value.is_a?(MetaUnknown) && value.respond_to?(:adsl_ast)
+            return false if value.is_a?(MetaUnknown) || !value.respond_to?(:adsl_ast)
           end
           adsl_asts = values.reject{ |v| v.nil? }.map(&:adsl_ast)
           adsl_asts = adsl_asts.map{ |v| v.is_a?(ADSL::Parser::ASTObjsetStmt) ? v.objset : v }

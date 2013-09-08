@@ -16,8 +16,8 @@ module ADSL
           self
         end
 
-        def respond_to?(*args)
-          true
+        def respond_to?(method_name, *args, &block)
+          return true unless method_name == :adsl_ast
         end
 
         def to_s

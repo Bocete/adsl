@@ -49,7 +49,8 @@ module Kernel
         )
         if operator == '||='
           old_value = outer_binding.eval name rescue nil
-          if old_value.respond_to?(:adsl_ast) && old_value.adsl_ast.class.is_objset?
+          if old_value.respond_to?(:adsl_ast) &&
+              old_value.adsl_ast.class.is_objset?
             assignment = [
               ::ADSL::Parser::ASTDeclareVar.new(:var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name.dup)),
               ::ADSL::Parser::ASTEither.new(:blocks => [
@@ -123,7 +124,6 @@ module Kernel
     ins_stmt condition
     push_frame_expr1, frame1_ret_value, frame1_stmts = arg1
     push_frame_expr2, frame2_ret_value, frame2_stmts = arg2
-
     if frame1_stmts.length <= 1 && frame2_stmts.length <= 1 &&
         frame1_ret_value.respond_to?(:adsl_ast) && frame1_ret_value.adsl_ast.class.is_objset? &&
         frame2_ret_value.respond_to?(:adsl_ast) && frame2_ret_value.adsl_ast.class.is_objset? &&
