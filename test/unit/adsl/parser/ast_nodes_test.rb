@@ -296,4 +296,15 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
     assert_equal ASTObjsetStmt,   stmts.first.class
     assert_equal ASTCreateObjset, stmts.first.objset.class
   end
+
+  def test__adsl_ast_size
+    ast = ASTBlock.new(:statements => [
+      ASTAssignment.new(:var_name => ASTIdent.new(:text => 'asd'), :objset => ASTEmptyObjset.new),
+      ASTDummyStmt.new(:type => :blah)
+    ])
+    assert_equal 5, ast.adsl_ast_size
+
+    ast = ASTBlock.new(:statements => [])
+    assert_equal 1, ast.adsl_ast_size
+  end
 end

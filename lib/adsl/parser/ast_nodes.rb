@@ -133,7 +133,7 @@ module ADSL
 
       # used for statistics
       def adsl_ast_size
-        sum = 0
+        sum = 1
         self.class.container_for_fields.each do |field_name|
           field = send field_name
           if field.is_a? Array
@@ -141,7 +141,7 @@ module ADSL
               sum += subfield.adsl_ast_size if subfield.respond_to? :adsl_ast_size
             end
           else
-            sum += field.adsl_ast_size if subfield.respond_to? :adsl_ast_size
+            sum += field.adsl_ast_size if field.respond_to? :adsl_ast_size
           end
         end
         sum

@@ -6,12 +6,11 @@ module ADSL
 
       def verify_spass(options = {})
         ast = extract_ast options
-        spec = ast.typecheck_and_resolve
         
         require 'adsl/spass/bin'
         self.class.send :include, ::ADSL::Spass::Bin
 
-        return verify(spec, options[:verify_options])
+        return verify(ast, options[:verify_options])
       end
 
       def extract_ast(options = {})
