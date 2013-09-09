@@ -169,8 +169,6 @@ module ADSL
         self
       end
 
-      def optimize; nil; end
-
       def to_adsl
         "DummyStmt(#{ @type })\n"
       end
@@ -263,6 +261,22 @@ module ADSL
 
       def to_adsl
         "#{ @classes.map(&:to_adsl).join }\n#{ @actions.map(&:to_adsl).join }\n#{ @invariants.map(&:to_adsl).join }"
+      end
+
+      def adsl_ast_size(options = {})
+        sum = 1
+        @classes.each do |c|
+          sum += c.adsl_ast_size
+        end
+        actions = options[:action_name].nil? ? @actions : @actions.select{ |a| a.name.text == options[:action_name] }
+        actions.each do |a|
+          sum += a.adsl_ast_size
+        end
+        invs = options[:invariant_name].nil? ? @invariants : @invariants.select{ |a| a.name.text == options[:invariant_name] }
+        invs.each do |i|
+          sum += i.adsl_ast_size
+        end
+        sum
       end
     end
     
@@ -572,6 +586,7 @@ module ADSL
           end
 
           next block if block.statements.length != 1
+
           if block.statements.first.is_a? ASTEither
             either = block.statements.first
             either = ASTEither.new(:blocks => either.blocks.reject{ |subblock| subblock.statements.empty? })
@@ -638,28 +653,31 @@ module ADSL
 
       def optimize(last_stmt = false)
         until_no_change super() do |block|
-          statements = block.statements.reject(&:nil?).map(&:optimize).reject(&:nil?).map{ |stmt|
+          next block if block.statements.empty?
+
+          statements = block.statements.map(&:optimize).map{ |stmt|
             stmt.is_a?(ASTBlock) ? stmt.statements : [stmt]
-          }.flatten(1)
+          }.flatten(1).reject{ |stmt|
+            stmt.is_a?(ASTDummyStmt)
+          }
 
           if last_stmt
-            statements = until_no_change statements do |stats|
-              if stats.last.is_a?(ASTAssignment)
-                if stats.last.objset.objset_has_side_effects?
-                  stats[-1] = ASTObjsetStmt.new(:objset => stats.last.objset)
-                else
-                  stats.pop
-                end
-              elsif stats.last.is_a?(ASTEither)
-                stats.last.blocks.map!{ |b| b.optimize true }
-              elsif stats.last.is_a?(ASTBlock)
-                stats[-1] = stats.last.optimize true
+            if statements.last.is_a?(ASTAssignment)
+              if statements.last.objset.objset_has_side_effects?
+                statements[-1] = ASTObjsetStmt.new(:objset => statements.last.objset)
+              else
+                statements.pop
               end
-              stats
+            elsif statements.last.is_a?(ASTEither)
+              statements.last.blocks.map!{ |b| b.optimize true }
+              statements[-1] = statements.last.optimize
+            elsif statements.last.is_a?(ASTBlock)
+              last = statements.pop.optimize true
+              statements += last.statements
             end
           end
 
-          ASTBlock.new :statements => statements.reject(&:nil?)
+          ASTBlock.new(:statements => statements)
         end
       end
 
@@ -709,7 +727,7 @@ module ADSL
       end
 
       def optimize(last_stmt = false)
-        @objset.objset_has_side_effects? ? self : nil
+        @objset.objset_has_side_effects? ? self : ASTDummyStmt.new
       end
 
       def to_adsl
@@ -795,6 +813,14 @@ module ADSL
 
       def list_creations
         @block.list_creations
+      end
+
+      def optimize
+        optimized = super
+        if optimized.block.statements.empty?
+          return ASTObjsetStmt.new(:objset => optimized.objset).optimize
+        end
+        optimized
       end
 
       def to_adsl

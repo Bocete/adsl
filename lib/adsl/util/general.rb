@@ -222,7 +222,7 @@ module Kernel
     loop do
       old_object = object
       object = yield object
-      return object if object == old_object
+      return object if old_object == object
     end
   end
 end

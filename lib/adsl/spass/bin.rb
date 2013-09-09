@@ -131,7 +131,12 @@ module ADSL
                 stats[:action] = action.name
                 stats[:invariant] = invariant.name
                 stats[:result] = result.to_s
-                stats[:adsl_ast_size] = input.adsl_ast_size if input.is_a? ADSL::Parser::ASTNode
+                if input.is_a? ADSL::Parser::ASTNode
+                  stats[:adsl_ast_size] = input.adsl_ast_size(
+                    :action_name => action.name,
+                    :invariant_name => invariant.name
+                  )
+                end
               end
 
               case result

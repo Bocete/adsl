@@ -307,4 +307,27 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
     ast = ASTBlock.new(:statements => [])
     assert_equal 1, ast.adsl_ast_size
   end
+
+  def test__spec_adsl_ast_size
+    spec = ASTSpec.new(
+      :classes => [ASTClass.new],
+      :actions => [
+        ASTAction.new(:name => ASTIdent.new(:text => 'action1')),
+        ASTAction.new(:name => ASTIdent.new(:text => 'action2')),
+        ASTAction.new(:name => ASTIdent.new(:text => '')),
+      ],
+      :invariants => [
+        ASTInvariant.new(:name => ASTIdent.new(:text => 'inv_name1')),
+        ASTInvariant.new(:name => ASTIdent.new(:text => 'inv_name2'))
+      ]
+    )
+
+    assert_equal 12, spec.adsl_ast_size
+    assert_equal 8, spec.adsl_ast_size(:action_name => 'action1')
+    assert_equal 8, spec.adsl_ast_size(:action_name => 'action2')
+
+    assert_equal 10, spec.adsl_ast_size(:invariant_name => 'inv_name1')
+    
+    assert_equal 6, spec.adsl_ast_size(:action_name => '', :invariant_name => 'inv_name2')
+  end
 end

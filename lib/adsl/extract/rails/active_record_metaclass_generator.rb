@@ -384,7 +384,6 @@ module ADSL
                 :objset => self_adsl_ast.dup,
                 :rel_name => ASTIdent.new(:text => assoc.name.to_s)
               )
-              result.adsl_ast = ASTSubset.new(:objset => result.adsl_ast) if assoc.options.include? :conditions
 
               if assoc.macro == :has_many
                 result.singleton_class.send :define_method, :delete do |*args|
@@ -439,7 +438,6 @@ module ADSL
               first_step = self.send through_assoc.name
               result = first_step.send source_assoc.name
 
-              result.adsl_ast = ASTSubset.new(:objset => result.adsl_ast) if assoc.options.include? :conditions
               result.singleton_class.class_exec do
                 def build(*args)
                   # does not support composite :through associations
