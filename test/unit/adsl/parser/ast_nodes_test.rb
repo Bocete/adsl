@@ -330,4 +330,30 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
     
     assert_equal 6, spec.adsl_ast_size(:action_name => '', :invariant_name => 'inv_name2')
   end
+
+  def test__spec_pre_optimize_size
+    spec = ASTSpec.new(
+      :classes => [ASTClass.new],
+      :actions => [ASTAction.new(
+        :name => ASTIdent.new(:text => 'action'),
+        :block => ASTBlock.new(:statements => [
+          ASTDummyStmt.new(:type => :asd),
+          ASTEither.new(:blocks => [
+            ASTBlock.new(:statements => []),
+            ASTBlock.new(:statements => [
+              ASTDeleteObj.new
+            ]),
+          ])
+        ])
+      )],
+      :invariants => []
+    )
+    spec.actions.map!(&:optimize)
+
+    assert_equal 8, spec.actions.first.pre_optimize_adsl_ast_size
+    assert_equal 4, spec.actions.first.adsl_ast_size
+
+    assert_equal 6, spec.adsl_ast_size
+    assert_equal 10, spec.adsl_ast_size(:pre_optimize => true)
+  end
 end

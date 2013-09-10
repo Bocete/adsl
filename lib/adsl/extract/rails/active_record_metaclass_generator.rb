@@ -134,15 +134,15 @@ module ADSL
 
             stmts
           end
-          new_class.send(:define_method, :destroy!    ){ |*args| destroy args }
-          new_class.send(:define_method, :destroy_all ){ |*args| destroy args }
+          new_class.send(:define_method, :destroy!    ){ |*args| destroy *args }
+          new_class.send(:define_method, :destroy_all ){ |*args| destroy *args }
 
           new_class.send :define_method, :delete do |*args|
             [ASTDeleteObj.new(:objset => adsl_ast)]
           end
-          new_class.send(:define_method, :delete!   ){ |*args| delete args }
-          new_class.send(:define_method, :delete_all){ |*args| delete args }
-          new_class.send(:define_method, :clear     ){ |*args| delete args }
+          new_class.send(:define_method, :delete!   ){ |*args| delete *args }
+          new_class.send(:define_method, :delete_all){ |*args| delete *args }
+          new_class.send(:define_method, :clear     ){ |*args| delete *args }
         end
 
         def generate_class
@@ -177,6 +177,10 @@ module ADSL
             def count;                 MetaUnknown.new; end
             def map;                   MetaUnknown.new; end
             def valid?(*args);         MetaUnknown.new; end
+
+            def hash
+              @adsl_ast.hash
+            end
 
             def take(*params)
               self.class.new :adsl_ast => ASTOneOf.new(:objset => self.adsl_ast)
@@ -334,7 +338,7 @@ module ADSL
               alias_method :order,  :all
 
               # calculations
-              def calculate(*args); ADSL::Extract::MetaUnknown.new; end
+              def calculate(*args); ::ADSL::Extract::Rails::MetaUnknown.new; end
               alias_method :count,   :calculate
               alias_method :average, :calculate
               alias_method :minimum, :calculate
@@ -388,26 +392,38 @@ module ADSL
               if assoc.macro == :has_many
                 result.singleton_class.send :define_method, :delete do |*args|
                   # has_many association.delete(ids)
-                  subset_method = args.length == 1 ? :find : :where
+                  object = if args.empty?
+                    self
+                  elsif args.length == 1
+                    self.find
+                  else
+                    self.where
+                  end
                   if [:delete, :delete_all].include? assoc.options[:dependent]
-                    self.send(subset_method).delete
+                    object == self ? super() : object.delete
                   elsif [:destroy, :destroy_all].include? assoc.options[:dependent]
-                    self.send(subset_method).destroy
+                    object.destroy
                   else
                     [ASTDeleteTup.new(
                       :objset1 => self_adsl_ast.dup,
                       :rel_name => ASTIdent.new(:text => assoc.name.to_s),
-                      :objset2 => send(subset_method).adsl_ast
+                      :objset2 => object.adsl_ast
                     )]
                   end
                 end
               elsif assoc.macro == :has_and_belongs_to_many
                 result.singleton_class.send :define_method, :delete do |*args|
-                  subset_method = args.length == 1 ? :find : :where
+                  object = if args.empty?
+                    self
+                  elsif args.length == 1
+                    self.find
+                  else
+                    self.where
+                  end
                   [ASTDeleteTup.new(
                     :objset1 => self_adsl_ast.dup,
                     :rel_name => ASTIdent.new(:text => assoc.name.to_s),
-                    :objset2 => send(subset_method).adsl_ast
+                    :objset2 => object.adsl_ast
                   )]
                 end
               end

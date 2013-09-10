@@ -187,6 +187,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 'Asd',           statements[1].objset.class_name.text
 
     assert_equal ASTDeleteObj, statements[2].class
+    assert_equal ASTVariable,  statements[2].objset.class
     assert_equal 'atat__a',    statements[2].objset.var_name.text
   end
 
@@ -1272,8 +1273,8 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal ASTAssignment,  statements[0].class
     assert_equal 'a',            statements[0].var_name.text
     assert_equal ASTOneOfObjset, statements[0].objset.class
-    assert_equal ASTAllOf,       statements[0].objset.objsets[0].class
-    assert_equal ASTEmptyObjset, statements[0].objset.objsets[1].class
+    assert_equal ASTEmptyObjset, statements[0].objset.objsets[0].class
+    assert_equal ASTAllOf,       statements[0].objset.objsets[1].class
 
     assert_equal ASTDeleteObj, statements[1].class
     assert_equal ASTVariable,  statements[1].objset.class

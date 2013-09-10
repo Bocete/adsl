@@ -359,7 +359,7 @@ module ADSL
             exception_type_array = s(:array, *resbody[1].sexp_body)
             res_block = resbody[2..-1]
             res_block = res_block.length > 1 ? s(:block, *res_block) : res_block.first
-            s(:if, s(:nil), sexp[1], res_block)
+            s(:if, s(:nil), res_block, sexp[1])
           end
 
           # change attrasgn into a normal call

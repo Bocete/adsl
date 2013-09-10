@@ -270,7 +270,7 @@ module ADSL
         end
         actions = options[:action_name].nil? ? @actions : @actions.select{ |a| a.name.text == options[:action_name] }
         actions.each do |a|
-          sum += a.adsl_ast_size
+          sum += options[:pre_optimize] ? a.pre_optimize_adsl_ast_size : a.adsl_ast_size
         end
         invs = options[:invariant_name].nil? ? @invariants : @invariants.select{ |a| a.name.text == options[:invariant_name] }
         invs.each do |i|
@@ -570,6 +570,7 @@ module ADSL
 
       def optimize
         copy = dup
+        copy.instance_variable_set :@pre_optimize_adsl_ast_size, copy.adsl_ast_size
 
         copy.block = until_no_change(copy.block) do |block|
           block = block.optimize(true)
@@ -603,6 +604,10 @@ module ADSL
         end
 
         copy
+      end
+
+      def pre_optimize_adsl_ast_size
+        @pre_optimize_adsl_ast_size || adsl_ast_size
       end
 
       def prepend_global_variables_by_signatures(*regexes)
@@ -896,7 +901,6 @@ module ADSL
         return [] if objset.type.nil?
         return ADSL::DS::DSDeleteObj.new :objset => objset
       end
-
 
       def to_adsl
         "delete #{ @objset.to_adsl }\n"

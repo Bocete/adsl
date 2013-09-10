@@ -100,7 +100,10 @@ module ADSL
               stats[:translation_time] = translation_time
               stats[:action] = '<unsatisfiability>'
               stats[:result] = result.to_s
-              stats[:adsl_ast_size] = input.adsl_ast_size if input.is_a? ADSL::Parser::ASTNode
+              if input.is_a? ADSL::Parser::ASTNode
+                stats[:pre_optimize_size] = input.adsl_ast_size :pre_optimize => true
+                stats[:adsl_ast_size] = input.adsl_ast_size
+              end
             end
 
             if result == :correct
@@ -133,6 +136,11 @@ module ADSL
                 stats[:result] = result.to_s
                 if input.is_a? ADSL::Parser::ASTNode
                   stats[:adsl_ast_size] = input.adsl_ast_size(
+                    :action_name => action.name,
+                    :invariant_name => invariant.name
+                  )
+                  stats[:pre_optimize_size] = input.adsl_ast_size(
+                    :pre_optimize => true,
                     :action_name => action.name,
                     :invariant_name => invariant.name
                   )
