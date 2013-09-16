@@ -1,17 +1,15 @@
-ADSL - Abstract Data Store Language Parser and Translator
+ADSL - Abstract Data Store Library
 =========================================================
 
-This tool an Abstract Data Store Language (ADSL) specification verification tool.
+ADSL is a gem for formal verification of Ruby on Rails models.  Simply include it in your Gemfile, write a few 
+invariants (rules) about ActiveRecord data that you wish to verify (for example, that at any given moment, every
+Address has a User) and run `rake verify`!
 
-ADSL is a language for specifying Abstract Data Stores using a syntax familiar to anyone that has experience
-with ORM tools such as Hibernate and ActiveRecord. A specification contains the model classes, actions executed
-using a RESTful interface, and a set of invariants to be verified.
+Besides the verification algorithm, this tool includes a DSL for specifying invariants.  The syntax should feel
+natural to any Rails user. Look at /examples.
 
-This tool verifies a specification by translating it into a first order logic theorem verifiable by [Spass] [1],
-a theorem prover. It provides detailed information on the actions and invariants verified in human-readable or
-CSV format.
-
-This tool is distributed as a Ruby gem and is uploaded to [RubyGems.org] [2]. Install it and give it a try!
+This tool is distributed as a Ruby gem and is uploaded to [RubyGems.org] [2]. It requires Spass[1] to run. Install
+it and give it a try!
 
 
 Installation
@@ -20,24 +18,20 @@ Installation
 This gem is tested on 32 and 64 bit Linux. OS-X compatibility not tested, give it a try
 and tell us if it works! Windows is not supported at this moment.
 
- - Ruby 1.8.7 or later required. We suggest using the [Ruby Version Manager](https://rvm.io/rvm/install/) to manage this installation.
+ - Ruby 1.9.3 or later required, along with Rails 3.2.  We suggest using the [Ruby Version Manager](https://rvm.io/rvm/install/) to manage this installation.
  - [Download and install Spass](http://www.spass-prover.org/download/index.html) and make sure its executable (`bin/SPASS`) on your $PATH
  - Install the ADSL gem by running `gem install adsl`.
    
    If you receive an error while generating documentation for 'activesupport' run `gem install rdoc adsl` instead.
- - Test the installation by verifying [the example specification](https://raw.github.com/Bocete/adsl/master/example/running-example.adsl)
-
+ 
 Usage
 -----
 
-    adsl-verify <specification-file>
+    rake verify <options>
+    
+Or, to just observe the extracted model,
 
-For options and other modes of operation, run
-
-    adsl-verify --help
-
-You can download sample ADSL specifications 
-
+    rake adsl_translate
 
 Development
 -----------
