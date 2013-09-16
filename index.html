@@ -32,26 +32,24 @@
       <section>
         <div id="title">
           <h1>ADSL</h1>
-          <p>An Abstract Data Store Language Parser and Translator</p>
+          <p>ADSL - Abstract Data Store Library</p>
           <hr>
           <span class="credits left">Project maintained by <a href="https://github.com/Bocete">Bocete</a></span>
           <span class="credits right">Hosted on GitHub Pages &mdash; Theme by <a href="https://twitter.com/michigangraham">mattgraham</a></span>
         </div>
 
         <h1>
-<a name="adsl---abstract-data-store-language-parser-and-translator" class="anchor" href="#adsl---abstract-data-store-language-parser-and-translator"><span class="octicon octicon-link"></span></a>ADSL - Abstract Data Store Language Parser and Translator</h1>
+<a name="adsl---abstract-data-store-library" class="anchor" href="#adsl---abstract-data-store-library"><span class="octicon octicon-link"></span></a>ADSL - Abstract Data Store Library</h1>
 
-<p>This tool an Abstract Data Store Language (ADSL) specification verification tool.</p>
+<p>ADSL is a gem for formal verification of Ruby on Rails models.  Simply include it in your Gemfile, write a few 
+invariants (rules) about ActiveRecord data that you wish to verify (for example, that at any given moment, every
+Address has a User) and run <code>rake verify</code>!</p>
 
-<p>ADSL is a language for specifying Abstract Data Stores using a syntax familiar to anyone that has experience
-with ORM tools such as Hibernate and ActiveRecord. A specification contains the model classes, actions executed
-using a RESTful interface, and a set of invariants to be verified.</p>
+<p>Besides the verification algorithm, this tool includes a DSL for specifying invariants.  The syntax should feel
+natural to any Rails user. Look at /examples.</p>
 
-<p>This tool verifies a specification by translating it into a first order logic theorem verifiable by <a href="http://www.spass-prover.org/" title="Spass">Spass</a>,
-a theorem prover. It provides detailed information on the actions and invariants verified in human-readable or
-CSV format.</p>
-
-<p>This tool is distributed as a Ruby gem and is uploaded to <a href="https://rubygems.org/gems/adsl" title="RubyGems.org">RubyGems.org</a>. Install it and give it a try!</p>
+<p>This tool is distributed as a Ruby gem and is uploaded to <a href="https://rubygems.org/gems/adsl" title="RubyGems.org">RubyGems.org</a>. It requires Spass<a href="http://www.spass-prover.org/" title="Spass">1</a> to run. Install
+it and give it a try!</p>
 
 <h2>
 <a name="installation" class="anchor" href="#installation"><span class="octicon octicon-link"></span></a>Installation</h2>
@@ -60,27 +58,21 @@ CSV format.</p>
 and tell us if it works! Windows is not supported at this moment.</p>
 
 <ul>
-<li>Ruby 1.8.7 or later required. We suggest using the <a href="https://rvm.io/rvm/install/">Ruby Version Manager</a> to manage this installation.</li>
+<li>Ruby 1.9.3 or later required, along with Rails 3.2.  We suggest using the <a href="https://rvm.io/rvm/install/">Ruby Version Manager</a> to manage this installation.</li>
 <li>
 <a href="http://www.spass-prover.org/download/index.html">Download and install Spass</a> and make sure its executable (<code>bin/SPASS</code>) on your $PATH</li>
-<li>
-<p>Install the ADSL gem by running <code>gem install adsl</code>.</p>
-
-<p>If you receive an error while generating documentation for 'activesupport' run <code>gem install rdoc adsl</code> instead.</p>
-</li>
-<li><p>Test the installation by verifying <a href="https://raw.github.com/Bocete/adsl/master/example/running-example.adsl">the example specification</a></p></li>
+<li>Install the ADSL gem by running <code>gem install adsl</code>.
+If you receive an error while generating documentation for 'activesupport' run <code>gem install rdoc adsl</code> instead.</li>
 </ul><h2>
 <a name="usage" class="anchor" href="#usage"><span class="octicon octicon-link"></span></a>Usage</h2>
 
-<pre><code>adsl-verify &lt;specification-file&gt;
+<pre><code>rake verify &lt;options&gt;
 </code></pre>
 
-<p>For options and other modes of operation, run</p>
+<p>Or, to just observe the extracted model,</p>
 
-<pre><code>adsl-verify --help
+<pre><code>rake adsl_translate
 </code></pre>
-
-<p>You can download sample ADSL specifications </p>
 
 <h2>
 <a name="development" class="anchor" href="#development"><span class="octicon octicon-link"></span></a>Development</h2>
