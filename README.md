@@ -21,7 +21,6 @@ and tell us if it works! Windows is not supported at this moment.
  - Ruby 1.9.3 or later required, along with Rails 3.2.  We suggest using the [Ruby Version Manager](https://rvm.io/rvm/install/) to manage this installation.
  - [Download and install Spass](http://www.spass-prover.org/download/index.html) and make sure its executable (`bin/SPASS`) on your $PATH
  - Install the ADSL gem by running `gem install adsl`.
-   
    If you receive an error while generating documentation for 'activesupport' run `gem install rdoc adsl` instead.
  
 Usage
