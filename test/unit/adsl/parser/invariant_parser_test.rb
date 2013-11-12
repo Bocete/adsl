@@ -205,18 +205,11 @@ module ADSL::Parser
       }
       operators.each do |word, type|
         spec = parser.parse <<-ADSL
-          invariant true #{word} false
+          invariant * #{word} *
         ADSL
         invariant = spec.invariants.first
         assert_equal type, invariant.formula.class
-        assert_equal [true, false], invariant.formula.subformulae.map{ |a| a.bool_value}
-        
-        spec = parser.parse <<-ADSL
-          invariant true #{word} false #{word} true
-        ADSL
-        invariant = spec.invariants.first
-        assert_equal type, invariant.formula.class
-        assert_equal [true, false, true], invariant.formula.subformulae.map{ |a| a.bool_value}
+        assert_equal [nil, nil], invariant.formula.subformulae.map{ |a| a.bool_value}
       end
     end
 
@@ -377,10 +370,10 @@ module ADSL::Parser
       parser = ADSLParser.new
       spec = parser.parse <<-ADSL
         class Class {}
-        invariant empty(allof(Class))
+        invariant isempty(allof(Class))
       ADSL
       invariant = spec.invariants.first
-      assert_equal DSEmpty, invariant.formula.class
+      assert_equal DSIsEmpty, invariant.formula.class
       assert_equal DSAllOf, invariant.formula.objset.class
     end
 
@@ -420,13 +413,37 @@ module ADSL::Parser
 
     def test_invariant__variable_scope
       parser = ADSLParser.new
-      spec = parser.parse <<-ADSL
-        class Class {}
-        invariant exists(Class o)
-        invariant exists(Class o)
-        invariant exists(Class o)
-        invariant exists(Class o)
-      ADSL
+      assert_nothing_raised do
+        parser.parse <<-ADSL
+          class Class {}
+          invariant exists(Class o)
+          invariant exists(Class o)
+          invariant exists(Class o)
+          invariant exists(Class o)
+        ADSL
+      end
+    end
+
+    def test_invariant__no_side_effects
+      parser = ADSLParser.new
+      assert_nothing_raised do
+        parser.parse <<-ADSL
+          class Class {}
+          invariant exists(o in allof(Class))
+        ADSL
+      end
+      assert_raise ADSLError do
+        parser.parse <<-ADSL
+          class Class {}
+          invariant exists(o in create(Class))
+        ADSL
+      end
+      assert_raise ADSLError do
+        parser.parse <<-ADSL
+          class Class {}
+          invariant exists(o in a = allof(Class))
+        ADSL
+      end
     end
   end
 end

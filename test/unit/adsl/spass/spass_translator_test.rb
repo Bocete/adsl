@@ -312,7 +312,7 @@ class ADSL::Spass::SpassTranslatorTest < Test::Unit::TestCase
     b_stmt = ADSL::DS::DSCreateObj.new(:klass => b_klass)
     block = ADSL::DS::DSBlock.new(:statements => [a_stmt, b_stmt])
    
-    translation.prev_state = translation.create_state :initial
+    translation.state = translation.create_state :initial
     block.prepare translation
     
     assert_equal [a_klass, b_klass], translation.create_obj_stmts.keys.sort_by{ |a| a.name }

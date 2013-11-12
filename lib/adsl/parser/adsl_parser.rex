@@ -13,6 +13,8 @@ rule
   delete\b       { [:delete, lineno] }
   foreach\b      { [:foreach, lineno] }
   either\b       { [:either, lineno] }
+  if             { [:if, lineno] }
+  else           { [:else, lineno] }
   action\b       { [:action, lineno] }
   or\b           { [:or, lineno] }
   subset\b       { [:subset, lineno] }
@@ -30,7 +32,9 @@ rule
   equal\b        { [:equal, lineno] }
   equiv\b        { [:equiv, lineno] }
   empty\b        { [:empty, lineno] }
+  isempty\b      { [:isempty, lineno] }
   implies\b      { [:implies, lineno] }
+  unknown\b      { [:unknown, lineno] }
   \.\.           { [text, lineno] }
   [{}:\(\)\.,]   { [text, lineno] }
   \+=            { [text, lineno] }
@@ -41,6 +45,7 @@ rule
   =>             { [text, lineno] }
   =              { [text, lineno] }
   \+             { [text, lineno] }
+  \*             { [text, lineno] }
   [01]           { [text, lineno] }
   \w+            { [:IDENT, ADSL::Parser::ASTIdent.new(:lineno => lineno, :text => text)] }
   \s              # blank, no action

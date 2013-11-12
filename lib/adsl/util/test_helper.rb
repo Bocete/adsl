@@ -68,4 +68,12 @@ class Test::Unit::TestCase
       end
     end
   end
+
+  def assert_all_different(objects = {})
+    counts = Hash.new{ |key, val| [] }
+    objects.each{ |name, o| counts[o] << name }
+    counts.each do |object, names|
+      assert_equal 1, names.length, "Multiple identical objects found. Keys: #{ names.map(&:to_s).join(', ') }"
+    end
+  end
 end

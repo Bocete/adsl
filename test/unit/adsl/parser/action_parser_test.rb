@@ -795,19 +795,104 @@ module ADSL::Parser
       end
 
       action = spec.actions.first
-      orig_def = action.statements[0].var
-      inside_def1 = action.statements[1].blocks[0].statements.first.var
-      inside_def2 = action.statements[1].blocks[1].statements.first.var
-      after_def = action.statements[2].objset
+      statements = action.statements
 
-      assert orig_def != inside_def1
-      assert orig_def != inside_def2
-      assert inside_def1 != after_def
-      assert inside_def2 != after_def
-      assert inside_def1 != inside_def2
-      assert orig_def != after_def
-      assert_equal after_def.vars[0], inside_def1
-      assert_equal after_def.vars[1], inside_def2
+      assert_equal 4, statements.length
+      
+      orig_def    = statements[0]
+      inside_def1 = statements[1].blocks[0].statements.first
+      inside_def2 = statements[1].blocks[1].statements.first
+      lambda_def  = statements[2]
+      final_def   = statements[3]
+
+      assert_all_different(
+        :orig_def    => orig_def.var,
+        :inside_def1 => inside_def1.var,
+        :inside_def2 => inside_def2.var,
+        :lambda_def  => lambda_def.var,
+        :final_def   => final_def.var
+      )
+
+      assert_equal lambda_def.objset.objsets[0], inside_def1.var
+      assert_equal lambda_def.objset.objsets[1], inside_def2.var
+    end
+    
+    def test_action__if_lambda_works
+      parser = ADSLParser.new
+      spec = nil
+      assert_nothing_raised ADSLError do
+        spec = parser.parse <<-adsl
+          class Class { 0+ Class relation }
+          action do_something() {
+            var = allof(Class)
+            if isempty(var) {
+              var = subset(var)
+            } else {
+              var = empty
+            }
+            var = var
+          }
+        adsl
+      end
+
+      action = spec.actions.first
+      statements = action.statements
+
+      assert_equal 4, statements.length
+      
+      orig_def   = statements[0]
+      then_def   = statements[1].then_block.statements.first
+      else_def   = statements[1].else_block.statements.first
+      lambda_def = statements[2]
+      final_def  = statements[3]
+
+      assert_all_different(
+        :orig_def   => orig_def.var,
+        :then_def   => then_def.var,
+        :else_def   => else_def.var,
+        :lambda_def => lambda_def.var,
+        :final_def  => final_def.var
+      )
+
+      assert_equal lambda_def.objset.then_objset, then_def.var
+      assert_equal lambda_def.objset.else_objset, else_def.var
+    end
+
+    def test_action__if_condition_var_definition
+      parser = ADSLParser.new
+      spec = nil
+      assert_raise ADSLError do
+        spec = parser.parse <<-adsl
+          class Class {}
+          action blah() {
+            if isempty(var = allof(Class)) {
+              a = var
+            } else {
+              b = var
+            }
+            delete var
+          }
+        adsl
+      end
+      assert_nothing_raised ADSLError do
+        spec = parser.parse <<-adsl
+          class Class {}
+          action blah() {
+            if isempty(var = allof(Class)) {
+              a = var
+            } else {
+              b = var
+            }
+          }
+        adsl
+      end
+
+      statements = spec.actions.first.block.statements
+      
+      assert_equal 2, statements.length
+
+      assert_equal 'var', statements[0].var.name
+      assert_equal 'var', statements[1].condition.objset.name
     end
 
     def test_action__foreach_pre_lambda
@@ -969,6 +1054,63 @@ module ADSL::Parser
           }
         adsl
       end
+    end
+
+    def test_action__nested_assignments
+      parser = ADSLParser.new
+      spec = nil
+      assert_nothing_raised ADSLError do
+        spec = parser.parse <<-ADSL
+          class Class {}
+          action blah() {
+            a = b = create(Class)
+            delete a
+            delete b
+          }
+        ADSL
+      end
+
+      klass = spec.classes.first
+      statements = spec.actions.first.block.statements
+
+      assert_equal 5, statements.length
+
+      assert_equal klass, statements[0].klass
+      assert_equal 'b',   statements[1].var.name
+      assert_equal 'a',   statements[2].var.name
+      assert_equal 'b',   statements[2].objset.name
+      assert_equal 'a',   statements[3].objset.name
+      assert_equal 'b',   statements[4].objset.name
+    end
+
+    def test_action__conditional_branches
+      parser = ADSLParser.new
+      spec = nil
+      assert_nothing_raised ADSLError do
+        spec = parser.parse <<-ADSL
+          class Class {}
+          action blah() {
+            if isempty(allof(Class)) {
+              delete allof(Class)
+            }
+            if isempty(allof(Class)) {
+            } else {
+              delete allof(Class)
+            }
+          }
+        ADSL
+      end
+
+      klass = spec.classes.first
+      statements = spec.actions.first.block.statements
+      
+      assert_equal 2, statements.length
+
+      assert_equal 1, statements[0].then_block.statements.length
+      assert_equal 0, statements[0].else_block.statements.length
+      
+      assert_equal 0, statements[1].then_block.statements.length
+      assert_equal 1, statements[1].else_block.statements.length
     end
 
     def test_action__entity_class_writes

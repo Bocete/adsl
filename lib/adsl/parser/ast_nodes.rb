@@ -583,7 +583,7 @@ module ADSL
           block.block_replace do |node|
             next unless node.is_a? ASTAssignment
             next if node.var_name.nil? || variables_read.include?(node.var_name.text)
-            ASTObjsetStmt.new :objset => node.objset
+            node.objset
           end
 
           next block if block.statements.length != 1
@@ -618,10 +618,10 @@ module ADSL
           variable_names << name if regexes.map{ |r| r =~ name ? true : false }.include? true
         end
         variable_names.each do |name|
-          @block.statements.unshift ASTAssignment.new(
+          @block.statements.unshift ASTObjsetStmt.new(:objset => ASTAssignment.new(
             :var_name => ASTIdent.new(:text => name),
             :objset => ASTEmptyObjset.new
-          )
+          ))
         end
       end
 
@@ -667,13 +667,7 @@ module ADSL
           }
 
           if last_stmt
-            if statements.last.is_a?(ASTAssignment)
-              if statements.last.objset.objset_has_side_effects?
-                statements[-1] = ASTObjsetStmt.new(:objset => statements.last.objset)
-              else
-                statements.pop
-              end
-            elsif statements.last.is_a?(ASTEither)
+            if statements.last.is_a?(ASTEither)
               statements.last.blocks.map!{ |b| b.optimize true }
               statements[-1] = statements.last.optimize
             elsif statements.last.is_a?(ASTBlock)
@@ -692,17 +686,21 @@ module ADSL
     end
 
     class ASTAssignment < ASTNode
-      node_type :var_name, :objset, :type => :statement
+      node_type :var_name, :objset, :type => :objset
+      
+      def objset_has_side_effects?; true; end
 
       def typecheck_and_resolve(context)
         objset = @objset.typecheck_and_resolve context
         @var = ADSL::DS::DSVariable.new :name => @var_name.text, :type => objset.type
         context.redefine_var @var, @var_name
-        return ADSL::DS::DSAssignment.new :var => @var, :objset => objset
+        create_prestmt = ADSL::DS::DSAssignment.new :var => @var, :objset => objset
+        context.pre_stmts << create_prestmt
+        @var
       end
 
       def to_adsl
-        "#{ @var_name.text } = #{ @objset.to_adsl }\n"
+        "#{ @var_name.text } = #{ @objset.to_adsl }"
       end
     end
 
@@ -712,7 +710,9 @@ module ADSL
       def typecheck_and_resolve(context)
         var = context.lookup_var @var_name.text, false
         if var.nil?
-          return ASTAssignment.new(:var_name => @var_name.dup, :objset => ASTEmptyObjset.new).typecheck_and_resolve(context)
+          ASTObjsetStmt.new(
+            :objset => ASTAssignment.new(:var_name => @var_name.dup, :objset => ASTEmptyObjset.new).typecheck_and_resolve(context)
+          )
         else
           []
         end
@@ -766,9 +766,11 @@ module ADSL
       def typecheck_and_resolve(context)
         before_context = context.dup
         objset = @objset.typecheck_and_resolve context
-        
+
         temp_iterator_objset = ASTDummyObjset.new :type => objset.type
-        assignment = ASTAssignment.new :lineno => @lineno, :var_name => @var_name, :objset => temp_iterator_objset
+        assignment = ASTObjsetStmt.new(
+          :objset => ASTAssignment.new(:lineno => @lineno, :var_name => @var_name, :objset => temp_iterator_objset)
+        )
         @block.statements = [assignment, @block.statements].flatten
         
         vars_written_to = Set[]
@@ -857,10 +859,10 @@ module ADSL
 
         lambdas = []
 
-        ASTTypecheckResolveContext::context_vars_that_differ(*contexts).each do |var_name, vars|
-          common_type = ADSL::DS::DSClass.common_supertype(vars.map(&:type))
+        ASTTypecheckResolveContext::context_vars_that_differ(*contexts).each do |var_name, objsets|
+          common_type = ADSL::DS::DSClass.common_supertype(objsets.map(&:type))
           var = ADSL::DS::DSVariable.new :name => var_name, :type => common_type
-          objset = ADSL::DS::DSEitherLambdaObjset.new :either => either, :vars => vars
+          objset = ADSL::DS::DSEitherLambdaObjset.new :either => either, :objsets => objsets
           assignment = ADSL::DS::DSAssignment.new :var => var, :objset => objset
           context.redefine_var var, nil
           lambdas << assignment
@@ -870,7 +872,7 @@ module ADSL
       end
 
       def list_entity_classes_written_to
-        @blocks.map{ block.list_entity_classes_written_to }.flatten
+        @blocks.map(&:list_entity_classes_written_to).flatten
       end
 
       def optimize
@@ -890,6 +892,71 @@ module ADSL
 
       def to_adsl
         "either #{ @blocks.map{ |b| "{\n#{ b.to_adsl.adsl_indent }}" }.join " or " }\n"
+      end
+    end
+
+    class ASTIf < ASTNode
+      node_type :condition, :then_block, :else_block, :type => :statement
+
+      def blocks
+        [@then_block, @else_block]
+      end
+
+      def typecheck_and_resolve(context)
+        context.push_frame
+        
+        condition = @condition.typecheck_and_resolve(context)
+        
+        pre_stmts = context.pre_stmts
+        context.pre_stmts = []
+
+        context.push_frame
+        
+        contexts = [context, context.dup]
+        blocks = [@then_block.typecheck_and_resolve(contexts[0]), @else_block.typecheck_and_resolve(contexts[1])]
+        contexts.each{ |c| c.pop_frame; c.pop_frame }
+
+        ds_if = ADSL::DS::DSIf.new :condition => condition, :then_block => blocks[0], :else_block => blocks[1]
+
+        lambdas = []
+        ASTTypecheckResolveContext::context_vars_that_differ(*contexts).each do |var_name, objsets|
+          common_type = ADSL::DS::DSClass.common_supertype(objsets.map(&:type))
+          var = ADSL::DS::DSVariable.new :name => var_name, :type => common_type
+          objset = ADSL::DS::DSIfLambdaObjset.new :if => ds_if, :then_objset => objsets[0], :else_objset => objsets[1]
+          assignment = ADSL::DS::DSAssignment.new :var => var, :objset => objset
+          context.redefine_var var, nil
+          lambdas << assignment
+        end
+
+        return [*pre_stmts, ds_if, lambdas]
+      end
+
+      def optimize
+        until_no_change super do |if_node|
+          next if_node.optimize unless if_node.is_a?(ASTIf)
+          next ASTDummyStmt.new if blocks.map(&:statements).flatten.empty?
+          if if_node.condition.is_a?(ASTBoolean)
+            case if_node.condition.bool_value
+            when true;  next if_node.then_block.optimize
+            when false; next if_node.else_block.optimize
+            when nil;   next ASTEither.new(:blocks => if_node.blocks).optimize
+            end
+          end
+          ASTIf.new(
+            :condition  => if_node.condition.optimize,
+            :then_block => if_node.then_block.optimize,
+            :else_block => if_node.else_block.optimize
+          )
+        end
+      end
+
+      def list_entity_classes_written_to
+        [@then_block, @else_block].map(&:list_entity_classes_written_to).flatten
+      end
+
+      def to_adsl
+        else_code = @else_block.statements.empty? ? "" : " else {\n#{ @else_block.to_adsl.adsl_indent }}"
+        "if #{@condition.to_adsl} {\n#{ @then_block.to_adsl.adsl_indent }}#{ else_code }\n"
       end
     end
 
@@ -1107,7 +1174,7 @@ module ADSL
       def typecheck_and_resolve(context)
         var_node, var = context.lookup_var @var_name.text
         raise ADSLError, "Undefined variable #{@var_name.text} on line #{@var_name.lineno}" if var.nil?
-        return var
+        var
       end
 
       def to_adsl
@@ -1181,9 +1248,26 @@ module ADSL
       node_type :name, :formula, :type => :formula
 
       def typecheck_and_resolve(context)
+        @formula.preorder_traverse do |node|
+          if node.class.is_objset?
+            raise ADSLError, "Object set cannot have sideeffects at line #{node.lineno}" if node.objset_has_side_effects?
+          end
+          if node.class.is_a?(ASTBoolean)
+            raise ADSLError, "Star cannot be used in invariants (line #{node.lineno})" if node.bool_
+          end
+          node
+        end
+        
         formula = @formula.typecheck_and_resolve context
         name = @name.nil? ? nil : @name.text
+            
         return ADSL::DS::DSInvariant.new :name => name, :formula => formula
+      end
+
+      def optimize
+        until_no_change super do |node|
+          node.formula = node.formula.optimize
+        end
       end
 
       def to_adsl
@@ -1196,8 +1280,16 @@ module ADSL
       node_type :bool_value, :type => :formula
 
       def typecheck_and_resolve(context)
-        return ADSL::DS::DSBoolean::TRUE if @bool_value
-        return ADSL::DS::DSBoolean::FALSE
+        case @bool_value
+        when true;  ADSL::DS::DSBoolean::TRUE
+        when false; ADSL::DS::DSBoolean::FALSE
+        when nil;   ADSL::DS::DSBoolean::UNKNOWN
+        else raise "Unknown bool value #{@bool_value}"
+        end
+      end
+
+      def optimize
+        self
       end
 
       def to_adsl
@@ -1214,8 +1306,8 @@ module ADSL
           objsets = []
           @vars.each do |var_node, objset_node|
             objset = objset_node.typecheck_and_resolve context
-            
-            var = ADSL::DS::DSVariable.new :name => var_node.text, :type => objset.type
+        
+            var = ADSL::DS::DSQuantifiedVariable.new :name => var_node.text, :type => objset.type
             context.define_var var, var_node
 
             vars << var
@@ -1230,6 +1322,17 @@ module ADSL
         v = @vars.map{ |var, objset| "#{ var.text } in #{ objset.to_adsl }" }.join ", " 
         "forall(#{v}: #{ @subformula.to_adsl })"
       end
+
+      def optimize
+        until_no_change super do |node|
+          next node.optimize unless node.is_a?(ASTForAll)
+          next node.subformula if node.subformula.is_a?(ASTBoolean)
+          ASTForAll.new(
+            :vars       => node.vars.map{ |var, objset| [var, objset.optimize] },
+            :subformula => node.subformula.optimize
+          )
+        end
+      end
     end
 
     class ASTExists < ASTNode
@@ -1242,7 +1345,7 @@ module ADSL
           @vars.each do |var_node, objset_node|
             objset = objset_node.typecheck_and_resolve context
             
-            var = ADSL::DS::DSVariable.new :name => var_node.text, :type => objset.type
+            var = ADSL::DS::DSQuantifiedVariable.new :name => var_node.text, :type => objset.type
             context.define_var var, var_node
 
             vars << var
@@ -1257,6 +1360,16 @@ module ADSL
         v = @vars.map{ |var, objset| "#{ var.text } in #{ objset.to_adsl }" }.join ", " 
         "exists(#{v}: #{ @subformula.to_adsl })"
       end
+
+      def optimize
+        until_no_change super do |node|
+          next node.optimize unless node.is_a?(ASTEither)
+          ASTExists.new(
+            :vars       => node.vars.map{ |var, objset| [var, objset.optimize] },
+            :subformula => node.subformula.optimize
+          )
+        end
+      end
     end
 
     class ASTNot < ASTNode
@@ -1265,12 +1378,25 @@ module ADSL
       def typecheck_and_resolve(context)
         subformula = @subformula.typecheck_and_resolve context
         raise "Substatement not a formula on line #{@subformula.lineno}" unless subformula.type == :formula
-        return subformula.subformula if subformula.is_a? ADSL::DS::DSNot
         return ADSL::DS::DSNot.new :subformula => subformula
       end
 
       def to_adsl
         "not(#{ @subformula.to_adsl })"
+      end
+
+      def optimize
+        until_no_change super do |node|
+          next node.optimize unless node.is_a?(ASTNot)
+          next node.subformula.subformula if node.subformula.is_a?(ASTNot)
+          if node.subformula.is_a?(ASTBoolean)
+            if [true, false].include?(node.subformula.bool_value)
+              next ASTBoolean.new :bool_value => !node.subformula.bool_value
+            end
+            next node.subformula
+          end
+          next node
+        end
       end
     end
 
@@ -1282,15 +1408,29 @@ module ADSL
         subformulae.each do |subformula|
           raise "Substatement not a formula on line #{subformula.lineno}" unless subformula.type == :formula  
         end
-        flattened_subformulae = []
-        subformulae.each do |subformula|
-          if subformula.is_a? ADSL::DS::DSAnd
-            flattened_subformulae += subformula.subformulae
-          else
-            flattened_subformulae << subformula
+        return ADSL::DS::DSAnd.new :subformulae => subformulae
+      end
+
+      def optimize
+        until_no_change super do |node|
+          next node.optimize unless node.is_a?(ASTAnd)
+          formulae = []
+          node.subformulae.each do |subf|
+            subf = subf.optimize
+            if subf.is_a?(ASTAnd)
+              formulae += subf.subformulae
+            else
+              formulae << subf
+            end
           end
+          formulae.delete_if{ |subf| subf.is_a?(ASTBoolean) && subf.bool_value == true }
+          unless formulae.select{ |subf| subf.is_a?(ASTBoolean) && subf.bool_value == false }.empty?
+            next ASTBoolean.new(:bool_value => false)
+          end
+          next formulae.first if formulae.length == 1
+          next ASTBoolean.new(:bool_value => true) if formulae.empty?
+          ASTAnd.new :subformulae => formulae
         end
-        return ADSL::DS::DSAnd.new :subformulae => flattened_subformulae
       end
 
       def to_adsl
@@ -1316,6 +1456,28 @@ module ADSL
         end
         return ADSL::DS::DSOr.new :subformulae => flattened_subformulae
       end
+      
+      def optimize
+        until_no_change super do |node|
+          next node.optimize unless node.is_a?(ASTOr)
+          formulae = []
+          node.subformulae.each do |subf|
+            subf = subf.optimize
+            if subf.is_a?(ASTOr)
+              formulae += subf.subformulae
+            else
+              formulae << subf
+            end
+          end
+          formulae.delete_if{ |subf| subf.is_a?(ASTBoolean) && subf.bool_value == false }
+          unless formulae.select{ |subf| subf.is_a?(ASTBoolean) && subf.bool_value == true }.empty?
+            next ASTBoolean.new(:bool_value => true)
+          end
+          next formulae.first if formulae.length == 1
+          next ASTBoolean.new(:bool_value => false) if formulae.empty?
+          ASTAnd.new :subformulae => formulae
+        end
+      end
 
       def to_adsl
         "or(#{ @subformulae.map(&:to_adsl).join ", " })"
@@ -1331,6 +1493,21 @@ module ADSL
           raise "Substatement not a formula on line #{subformula.lineno}" unless subformula.type == :formula  
         end
         return ADSL::DS::DSEquiv.new :subformulae => subformulae
+      end
+
+      def optimize
+        until_no_change super do |node|
+          next node.optimize unless node.is_a?(ASTEquiv)
+          subfs = node.subformulae.map(&:optimize).uniq
+          if subfs.select{ |subf| subf.is_a?(ASTBoolean) && subf.bool_value == true }
+            next ASTAnd.new(:subformulae => subfs).optimize
+          end
+          if subfs.select{ |subf| subf.is_a?(ASTBoolean) && subf.bool_value == false }
+            next ASTAnd.new(:subformulae => subfs.map{ |subf| ASTNot.new(:subformula => subf) }).optimize
+          end
+          next subfs.first if subfs.length == 1
+          ASTEquiv.new :subformulae => subfs
+        end
       end
 
       def to_adsl
@@ -1393,17 +1570,17 @@ module ADSL
       end
     end
     
-    class ASTEmpty < ASTNode
+    class ASTIsEmpty < ASTNode
       node_type :objset, :type => :formula
 
       def typecheck_and_resolve(context)
         objset = @objset.typecheck_and_resolve context
         return ADSL::DS::Boolean::TRUE if objset.type.nil?
-        return ADSL::DS::DSEmpty.new :objset => objset
+        return ADSL::DS::DSIsEmpty.new :objset => objset
       end
 
       def to_adsl
-        "empty(#{ @objset.to_adsl })"
+        "isempty(#{ @objset.to_adsl })"
       end
     end
   end

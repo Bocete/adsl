@@ -5,8 +5,10 @@ class ADSLParser
     left '<=>'
     left '<=' '=>'
     left and or
+    left '.'
+    right '='
   preclow
-  token class extends inverseof action foreach either or create delete subset oneof allof invariant forall exists in empty true false not and equal equiv implies IDENT
+  token class extends inverseof action foreach either or create delete if else subset oneof allof invariant forall exists in isempty empty true false not and equal equiv implies unknown IDENT
   start adslspec
 rule
   adslspec: root_elems { return ASTSpec.new :lineno => lineno, :classes => val[0][0], :actions => val[0][1], :invariants => val[0][2] }
@@ -49,36 +51,40 @@ rule
   statements: statement statements { val[1].unshift val[0]; return val[1] }
             |                      { return [] }
 
-  statement: IDENT '=' objset                { return ASTAssignment.new :lineno => val[0].lineno, :var_name => val[0], :objset => val[2] }
-           | create_objset                   { return ASTObjsetStmt.new :lineno => val[0].lineno, :objset => val[0] }
-           | delete objset                   { return ASTDeleteObj.new :lineno => val[0], :objset => val[1] }
-           | objset '.' IDENT '+=' objset    { return ASTCreateTup.new :lineno => val[0].lineno, :objset1 => val[0], :rel_name => val[2], :objset2 => val[4] }
-           | objset '.' IDENT '-=' objset    { return ASTDeleteTup.new :lineno => val[0].lineno, :objset1 => val[0], :rel_name => val[2], :objset2 => val[4] }
-           | objset '.' IDENT '=' objset     { return ASTSetTup.new :lineno => val[0].lineno, :objset1 => val[0], :rel_name => val[2], :objset2 => val[4] }
-           | foreach IDENT ':' objset block  { return ASTForEach.new :lineno => val[0], :var_name => val[1], :objset => val[3], :block => val[4] }
-           | either block or eitherblocks    { val[3].unshift val[1]; return ASTEither.new :lineno => val[0], :blocks => val[3] }
+  statement: objset                         { return ASTObjsetStmt.new :lineno => val[0].lineno, :objset => val[0] }
+           | delete objset                  { return ASTDeleteObj.new :lineno => val[0], :objset => val[1] }
+           | objset '.' IDENT '+=' objset {
+               return ASTCreateTup.new :lineno => val[0].lineno, :objset1 => val[0], :rel_name => val[2], :objset2 => val[4]
+             }
+           | objset '.' IDENT '-=' objset {
+               return ASTDeleteTup.new :lineno => val[0].lineno, :objset1 => val[0], :rel_name => val[2], :objset2 => val[4]
+             }
+           | objset '.' IDENT '=' objset {
+               return ASTSetTup.new :lineno => val[0].lineno, :objset1 => val[0], :rel_name => val[2], :objset2 => val[4]
+             }
+           | foreach IDENT ':' objset block {
+               return ASTForEach.new :lineno => val[0], :var_name => val[1], :objset => val[3], :block => val[4]
+             }
+           | either block or eitherblocks   { val[3].unshift val[1]; return ASTEither.new :lineno => val[0], :blocks => val[3] }
+           | if formula block optelse       { return ASTIf.new :lineno => val[0], :condition => val[1], :then_block => val[2], :else_block => val[3] }
+
+  optelse: else block  { return val[1] }
+         |             { return ASTBlock.new :statements => [] }
   
   eitherblocks: eitherblocks or block { val[0] << val[2]; return val[0] }
               | block                 { return [val[0]] }
 
-  create_objset: create '(' IDENT ')'   { return ASTCreateObjset.new :lineno => val[0], :class_name => val[2] }
-
   objset: IDENT                  { return ASTVariable.new :lineno => val[0].lineno, :var_name => val[0] }
+        | IDENT '=' objset       { return ASTAssignment.new :lineno => val[0].lineno, :var_name => val[0], :objset => val[2] }
         | subset '(' objset ')'  { return ASTSubset.new :lineno => val[0], :objset => val[2] }
         | oneof '(' objset ')'   { return ASTOneOf.new :lineno => val[0], :objset => val[2] }
         | allof '(' IDENT ')'    { return ASTAllOf.new :lineno => val[0], :class_name => val[2] }
-        | create_objset          { return val[0] }
+        | create '(' IDENT ')'   { return ASTCreateObjset.new :lineno => val[0], :class_name => val[2] }
         | create '(' objset '.' IDENT ')' {
             return ASTDereferenceBuild.new :lineno => val[0].lineno, :objset => val[2], :rel_name => val[4]
           }
         | objset '.' IDENT       { return ASTDereference.new :lineno => val[0].lineno, :objset => val[0], :rel_name => val[2] }
         | empty                  { return ASTEmptyObjset.new :lineno => val[0] }
-  
-  invariant_objset: IDENT                       { return ASTVariable.new :lineno => val[0].lineno, :var_name => val[0] }
-                  | subset '(' objset ')'       { return ASTSubset.new :lineno => val[0], :objset => val[2] }
-                  | allof '(' IDENT ')'         { return ASTAllOf.new :lineno => val[0], :class_name => val[2] }
-                  | invariant_objset '.' IDENT  { return ASTDereference.new :lineno => val[0].lineno, :objset => val[0], :rel_name => val[2] }
-                  | empty                       { return ASTEmptyObjset.new :lineno => val[0] }
 
   invariant_decl: invariant formula           { return ASTInvariant.new :lineno => val[0], :name => nil, :formula => val[1] }
                 | invariant IDENT ':' formula { return ASTInvariant.new :lineno => val[0], :name => val[1], :formula => val[3] }
@@ -104,16 +110,17 @@ rule
            { return ASTEquiv.new :lineno => val[0], :subformulae => [val[2], val[4]] + val[5] }
          | implies '(' formula ',' formula ')'
            { return ASTImplies.new :lineno => val[0], :subformula1 => val[2], :subformula2 => val[4] }
-         | invariant_objset '==' invariant_objset
+         | objset '==' objset
            { return ASTEqual.new :lineno => val[0].lineno, :objsets => [val[0], val[2]] }
-         | invariant_objset '!=' invariant_objset
+         | objset '!=' objset
            { return ASTNot.new(:lineno => val[0].lineno, :subformula => ASTEqual.new(:lineno => val[0].lineno, :objsets => [val[0], val[2]])) }
-         | equal '(' invariant_objset ',' invariant_objset additional_invariant_objsets ')'
+         | equal '(' objset ',' objset additional_objsets ')'
            { return ASTEqual.new :lineno => val[0], :objsets => [val[2], val[4]] + val[5] }
-         | invariant_objset in invariant_objset { return ASTIn.new :lineno => val[0].lineno, :objset1 => val[0], :objset2 => val[2] }
-         | true                                 { return ASTBoolean.new :lineno => val[0], :bool_value => true }
-         | false                                { return ASTBoolean.new :lineno => val[0], :bool_value => false }
-         | empty '(' invariant_objset ')'       { return ASTEmpty.new :lineno => val[0], :objset => val[2] }
+         | objset in objset           { return ASTIn.new :lineno => val[0].lineno, :objset1 => val[0], :objset2 => val[2] }
+         | true                       { return ASTBoolean.new :lineno => val[0], :bool_value => true  }
+         | false                      { return ASTBoolean.new :lineno => val[0], :bool_value => false }
+         | '*'                        { return ASTBoolean.new :lineno => val[0], :bool_value => nil   }
+         | isempty '(' objset ')'     { return ASTIsEmpty.new :lineno => val[0], :objset => val[2] }
 
   quantifier_parameters_with_commas: quantifier_parameters_with_commas ',' quantifier_parameter
             { val[0] << val[2]; return val[0] }
@@ -128,8 +135,8 @@ rule
   additional_formulae: additional_formulae ',' formula { val[0] << val[2]; return val[0] }
                      |                                 { return [] }
 
-  additional_invariant_objsets: additional_invariant_objsets ',' invariant_objset { val[0] << val[2]; return val[0] }
-                              |                                                   { return [] }
+  additional_objsets: additional_objsets ',' objset { val[0] << val[2]; return val[0] }
+                    |                               { return [] }
 
 end
 

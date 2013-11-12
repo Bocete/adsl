@@ -350,19 +350,19 @@ class BasicTranslationTest < Test::Unit::TestCase
       action blah() {
         delete allof(Class)
       }
-      invariant empty(allof(Class))
+      invariant isempty(allof(Class))
     ADSL
     adsl_assert :correct, <<-ADSL
       class Class {}
       action blah() {}
-      invariant empty(allof(Class))
+      invariant isempty(allof(Class))
     ADSL
     adsl_assert :incorrect, <<-ADSL
       class Class {}
       action blah() {
         create(Class)
       }
-      invariant empty(allof(Class))
+      invariant isempty(allof(Class))
     ADSL
   end
 
@@ -373,7 +373,7 @@ class BasicTranslationTest < Test::Unit::TestCase
       action blah() {
         delete allof(Class).rel
       }
-      invariant forall(Class o: empty(o.rel))
+      invariant forall(Class o: isempty(o.rel))
     ADSL
     adsl_assert :incorrect, <<-ADSL
       class Class { 0+ Class2 rel }
@@ -381,7 +381,7 @@ class BasicTranslationTest < Test::Unit::TestCase
       action blah() {
         delete allof(Class).rel
       }
-      invariant not forall(Class o: empty(o.rel))
+      invariant not forall(Class o: isempty(o.rel))
     ADSL
   end
 
@@ -392,7 +392,7 @@ class BasicTranslationTest < Test::Unit::TestCase
       action blah() {
         delete allof(Parent).rel
       }
-      invariant exists(Child o: not empty(o.rel))
+      invariant exists(Child o: not isempty(o.rel))
     ADSL
     adsl_assert :incorrect, <<-ADSL
       class Parent { 0+ Parent rel }
@@ -400,7 +400,7 @@ class BasicTranslationTest < Test::Unit::TestCase
       action blah() {
         delete allof(Child).rel
       }
-      invariant exists(Child o: not empty(o.rel))
+      invariant exists(Child o: not isempty(o.rel))
     ADSL
     adsl_assert :correct, <<-ADSL
       class Parent { 0+ Parent rel }
@@ -408,7 +408,7 @@ class BasicTranslationTest < Test::Unit::TestCase
       action blah() {
         delete allof(Child).rel
       }
-      invariant exists(Parent o: not empty(o.rel)) and not exists(Child o: not empty(o.rel))
+      invariant exists(Parent o: not isempty(o.rel)) and not exists(Child o: not isempty(o.rel))
     ADSL
   end
   
@@ -420,7 +420,7 @@ class BasicTranslationTest < Test::Unit::TestCase
         v2 = oneof (allof(Class))
         v1.rel += v2
       }
-      invariant exists(Class o: not empty(o.rel))
+      invariant exists(Class o: not isempty(o.rel))
     ADSL
     adsl_assert :incorrect, <<-ADSL
       class Class{ 0+ Class rel }
@@ -429,7 +429,7 @@ class BasicTranslationTest < Test::Unit::TestCase
         v2 = oneof (allof(Class))
         v1.rel += v2
       }
-      invariant forall(Class o: empty(o.rel))
+      invariant forall(Class o: isempty(o.rel))
     ADSL
   end
 
@@ -471,14 +471,14 @@ class BasicTranslationTest < Test::Unit::TestCase
       action blah() {
         create(Class)
       }
-      invariant exists(Class o: empty(o.rel))
+      invariant exists(Class o: isempty(o.rel))
     ADSL
     adsl_assert :incorrect, <<-ADSL
       class Class { 0+ Class rel }
       action blah() {
         create(Class)
       }
-      invariant forall(Class o: not empty(o.rel))
+      invariant forall(Class o: not isempty(o.rel))
     ADSL
   end
 
@@ -492,7 +492,7 @@ class BasicTranslationTest < Test::Unit::TestCase
         a.rel += b
         delete a
       }
-      invariant forall(Class a: empty(a.rel))
+      invariant forall(Class a: isempty(a.rel))
     ADSL
     adsl_assert :incorrect, <<-ADSL
       class Class { 0+ Class rel }
@@ -503,7 +503,7 @@ class BasicTranslationTest < Test::Unit::TestCase
         a.rel += b
         delete a
       }
-      invariant !forall(Class a: empty(a.rel))
+      invariant !forall(Class a: isempty(a.rel))
     ADSL
   end
 
@@ -513,14 +513,14 @@ class BasicTranslationTest < Test::Unit::TestCase
       action blah() {
         allof(Class).rel -= allof(Class)
       }
-      invariant forall(Class a: empty(a.rel))
+      invariant forall(Class a: isempty(a.rel))
     ADSL
     adsl_assert :incorrect, <<-ADSL
       class Class { 0+ Class rel }
       action blah() {
         allof(Class).rel -= allof(Class)
       }
-      invariant exists(Class a: not empty(a.rel))
+      invariant exists(Class a: not isempty(a.rel))
     ADSL
   end
 

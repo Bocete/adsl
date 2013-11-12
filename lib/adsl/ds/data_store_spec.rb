@@ -65,6 +65,7 @@ module ADSL
         end
         return false
       end
+      alias_method :>=, :superclass_of?
 
       def self.common_supertype(classes)
         types = classes.uniq
@@ -145,7 +146,15 @@ module ADSL
     end
     
     class DSEitherLambdaObjset < DSNode
-      container_for :either, :vars
+      container_for :either, :objsets
+    end
+
+    class DSIf < DSNode
+      container_for :condition, :then_block, :else_block
+    end
+
+    class DSIfLambdaObjset < DSNode
+      container_for :if, :then_objset, :else_objset
     end
 
     class DSForEachCommon < DSNode
@@ -248,8 +257,9 @@ module ADSL
     class DSBoolean < DSNode
       container_for :bool_value
 
-      TRUE = DSBoolean.new :bool_value => true
-      FALSE = DSBoolean.new :bool_value => false
+      TRUE    = DSBoolean.new :bool_value => true
+      FALSE   = DSBoolean.new :bool_value => false
+      UNKNOWN = DSBoolean.new :bool_value => nil
 
       def type
         :formula
@@ -272,6 +282,10 @@ module ADSL
       end
     end
 
+    class DSQuantifiedVariable < DSNode
+      container_for :name, :type
+    end
+
     class DSIn < DSNode
       container_for :objset1, :objset2
       
@@ -280,7 +294,7 @@ module ADSL
       end
     end
     
-    class DSEmpty < DSNode
+    class DSIsEmpty < DSNode
       container_for :objset
       
       def type

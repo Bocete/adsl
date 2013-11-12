@@ -178,6 +178,7 @@ module ADSL
         arg_combos = ["", "-Sorts=0"]
         commands = arg_combos.map{ |a| "SPASS #{a} -TimeLimit=#{timeout} #{tmp_file.path}" }
         output = process_race(*commands)
+
         result = /^SPASS beiseite: (.+)\.$/.match(output)[1]
 
         stats = include_stats ? pack_stats(spass_code, output) : nil

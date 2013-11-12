@@ -266,6 +266,112 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
     ADSL
   end
 
+  def test_if__basic
+    adsl_assert :correct, <<-ADSL
+      class Class {}
+      action blah() {
+        if isempty(allof(Class)) {
+          create(Class)
+        }
+      }
+      invariant exists(Class o)
+    ADSL
+    adsl_assert :correct, <<-ADSL
+      class Class {}
+      action blah() {
+        if not isempty(allof(Class)) {
+          create(Class)
+        }
+      }
+      invariant not exists(Class o)
+    ADSL
+  end
+
+  def test_if__nested
+    adsl_assert :incorrect, <<-ADSL
+      class Class {}
+      action blah() {
+        if exists(Class o) {
+        } else {
+          if not exists(Class o) {
+            create(Class)
+          }
+        }
+      }
+      invariant not exists(Class o)
+    ADSL
+  end
+
+  def test_if__in_loop
+    adsl_assert :correct, <<-ADSL
+      class Class {
+        0+ Class2 rel
+      }
+      class Class2 {}
+      action blah() {
+        foreach o: allof(Class) {
+          if isempty(o.rel) {
+            o.rel += create(Class2)
+          }
+        }
+      }
+      invariant forall(Class o, Class2 r1, Class2 r2: implies(r1 == o.rel and r2 == o.rel, r1 == r2))
+    ADSL
+    adsl_assert :incorrect, <<-ADSL
+      class Class {
+        0+ Class2 rel
+      }
+      class Class2 {}
+      action blah() {
+        foreach o: allof(Class) {
+          if isempty(o.rel) {
+            delete o
+          }
+        }
+      }
+      invariant exists(Class o: isempty(o.rel))
+    ADSL
+  end
+
+  def test_if__no_objects
+    adsl_assert :correct, <<-ADSL
+      class Class {}
+      action blah() {
+        if isempty(allof(Class)) {
+          create(Class)
+        }
+      }
+      invariant exists(Class o)
+    ADSL
+  end
+
+  def test_if__lambda
+    adsl_assert :correct, <<-ADSL
+      class Class {}
+      action blah() {
+        var = empty
+        if isempty(allof(Class)) {
+          var = create(Class)
+        } else {
+          var = oneof(allof(Class))
+        }
+        delete var
+      }
+      invariant forall(Class o1, Class o2: o1 == o2)
+    ADSL
+    adsl_assert :correct, <<-ADSL
+      class Class {}
+      action blah() {
+        var = empty
+        if forall(Class o1, Class o2: o1 == o2) {
+          var = oneof(allof(Class))
+        }
+        delete var
+      }
+      invariant not(exists(Class o) and forall(Class o1, Class o2: o1 == o2))
+    ADSL
+  end
+
   def test_for_each__no_contradictions
     adsl_assert :incorrect, <<-ADSL, :conjecture => false
       class Class{}
@@ -394,7 +500,7 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
     ADSL
   end
 
-  def test__single_ref
+  def test__all_objects_have_single_ref
     adsl_assert :correct, <<-ADSL
       class Class { 0+ Class rel }
       action blah() {
@@ -404,7 +510,7 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
           c.rel += c2
         }
       }
-      invariant forall(Class o: not empty(o.rel))
+      invariant forall(Class o: not isempty(o.rel))
     ADSL
     adsl_assert :correct, <<-ADSL
       class Class { 0+ Class rel }

@@ -106,7 +106,7 @@ module ADSL
             stmts = []
             object = if self.adsl_ast.objset_has_side_effects?
               var_name = ASTIdent.new(:text => "__delete_#{ self.class.adsl_ast_class_name }_temp_var")
-              stmts << ASTAssignment.new(:var_name => var_name.dup, :objset => self.adsl_ast)
+              stmts << ASTObjsetStmt.new(:objset => ASTAssignment.new(:var_name => var_name.dup, :objset => self.adsl_ast))
               self.class.new :adsl_ast => ASTVariable.new(:var_name => var_name.dup)
             else
               self
@@ -218,7 +218,7 @@ module ADSL
             end
 
             def empty?
-              ASTEmpty.new :objset => self.adsl_ast
+              ASTIsEmpty.new :objset => self.adsl_ast
             end
 
             def +(other)
@@ -496,8 +496,8 @@ module ADSL
               iter_name   = ASTIdent.new :text => "#{self.class.name.underscore}__#{through_assoc.name}__iterator"
               join_name   = ASTIdent.new :text => "#{self.class.name.underscore}__#{through_assoc.name}__join_object"
               [
-                ASTAssignment.new(:var_name => origin_name.dup, :objset => self.adsl_ast),
-                ASTAssignment.new(:var_name => target_name.dup, :objset => other.adsl_ast),
+                ASTObjsetStmt.new(:objset => ASTAssignment.new(:var_name => origin_name.dup, :objset => self.adsl_ast)),
+                ASTObjsetStmt.new(:objset => ASTAssignment.new(:var_name => target_name.dup, :objset => other.adsl_ast)),
                 ASTDeleteObj.new(:objset => ASTDereference.new(
                   :objset => ASTVariable.new(:var_name => origin_name.dup),
                   :rel_name => ASTIdent.new(:text => through_assoc.name.to_s)
@@ -506,10 +506,10 @@ module ADSL
                   :var_name => iter_name,
                   :objset => ASTVariable.new(:var_name => target_name.dup),
                   :block => ASTBlock.new(:statements => [
-                    ASTAssignment.new(
+                    ASTObjsetStmt.new(:objset => ASTAssignment.new(
                       :var_name => join_name,
                       :objset => ASTCreateObjset.new(:class_name => ASTIdent.new(:text => join_class_name))
-                    ),
+                    )),
                     ASTCreateTup.new(
                       :objset1  => ASTVariable.new(:var_name => origin_name.dup),
                       :rel_name => ASTIdent.new(:text => through_assoc.name.to_s),

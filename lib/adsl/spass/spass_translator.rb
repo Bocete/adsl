@@ -189,7 +189,7 @@ module ADSL
       end
 
       class Translation
-        attr_accessor :context, :prev_state, :invariant_state
+        attr_accessor :context, :state
         attr_reader :existed_initially, :exists_finally, :root_context
         attr_reader :is_object, :is_tuple, :is_either_resolution, :resolved_as_true
         attr_reader :create_obj_stmts, :delete_obj_stmts, :all_contexts, :classes
@@ -215,9 +215,7 @@ module ADSL
           # {class => [[before_stmt, context], [after_stmt, context]]}
           @create_obj_stmts = Hash.new{ |hash, klass| hash[klass] = [] }
           @delete_obj_stmts = Hash.new{ |hash, klass| hash[klass] = [] }
-          @prev_state = create_state :init_state
-
-          @invariant_state = nil
+          @state = create_state :init_state
         end
 
         def create_state name

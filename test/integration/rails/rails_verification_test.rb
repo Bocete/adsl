@@ -11,7 +11,7 @@ class ADSL::Verification::RailsVerificationTest < ADSL::Extract::Rails::RailsIns
       :output => :silent,
       :check_satisfiability => false,
       :halt_on_error => true,
-      :timeout => 120,
+      :timeout => 40,
       :actions => [action.to_s]
     }
   end
@@ -188,7 +188,7 @@ class ADSL::Verification::RailsVerificationTest < ADSL::Extract::Rails::RailsIns
   def test_verify_spass__association_build__through_creates_join_objects
     AsdsController.class_exec do
       def nothing
-        Asd.find.kmes.build
+        Asd.new.kmes.build
       end
     end
 

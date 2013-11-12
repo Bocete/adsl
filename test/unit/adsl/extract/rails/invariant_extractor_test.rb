@@ -43,11 +43,11 @@ module ADSL::Extract::Rails
 
       assert_equal 'first',   ie.invariants[0].description
       assert_equal ASTForAll, ie.invariants[0].formula.class
-      assert_equal ASTEmpty,  ie.invariants[0].formula.subformula.class
+      assert_equal ASTIsEmpty,  ie.invariants[0].formula.subformula.class
 
       assert_equal 'second',  ie.invariants[1].description
       assert_equal ASTForAll, ie.invariants[1].formula.class
-      assert_equal ASTEmpty,  ie.invariants[1].formula.subformula.class
+      assert_equal ASTIsEmpty,  ie.invariants[1].formula.subformula.class
     end
     
     def test_load_in_context__instrumented_ar_classes
@@ -63,7 +63,7 @@ module ADSL::Extract::Rails
 
       inv = ie.invariants.first.formula
 
-      assert_equal ASTEmpty, inv.class
+      assert_equal ASTIsEmpty, inv.class
       assert_equal ASTDereference, inv.objset.class
       assert_equal 'kme12', inv.objset.rel_name.text
       assert_equal ASTDereference, inv.objset.objset.class

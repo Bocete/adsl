@@ -89,6 +89,12 @@ class ADSL::Parser::ADSLParser < Racc::Parser
       when (text = @ss.scan(/either\b/))
          action { [:either, lineno] }
 
+      when (text = @ss.scan(/if/))
+         action { [:if, lineno] }
+
+      when (text = @ss.scan(/else/))
+         action { [:else, lineno] }
+
       when (text = @ss.scan(/action\b/))
          action { [:action, lineno] }
 
@@ -140,8 +146,14 @@ class ADSL::Parser::ADSLParser < Racc::Parser
       when (text = @ss.scan(/empty\b/))
          action { [:empty, lineno] }
 
+      when (text = @ss.scan(/isempty\b/))
+         action { [:isempty, lineno] }
+
       when (text = @ss.scan(/implies\b/))
          action { [:implies, lineno] }
+
+      when (text = @ss.scan(/unknown\b/))
+         action { [:unknown, lineno] }
 
       when (text = @ss.scan(/\.\./))
          action { [text, lineno] }
@@ -171,6 +183,9 @@ class ADSL::Parser::ADSLParser < Racc::Parser
          action { [text, lineno] }
 
       when (text = @ss.scan(/\+/))
+         action { [text, lineno] }
+
+      when (text = @ss.scan(/\*/))
          action { [text, lineno] }
 
       when (text = @ss.scan(/[01]/))

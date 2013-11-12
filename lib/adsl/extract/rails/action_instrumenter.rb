@@ -43,10 +43,10 @@ module Kernel
       end
       
       if value.respond_to?(:adsl_ast) && value.adsl_ast.class.is_objset?
-        assignment = ::ADSL::Parser::ASTAssignment.new(
+        assignment = ::ADSL::Parser::ASTObjsetStmt.new(:objset => ::ADSL::Parser::ASTAssignment.new(
           :var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name),
           :objset => value.adsl_ast
-        )
+        ))
         if operator == '||='
           old_value = outer_binding.eval name rescue nil
           if old_value.respond_to?(:adsl_ast) &&
