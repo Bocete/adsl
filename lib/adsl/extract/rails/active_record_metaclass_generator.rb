@@ -13,6 +13,21 @@ module ADSL
 
         def initialize(ar_class)
           @ar_class = ar_class
+          raise "Cyclic destroy dependency detected on class #{@ar_class}. Translation aborted" if cyclic_destroy_dependency?
+        end
+
+        def destroy_deps(origin_class)
+          Set[*origin_class.reflections.values.select{ |reflection|
+            [:destroy, :destroy_all].include? reflection.options[:dependent]
+          }.map{ |refl| refl.through_reflection || refl }.map(&:class_name).map(&:constantize)]
+        end
+
+        def cyclic_destroy_dependency?
+          will_destroy = until_no_change destroy_deps(@ar_class) do |so_far|
+            next so_far if so_far.empty?
+            so_far.union so_far.map{ |target| destroy_deps(target) }.inject(:union)
+          end
+          will_destroy.include? @ar_class
         end
 
         def parent_classname

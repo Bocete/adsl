@@ -11,6 +11,29 @@ module ADSL::Extract::Rails
   class ActiveRecordMetaclassGeneratorTest < RailsInstrumentationTestCase
 
     include ADSL::Parser
+    
+    def test_cyclic_destroy
+      Object.lookup_or_create_class('::Mod::Blah', ActiveRecord::Base).class_exec do
+        has_many :kmes, :dependent => :destroy
+      end
+      Object.lookup_or_create_class('::Kme', ActiveRecord::Base).class_exec do
+        has_many :asds, :dependent => :destroy
+      end
+
+      assert_raise do
+        initialize_metaclasses
+      end
+    end
+
+    def test_cyclic_destroy_reflective
+      Object.lookup_or_create_class('::Asd', ActiveRecord::Base).class_exec do
+        has_many :asds, :dependent => :destroy
+      end
+
+      assert_raise do
+        initialize_metaclasses
+      end
+    end
 
     def test_adsl_ast_class_name
       initialize_metaclasses

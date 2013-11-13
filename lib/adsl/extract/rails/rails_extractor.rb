@@ -17,12 +17,37 @@ module ADSL
         
         attr_accessor :ar_classes, :actions, :invariants, :instrumentation_filters
 
+        def cyclic_destroy_dependency?(options)
+          classes = options[:ar_classes]
+          destroy_deps = {}
+          classes.each do |ar_class|
+            destroy_deps[ar_class] = Set.new(ar_class.reflections.values.select{ |reflection|
+              [:destroy, :destroy_all].include? reflection.options[:dependent]
+            }.map{ |refl| refl.through_reflection || refl }.map(&:class_name).map(&:constantize))
+          end
+          destroy_reachability = until_no_change Hash.new(Set.new) do |so_far|
+            new_hash = so_far.dup
+            classes.each do |ar_class|
+              new_hash[ar_class] = destroy_deps[ar_class] + so_far[ar_class] + Set.new(so_far[ar_class].map{ |origin| destroy_deps[origin] }.flatten(1))
+            end
+            new_hash
+          end
+          classes.each do |origin|
+            if destroy_reachability[origin].include?(origin)
+              return true
+            end
+          end
+          false
+        end
+
         def initialize(options = {})
           options = Hash[
             :ar_classes => default_activerecord_models,
             :invariants => Dir['invariants/**/*_invs.rb'],
             :instrumentation_filters => []
           ].merge options
+
+          raise "Cyclic destroy dependency detected. Translation aborted" if cyclic_destroy_dependency?(options)
          
           @ar_classes = options[:ar_classes].map do |ar_class|
             generator = ActiveRecordMetaclassGenerator.new ar_class
