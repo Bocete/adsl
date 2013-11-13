@@ -465,41 +465,6 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
     ADSL
   end
 
-  def test_for_each__two_iterations_parallelizable
-    adsl_assert :correct, <<-ADSL
-      class Class1{}
-      class Class2{}
-      action blah() {
-        delete allof(Class1)
-        delete allof(Class2)
-        
-        create(Class1)
-        create(Class1)
-        foreach c: allof(Class1) {
-          create(Class2)
-        }
-      }
-      invariant exists(Class1 a)
-      invariant exists(Class2 a)
-      invariant forall(Class2 a, Class2 b, Class2 c: a == b or b == c or a == c)
-    ADSL
-    adsl_assert :incorrect, <<-ADSL
-      class Class1{}
-      class Class2{}
-      action blah() {
-        delete allof(Class1)
-        delete allof(Class2)
-        
-        create(Class1)
-        create(Class1)
-        foreach c: allof(Class1) {
-          create(Class2)
-        }
-      }
-      invariant exists(Class2 a, Class2 b, Class2 c: !a == b and !b == c and !a == c)
-    ADSL
-  end
-
   def test__all_objects_have_single_ref
     adsl_assert :correct, <<-ADSL
       class Class { 0+ Class rel }

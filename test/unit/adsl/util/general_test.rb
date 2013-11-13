@@ -300,4 +300,25 @@ class ADSL::Util::GeneralTest < Test::Unit::TestCase
     assert_equal [], accepted
     assert_equal [], rejected
   end
+
+  def test_range__empty
+    assert_false (1..2).empty?
+    assert_false (1..1).empty?
+    assert (1..0).empty?
+    assert (1...1).empty?
+  end
+
+  def test_range__intersect
+    assert_equal (2..3), (1..3).intersect(2..4)
+    assert_equal (2..3), (2..3).intersect(2..3)
+    assert_equal (2..3), (2..4).intersect(1..3)
+    assert_equal (2..3), (2..3).intersect(0..20)
+    assert (2..3).intersect(4..6).empty?
+    assert (0..5).intersect(1...1).empty?
+  end
+
+  def test_range__inject_on_intersection
+    assert_equal (2..3), [1..6, 2..12, 0..3].inject(:intersect)
+    assert [1..6, 2..3, 0...0].inject(:intersect).empty?
+  end
 end

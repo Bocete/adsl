@@ -71,6 +71,17 @@ class Array
   end
 end
 
+class Range
+  def empty?
+    max.nil?
+  end
+
+  def intersect(other)
+    return (0...0) if self.empty? || other.empty? || self.min > other.max || other.min > self.max
+    (([self.min, other.min].max)..([self.max, other.max].min))
+  end
+end
+
 class Symbol
   def dup; self; end
 end

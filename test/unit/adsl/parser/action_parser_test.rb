@@ -489,34 +489,36 @@ module ADSL::Parser
     end
     
     def test_action__oneof_typecheck
-      parser = ADSLParser.new
-      spec = nil
-      assert_nothing_raised ADSLError do
-        spec = parser.parse <<-adsl
-          class Class { 0+ Class relation }
-          action do_something() {
-            var = oneof(allof(Class))
-            var.relation -= var
-          }
-        adsl
-      end
+      [:oneof, :forceoneof].each do |op|
+        parser = ADSLParser.new
+        spec = nil
+        assert_nothing_raised ADSLError do
+          spec = parser.parse <<-adsl
+            class Class { 0+ Class relation }
+            action do_something() {
+              var = #{ op }(allof(Class))
+              var.relation -= var
+            }
+          adsl
+        end
 
-      assert_equal 1, spec.actions.length
-      klass = spec.classes.first
-      relation = spec.classes.first.relations.first
+        assert_equal 1, spec.actions.length
+        klass = spec.classes.first
+        relation = spec.classes.first.relations.first
 
-      assert_equal relation, spec.actions.first.block.statements.last.relation
-      
-      assert_raise ADSLError do
-        parser.parse <<-adsl
-          class Class { 0+ Class relation }
-          class Class2 {}
-          action do_something() {
-            var1 = allof(Class)
-            var2 = oneof(allof(Class2))
-            var1.relation -= var2
-          }
-        adsl
+        assert_equal relation, spec.actions.first.block.statements.last.relation
+        
+        assert_raise ADSLError do
+          parser.parse <<-adsl
+            class Class { 0+ Class relation }
+            class Class2 {}
+            action do_something() {
+              var1 = allof(Class)
+              var2 = #{ op }(allof(Class2))
+              var1.relation -= var2
+            }
+          adsl
+        end
       end
     end
 

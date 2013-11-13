@@ -19,6 +19,7 @@ rule
   or\b           { [:or, lineno] }
   subset\b       { [:subset, lineno] }
   oneof\b        { [:oneof, lineno] }
+  forceoneof\b   { [:forceoneof, lineno] }
   allof\b        { [:allof, lineno] }
   forall\b       { [:forall, lineno] }
   exists\b       { [:exists, lineno] }

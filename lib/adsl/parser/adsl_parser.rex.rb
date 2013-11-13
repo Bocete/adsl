@@ -107,6 +107,9 @@ class ADSL::Parser::ADSLParser < Racc::Parser
       when (text = @ss.scan(/oneof\b/))
          action { [:oneof, lineno] }
 
+      when (text = @ss.scan(/forceoneof\b/))
+         action { [:forceoneof, lineno] }
+
       when (text = @ss.scan(/allof\b/))
          action { [:allof, lineno] }
 

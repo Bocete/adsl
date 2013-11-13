@@ -1060,8 +1060,11 @@ module ADSL
       end
 
       def optimize
-        until_no_change super do |subset|
-          subset.objset.is_a?(ASTSubset) ? subset.objset : subset
+        until_no_change super do |node|
+          next node.optimize unless node.is_a?(ASTSubset)
+          next node.objset if node.objset.is_a?(ASTSubset) || node.objset.is_a?(ASTOneOf)
+          next ASTOneOf.new :objset => node.objset.objset if node.objset.is_a?(ASTForceOneOf)
+          ASTSubset.new :objset => node.objset.optimize
         end
       end
 
@@ -1085,7 +1088,9 @@ module ADSL
 
       def optimize
         until_no_change super do |oneof|
-          oneof.objset.is_a?(ASTOneOf) ? oneof.objset : oneof
+          next oneof.optimize unless oneof.is_a?(ASTOneOf)
+          next oneof.objset if oneof.objset.is_a?(ASTOneOf) || oneof.objset.is_a?(ASTSubset)
+          ASTOneOf.new :objset => oneof.objset.optimize
         end
       end
 
@@ -1094,6 +1099,32 @@ module ADSL
       end
     end
 
+    class ASTForceOneOf < ASTNode
+      node_type :objset, :type => :objset
+      
+      def objset_has_side_effects?
+        @objset.nil? ? false : @objset.objset_has_side_effects?
+      end
+
+      def typecheck_and_resolve(context)
+        objset = @objset.typecheck_and_resolve context
+        raise ADSLError, "Unknown forced oneof typei at line #{lineno}" if objset.type.nil?
+        return ADSL::DS::DSForceOneOf.new :objset => objset
+      end
+
+      def optimize
+        until_no_change super do |oneof|
+          next oneof.optimize unless oneof.is_a?(ASTForceOneOf)
+          next oneof.objset if oneof.objset.is_a?(ASTOneOf) || oneof.objset.is_a?(ASTForceOneOf)
+          ASTForceOneof.new :objset => oneof.objset.optimize
+        end
+      end
+
+      def to_adsl
+        "oneof(#{ @objset.to_adsl })"
+      end
+    end
+    
     class ASTUnion < ASTNode
       node_type :objsets, :type => :objset
       

@@ -333,6 +333,23 @@ class BasicTranslationTest < Test::Unit::TestCase
     ADSL
   end
 
+  def test_assignment__as_objset
+    adsl_assert :correct, <<-ADSL
+      class Class {
+        0+ Class rel
+      }
+      action blah() {
+        create(Class)
+        create(Class)
+        create(Class)
+        a = b = c = allof(Class)
+        delete a
+        b.rel += c
+      }
+      invariant not exists(Class o)
+    ADSL
+  end
+
   def test_oneof__is_one_object
     adsl_assert :correct, <<-ADSL
       class Class {}
@@ -341,6 +358,21 @@ class BasicTranslationTest < Test::Unit::TestCase
         delete oneof(allof(Class))
       }
       invariant exists(Class c)
+    ADSL
+  end
+
+  def test_forced_one_of__is_forced
+    adsl_assert :correct, <<-ADSL
+      class Class {
+        0+ Class2 rel
+      }
+      class Class2 {}
+      action blah() {
+        other = forceoneof(allof(Class2))
+        obj = create(Class)
+        obj.rel += other
+      }
+      invariant forall(Class o: not isempty(o.rel))
     ADSL
   end
   

@@ -229,6 +229,15 @@ module ADSL
 
     class DSOneOf < DSNode
       container_for :objset
+
+      def type
+        @objset.type
+      end
+    end
+    
+    class DSForceOneOf < DSNode
+      container_for :objset
+
       def type
         @objset.type
       end

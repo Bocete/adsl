@@ -897,6 +897,28 @@ module ADSL
         pred[ps, var]
       end
     end
+    
+    class DSForceOneOf < DSNode
+      def prepare_objset(translation)
+        @objset.prepare_objset translation
+      end
+
+      def resolve_objset(translation, ps, var)
+        context = translation.context
+        pred = translation.create_predicate :force_one_of, context.level + 1
+        translation.gen_formula_for_unique_arg(pred, context.level)
+        translation.reserve_names context.p_names, :o do |subps, o|
+          co_in_objset = @objset.resolve_objset(translation, subps, o)
+          translation.create_formula FOL::ForAll.new(subps,
+            FOL::Exists.new(o, pred[subps, o])
+          )
+          translation.create_formula FOL::ForAll.new(subps, o,
+            FOL::Implies.new(pred[subps, o], FOL::And.new(translation.state[subps, o], co_in_objset))
+          )
+        end
+        pred[ps, var]
+      end
+    end
 
     class DSNot < DSNode
       def prepare_formula(translation)
