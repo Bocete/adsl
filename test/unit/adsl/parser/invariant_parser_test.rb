@@ -74,13 +74,13 @@ module ADSL::Parser
         invariant = spec.invariants.first
         assert_equal type, invariant.formula.class
         assert_equal 1, invariant.formula.vars.length
-        assert_equal spec.classes.first, invariant.formula.vars.first.type
+        assert_equal spec.classes.first.to_sig, invariant.formula.vars.first.type_sig
         assert_equal 'a', invariant.formula.vars.first.name
         assert_equal true, invariant.formula.subformula.bool_value
       end 
     end
 
-    def test_invariant__forall_and_exists_mulitple_params
+    def test_invariant__forall_and_exists_multiple_params
       parser = ADSLParser.new
       
       operators = {
@@ -99,7 +99,7 @@ module ADSL::Parser
         invariant = spec.invariants.first
         assert_equal type, invariant.formula.class
         assert_equal 2, invariant.formula.vars.length
-        assert_equal [spec.classes.first, spec.classes.first], invariant.formula.vars.map{ |v| v.type }
+        assert_equal [spec.classes.first.to_sig, spec.classes.first.to_sig], invariant.formula.vars.map(&:type_sig)
         assert_equal ['a', 'b'], invariant.formula.vars.map{ |v| v.name }
         assert_equal true, invariant.formula.subformula.bool_value
       end 

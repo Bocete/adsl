@@ -23,8 +23,8 @@ module ADSL
             return false if sub_statuses.uniq == [false]
             return true if sub_statuses.uniq == [true]
             return nil
-          elsif ast_node.is_a?(ASTDummyStmt) and [:render, :raise].include?(ast_node.type)
-            return false if ast_node.type == :render and is_action_body
+          elsif ast_node.is_a?(ASTDummyStmt) and [:render, :raise].include?(ast_node.label)
+            return false if ast_node.label == :render and is_action_body
             return true
           else
             return false
@@ -82,7 +82,7 @@ module ADSL
           pairs = []
           root_block.statements.reverse_each do |stmt|
             if stmt.is_a? ADSL::Parser::ASTDummyStmt
-              pairs << [stmt.type, []]
+              pairs << [stmt.label, []]
             else
               pairs.last[1] << stmt
             end

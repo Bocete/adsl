@@ -9,11 +9,11 @@ module ADSL::Extract::Rails
     include ADSL::Extract::Rails::CallbackChainSimulator
 
     def dummy(flag = nil)
-      ASTDummyStmt.new :type => flag
+      ASTDummyStmt.new :label => flag
     end
 
     def render
-      ASTDummyStmt.new :type => :render
+      ASTDummyStmt.new :label => :render
     end
 
     def block(*stmts)
@@ -57,19 +57,19 @@ module ADSL::Extract::Rails
       # rendering:     0, 3, 4
       stmts = paths[:will_halt].statements
       assert_equal 3, stmts.length
-      assert_equal 0, stmts[0].type
-      assert_equal [3, :render], stmts[1].statements.map(&:type)
-      assert_equal 4, stmts[2].type
+      assert_equal 0, stmts[0].label
+      assert_equal [3, :render], stmts[1].statements.map(&:label)
+      assert_equal 4, stmts[2].label
 
       # non-rendering: 0, 1, 4 or 0, 2, 4
       stmts = paths[:will_not_halt].statements
       assert_equal 3,   stmts.length
       
-      assert_equal 0,         stmts[0].type
+      assert_equal 0,         stmts[0].label
       assert_equal ASTEither, stmts[1].class
       assert_equal 2,         stmts[1].blocks.length
-      assert_equal [1, 2],    stmts[1].blocks.map(&:statements).map(&:first).map(&:type)
-      assert_equal 4,         stmts[2].type
+      assert_equal [1, 2],    stmts[1].blocks.map(&:statements).map(&:first).map(&:label)
+      assert_equal 4,         stmts[2].label
     end
 
   end

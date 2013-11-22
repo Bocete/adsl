@@ -1,4 +1,5 @@
 require 'adsl/util/general'
+require 'adsl/util/partial_ordered'
 
 module ADSL
   module DS
@@ -49,40 +50,114 @@ module ADSL
     end
 
     class DSClass < DSNode
-      container_for :name, :parent, :relations, :inverse_relations do
+      include ADSL::Util::PartialOrdered
+
+      container_for :name, :parents, :relations do
         @relations = [] if @relations.nil?
-        @inverse_relations = [] if @inverse_relations.nil?
+        @parents   = [] if @parents.nil?
       end
 
       def to_s
         @name
       end
 
-      def superclass_of?(other_class)
-        until other_class.nil?
-          return true if other_class == self
-          other_class = other_class.parent
+      def all_parents(include_self = false)
+        p = Set[*@parents]
+        p << self if include_self
+        until_no_change p do |iter|
+          iter + Set[*iter.map(&:parents).flatten].flatten
         end
-        return false
       end
-      alias_method :>=, :superclass_of?
 
-      def self.common_supertype(classes)
-        types = classes.uniq
-        types.delete nil
-        while types.length > 1
-          type1 = types.pop
-          type2 = types.pop
-          if type1.superclass_of? type2
-            types << type2
-          elsif type2.superclass_of? type1
-            types << type1
-          else
-            raise ADSLError, "Object sets are not of compatible types: #{classes.map { |c| c.name }.join(", ")}"
-          end
-        end
-        types.first
+      def superclass_of?(other_class)
+        other_class.all_parents(true).include? self
       end
+
+      def compare(other)
+        return nil unless other.is_a? DSClass
+        return 0  if self == other
+        return 1  if self.superclass_of?(other_class)
+        return -1 if other_class.superclass_of?(self)
+        return nil
+      end
+
+      def to_sig
+        DSTypeSig.new self
+      end
+    end
+
+    class DSTypeSig
+      attr_reader :classes
+      
+      include ADSL::Util::PartialOrdered
+
+      def initialize(*classes)
+        @classes = Set[*classes.flatten].flatten
+        canonize!
+      end
+      
+      def canonize!
+        @classes.dup.each do |klass|
+          @classes -= klass.all_parents
+        end
+      end
+
+      def compare(other)
+        return nil unless other.is_a? DSTypeSig
+        my_full_tree    = self.classes.map{ |k| k.all_parents true }.inject(&:+)
+        other_full_tree = other.classes.map{ |k| k.all_parents true }.inject(&:+)
+        return 0  if my_full_tree == other_full_tree
+        return -1 if my_full_tree >  other_full_tree
+        return 1  if my_full_tree <  other_full_tree
+        return nil
+      end
+
+      def join(other)
+        DSTypeSig.join self, other
+      end
+
+      def all_parents(include_self = false)
+        @classes.map{ |c| c.all_parents include_self }.inject(&:+)
+      end
+
+      def nil_sig?
+        @classes.empty?
+      end
+
+      def to_s
+        @classes.map(&:to_s).join ', '
+      end
+
+      def ==(other)
+        return false unless other.is_a?(DSTypeSig)
+        other_seed = other.send(:instance_variable_get, :@random_seed)
+        if @random_seed || other_seed
+          return false if @random_seed != other_seed
+        end
+        @classes == other.classes
+      end
+      alias_method :eql?, :==
+
+      def hash
+        [@classes, @random_seed].hash
+      end
+
+      def self.join(*type_sigs)
+        type_sigs.flatten.inject do |sig1, sig2|
+          new_sig = DSTypeSig.new (sig1.all_parents(true) & sig2.all_parents(true))
+          raise "Incompatible type signatures joined: #{type_sigs.map(&:to_s).join}" if new_sig.nil_sig?
+          new_sig
+        end
+      end
+
+      def self.random
+        sig = DSTypeSig.new
+        @@random_seed ||= 0
+        sig.send :instance_variable_set, :@random_seed, (@@random_seed += 1)
+        sig
+      end
+      
+      EMPTY = DSTypeSig.new
     end
 
     class DSRelation < DSNode
@@ -120,8 +195,8 @@ module ADSL
     class DSCreateObjset < DSNode
       container_for :createobj
 
-      def type
-        @createobj.klass
+      def type_sig
+        @createobj.klass.to_sig
       end
     end
 
@@ -131,10 +206,6 @@ module ADSL
 
     class DSDeleteObj < DSNode
       container_for :objset
-      
-      def entity_class_writes
-        Set[@objset.type]
-      end
     end
 
     class DSDeleteTup < DSNode
@@ -147,6 +218,10 @@ module ADSL
     
     class DSEitherLambdaObjset < DSNode
       container_for :either, :objsets
+
+      def type_sig
+        DSTypeSig.join @objsets.map(&:type_sig)
+      end
     end
 
     class DSIf < DSNode
@@ -155,6 +230,10 @@ module ADSL
 
     class DSIfLambdaObjset < DSNode
       container_for :if, :then_objset, :else_objset
+
+      def type_sig
+        DSTypeSig.join @then_objset.type_sig, @else_objset.type_sig
+      end
     end
 
     class DSForEachCommon < DSNode
@@ -174,88 +253,92 @@ module ADSL
         self
       end
 
-      def type
-        @for_each.objset.type
+      def type_sig
+        @for_each.objset.type_sig
       end
     end
 
     class DSForEachPreLambdaObjset < DSNode
       container_for :for_each, :before_var, :inside_var
+
+      def type_sig
+        DSTypeSig.join @before_var.type_sig, @inside_var.type_sig
+      end
     end
     
     class DSForEachPostLambdaObjset < DSNode
       container_for :for_each, :before_var, :inside_var
+
+      def type_sig
+        DSTypeSig.join @before_var.type_sig, @inside_var.type_sig
+      end
     end
 
     class DSVariable < DSNode
-      container_for :name, :type
+      container_for :name, :type_sig
     end
 
     class DSAllOf < DSNode
       container_for :klass
       
-      def type
-        @klass
-      end
-
-      def entity_class_reads
-        @klass
+      def type_sig
+        @klass.to_sig
       end
     end
 
     class DSSubset < DSNode
       container_for :objset
 
-      def type
-        @objset.type
+      def type_sig
+        @objset.type_sig
       end
     end
 
     class DSUnion < DSNode
       container_for :objsets
 
-      def type
-        DSClass.common_supertype objsets.reject{ |o| o.type.nil? }.map{ |o| o.type }
+      def type_sig
+        DSTypeSig.join objsets.map(&:type_sig)
       end
     end
 
     class DSOneOfObjset < DSNode
       container_for :objsets
 
-      def type
-        DSClass.common_supertype objsets.reject{ |o| o.type.nil? }.map{ |o| o.type }
+      def type_sig
+        DSTypeSig.join objsets.map(&:type_sig)
       end
     end
 
     class DSOneOf < DSNode
       container_for :objset
 
-      def type
-        @objset.type
+      def type_sig
+        @objset.type_sig
       end
     end
     
     class DSForceOneOf < DSNode
       container_for :objset
 
-      def type
-        @objset.type
+      def type_sig
+        @objset.type_sig
       end
     end
 
     class DSDereference < DSNode
       container_for :objset, :relation
 
-      def type
-        @relation.to_class
+      def type_sig
+        @relation.to_class.to_sig
       end
     end
 
     class DSEmptyObjset < DSNode
       container_for
 
-      def type
-        nil
+      def type_sig
+        DSTypeSig::EMPTY
       end
     end
 
@@ -269,94 +352,50 @@ module ADSL
       TRUE    = DSBoolean.new :bool_value => true
       FALSE   = DSBoolean.new :bool_value => false
       UNKNOWN = DSBoolean.new :bool_value => nil
-
-      def type
-        :formula
-      end
     end
 
     class DSForAll < DSNode
       container_for :vars, :objsets, :subformula
-
-      def type
-        :formula
-      end
     end
     
     class DSExists < DSNode
       container_for :vars, :objsets, :subformula
-
-      def type
-        :formula
-      end
     end
 
     class DSQuantifiedVariable < DSNode
-      container_for :name, :type
+      container_for :name, :type_sig
     end
 
     class DSIn < DSNode
       container_for :objset1, :objset2
-      
-      def type
-        :formula
-      end
     end
     
     class DSIsEmpty < DSNode
       container_for :objset
-      
-      def type
-        :formula
-      end
     end
 
     class DSNot < DSNode
       container_for :subformula
-
-      def type
-        :formula
-      end
     end
     
     class DSAnd < DSNode
       container_for :subformulae
-
-      def type
-        :formula
-      end
     end
     
     class DSOr < DSNode
       container_for :subformulae
-
-      def type
-        :formula
-      end
     end
 
     class DSImplies < DSNode
       container_for :subformula1, :subformula2
-
-      def type
-        :formula
-      end
     end
     
     class DSEquiv < DSNode
       container_for :subformulae
-
-      def type
-        :formula
-      end
     end
     
     class DSEqual < DSNode
       container_for :objsets
-
-      def type
-        :formula
-      end
     end
   end
 end

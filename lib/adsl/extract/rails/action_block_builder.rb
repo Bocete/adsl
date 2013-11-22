@@ -202,7 +202,7 @@ module ADSL
         def do_raise(*args)
           unless @has_returned_or_raised
             # appending nothing to root paths
-            @root_paths << [::ADSL::Parser::ASTDummyStmt.new(:type => :raise)]
+            @root_paths << [::ADSL::Parser::ASTDummyStmt.new(:label => :raise)]
             @return_values << nil
             @has_returned_or_raised = true
           end

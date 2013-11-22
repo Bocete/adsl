@@ -128,24 +128,26 @@ module ADSL::Extract::Rails
     def test_generate__destroy_propagates_to_delete_but_not_further
       initialize_metaclasses
 
-      asd_delete = Mod::Blah.new(:adsl_ast => ASTDummyObjset.new(:type => :blah)).destroy
+      sig = ADSL::DS::DSTypeSig.random
+
+      asd_delete = Mod::Blah.new(:adsl_ast => ASTDummyObjset.new(:type_sig => sig)).destroy
       assert_equal 2, asd_delete.length
 
       assert_equal ASTDeleteObj,   asd_delete.first.class
       assert_equal ASTDereference, asd_delete.first.objset.class
       assert_equal 'kme12',        asd_delete.first.objset.rel_name.text
       assert_equal ASTDummyObjset, asd_delete.first.objset.objset.class
-      assert_equal :blah,          asd_delete.first.objset.objset.type
 
       assert_equal ASTDeleteObj,   asd_delete.last.class
       assert_equal ASTDummyObjset, asd_delete.last.objset.class
-      assert_equal :blah,          asd_delete.last.objset.type
     end
     
     def test_generate__destroy_through_destroys_the_join_object
       initialize_metaclasses
 
-      asd_delete = Asd.new(:adsl_ast => ASTDummyObjset.new(:type => :blah)).destroy
+      sig = ADSL::DS::DSTypeSig.random
+      
+      asd_delete = Asd.new(:adsl_ast => ASTDummyObjset.new(:type_sig => sig)).destroy
       assert_equal 3, asd_delete.length
       
       assert_equal ASTDeleteObj,   asd_delete[0].class
@@ -154,43 +156,43 @@ module ADSL::Extract::Rails
       assert_equal 'kme12',        asd_delete[0].objset.rel_name.text
       assert_equal 'blahs',        asd_delete[0].objset.objset.rel_name.text
       assert_equal ASTDummyObjset, asd_delete[0].objset.objset.objset.class
-      assert_equal :blah,          asd_delete[0].objset.objset.objset.type
 
       assert_equal ASTDeleteObj,   asd_delete[1].class
       assert_equal ASTDereference, asd_delete[1].objset.class
       assert_equal 'blahs',        asd_delete[1].objset.rel_name.text
       assert_equal ASTDummyObjset, asd_delete[1].objset.objset.class
-      assert_equal :blah,          asd_delete[1].objset.objset.type
       
       assert_equal ASTDeleteObj,   asd_delete[2].class
       assert_equal ASTDummyObjset, asd_delete[2].objset.class
-      assert_equal :blah,          asd_delete[2].objset.type
     end
   
     def test_generate__include_subset_ops
       initialize_metaclasses
+
+      type_sig1 = ADSL::DS::DSTypeSig.random
+      type_sig2 = ADSL::DS::DSTypeSig.random
       
-      asd = Asd.new :adsl_ast => ASTDummyObjset.new(:type => :blah)
+      asd = Asd.new :adsl_ast => ASTDummyObjset.new(:type_sig => type_sig1)
       assert asd.respond_to? :include?
       assert asd.respond_to? :<=
       assert asd.respond_to? :>=
       
-      kme = Kme.new :adsl_ast => ASTDummyObjset.new(:type => :blah2)
+      kme = Kme.new :adsl_ast => ASTDummyObjset.new(:type_sig => type_sig2)
 
       subset = asd.include? kme
       assert_equal ASTIn, subset.class
-      assert_equal :blah, subset.objset2.type
-      assert_equal :blah2, subset.objset1.type
+      assert_equal type_sig1, subset.objset2.type_sig
+      assert_equal type_sig2, subset.objset1.type_sig
 
       subset = asd >= kme
       assert_equal ASTIn, subset.class
-      assert_equal :blah, subset.objset2.type
-      assert_equal :blah2, subset.objset1.type
+      assert_equal type_sig1, subset.objset2.type_sig
+      assert_equal type_sig2, subset.objset1.type_sig
 
       subset = asd <= kme
       assert_equal ASTIn, subset.class
-      assert_equal :blah2, subset.objset2.type
-      assert_equal :blah, subset.objset1.type
+      assert_equal type_sig2, subset.objset2.type_sig
+      assert_equal type_sig1, subset.objset1.type_sig
     end
 
     def test_generate__scopes_work_on_classes

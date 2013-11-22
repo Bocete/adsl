@@ -54,13 +54,16 @@ module ADSL::Parser
       context1 = ASTTypecheckResolveContext.new
       context1.push_frame
 
-      a1 = DSVariable.new :name => 'a'
-      a2 = DSVariable.new :name => 'a'
-      b = DSVariable.new :name => 'b'
-      b2 = DSVariable.new :name => 'b'
+      klass = DSClass.new :name => 'klass'
+      sig = DSTypeSig.new klass
+
+      a1 = DSVariable.new :name => 'a', :type_sig => sig
+      a2 = DSVariable.new :name => 'a', :type_sig => sig
+      b1 = DSVariable.new :name => 'b', :type_sig => sig
+      b2 = DSVariable.new :name => 'b', :type_sig => sig
 
       context1.define_var a1, true
-      context1.define_var b, true
+      context1.define_var b1, true
 
       context2 = context1.dup
 
@@ -72,7 +75,7 @@ module ADSL::Parser
       assert_equal({"a" => [a1, a2, a2]}, ASTTypecheckResolveContext.context_vars_that_differ(context1, context2, context3))
 
       context3.redefine_var b2, false
-      assert_equal({"a" => [a1, a2, a2], "b" => [b, b, b2]}, ASTTypecheckResolveContext.context_vars_that_differ(context1, context2, context3))
+      assert_equal({"a" => [a1, a2, a2], "b" => [b1, b1, b2]}, ASTTypecheckResolveContext.context_vars_that_differ(context1, context2, context3))
     end
 
     def test_action__all_stmts_no_subblocks
@@ -148,8 +151,9 @@ module ADSL::Parser
       var1 = spec.actions.first.args.first
       var2 = spec.actions.first.statements.first.var
 
-      assert_equal klass, var1.type
-      assert_equal klass, var2.type
+      assert_equal Set[klass], klass.to_sig.classes
+      assert_equal klass.to_sig, var1.type_sig
+      assert_equal klass.to_sig, var2.type_sig
     end
 
     def test_action__args_multiple
@@ -165,7 +169,7 @@ module ADSL::Parser
         adsl
       end
       assert_equal ['var1', 'var2', 'var3'], spec.actions.first.args.map{ |v| v.name }
-      assert_equal spec.classes, spec.actions.first.args.map{ |v| v.type }
+      assert_equal spec.classes.map(&:to_sig), spec.actions.first.args.map(&:type_sig)
       assert_equal [[0, 1], [1, 1], [1, 1.0/0.0]], spec.actions.first.cardinalities
     end
     
@@ -540,7 +544,7 @@ module ADSL::Parser
       relation = klass2.relations.first
 
       stmt = spec.actions.first.block.statements.last
-      assert_equal klass2, stmt.objset1.type
+      assert_equal klass2.to_sig, stmt.objset1.type_sig
       assert_equal relation, stmt.relation
       
       assert_raise ADSLError do
@@ -570,7 +574,7 @@ module ADSL::Parser
       klass2 = spec.classes.last
       relation = klass2.relations.first
       stmt = spec.actions.first.block.statements.last
-      assert_equal klass2, stmt.objset1.type
+      assert_equal klass2.to_sig, stmt.objset1.type_sig
       assert_equal relation, stmt.relation
       
       assert_nothing_raised ADSLError do
@@ -585,7 +589,7 @@ module ADSL::Parser
       klass2 = spec.classes.last
       relation = klass2.relations.first
       stmt = spec.actions.first.block.statements.last
-      assert_equal klass2, stmt.objset1.type
+      assert_equal klass2.to_sig, stmt.objset1.type_sig
       assert_equal relation, stmt.relation
     end 
     
@@ -1113,72 +1117,6 @@ module ADSL::Parser
       
       assert_equal 0, statements[1].then_block.statements.length
       assert_equal 1, statements[1].else_block.statements.length
-    end
-
-    def test_action__entity_class_writes
-      parser = ADSLParser.new
-      spec = nil
-      assert_nothing_raised ADSLError do
-        spec = parser.parse <<-adsl
-          class Class {}
-          class Class2 {}
-          action do_something() {
-            create(Class)
-          }
-        adsl
-      end
-      assert_equal Set[spec.classes.first], spec.actions.first.block.list_entity_classes_written_to
-
-      assert_nothing_raised ADSLError do
-        spec = parser.parse <<-adsl
-          class Class {}
-          class Class2 {}
-          action do_something() {
-            create(Class)
-            either {
-              foreach a: allof(Class) {
-                delete allof(Class2)
-              }
-            } or {}
-          }
-        adsl
-      end
-      assert_equal Set[*spec.classes], spec.actions.first.block.list_entity_classes_written_to
-      assert_equal Set[spec.classes.first], spec.actions.first.block.statements.first.list_entity_classes_written_to
-      assert_equal Set[spec.classes.second], spec.actions.first.block.statements.last.list_entity_classes_written_to
-    end
-
-    def test_action__entity_class_reads
-      parser = ADSLParser.new
-      spec = nil
-      assert_nothing_raised ADSLError do
-        spec = parser.parse <<-adsl
-          class Class {}
-          class Class2 {}
-          action do_something() {
-            delete allof(Class)
-          }
-        adsl
-      end
-      assert_equal Set[spec.classes.first], spec.actions.first.block.list_entity_classes_read
-
-      assert_nothing_raised ADSLError do
-        spec = parser.parse <<-adsl
-          class Class {}
-          class Class2 {}
-          action do_something() {
-            create(Class)
-            either {
-              foreach a: allof(Class) {
-                delete allof(Class2)
-              }
-            } or {}
-          }
-        adsl
-      end
-      assert_equal Set[*spec.classes], spec.actions.first.block.list_entity_classes_read
-      assert_equal Set[], spec.actions.first.block.statements.first.list_entity_classes_read
-      assert_equal Set[*spec.classes], spec.actions.first.block.statements.last.list_entity_classes_read
     end
   end
 end

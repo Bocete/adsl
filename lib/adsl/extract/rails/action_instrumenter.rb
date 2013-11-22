@@ -23,7 +23,7 @@ module Kernel
   end
 
   def ins_mark_render_statement()
-    ::ADSL::Parser::ASTDummyStmt.new :type => :render
+    ::ADSL::Parser::ASTDummyStmt.new :label => :render
   end
 
   def ins_multi_assignment(outer_binding, names, values, operator = '=')
@@ -104,7 +104,7 @@ module Kernel
         adsl_ast = ::ADSL::Extract::Rails::ActionInstrumenter.extract_stmt_from_expr final_return
         block_adsl_ast.statements << adsl_ast if !adsl_ast.nil? and adsl_ast.class.is_statement?
       end
-      instrumenter.prev_abb << ::ADSL::Parser::ASTDummyStmt.new(:type => method_name)
+      instrumenter.prev_abb << ::ADSL::Parser::ASTDummyStmt.new(:label => method_name)
     end
     
     return_value

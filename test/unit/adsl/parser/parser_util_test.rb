@@ -13,7 +13,7 @@ module ADSL::Parser
       context.actions['action1'] = [:action1, :action1]
       context.relations['class1'] = {"relation1" => [:relation1, :relation1]}
       context.push_frame
-      var = DSVariable.new :name => "varname", :type => :whatever
+      var = DSVariable.new :name => "varname", :type_sig => ADSL::DS::DSTypeSig::EMPTY
       context.define_var var, :node
 
       counter = 0
@@ -57,7 +57,7 @@ module ADSL::Parser
         counter += 1
       end
       
-      var = DSVariable.new :name => "varname", :type => :whatever
+      var = DSVariable.new :name => "varname", :type_sig => ADSL::DS::DSTypeSig::EMPTY
       context.define_var var, :node
       
       assert_equal 1, counter
@@ -84,7 +84,7 @@ module ADSL::Parser
       context.actions['action1'] = [:action1, :action1]
       context.relations['class1'] = {"relation1" => [:relation1, :relation1]}
       context.push_frame
-      var = DSVariable.new :name => "varname", :type => :whatever
+      var = DSVariable.new :name => "varname", :type_sig => ADSL::DS::DSTypeSig::EMPTY
       context.define_var var, :node
 
       context2 = context.clone
@@ -98,7 +98,7 @@ module ADSL::Parser
       end
       assert context.var_stack.last.var_write_listeners.empty?
 
-      context.define_var DSVariable.new(:name => 'other', :type => :whatever), :node2
+      context.define_var DSVariable.new(:name => 'other', :type_sig => ADSL::DS::DSTypeSig::EMPTY), :node2
 
       assert_equal 1, context2.var_stack.count
       assert_equal 1, context.var_stack.count
@@ -117,10 +117,6 @@ module ADSL::Parser
 
       context.redefine_var var, :node
       assert written
-    end
-
-    def test_var_writes_and_reads
-
     end
   end
 end

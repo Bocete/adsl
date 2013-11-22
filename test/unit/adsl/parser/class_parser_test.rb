@@ -26,7 +26,7 @@ module ADSL::Parser
       assert_equal ["Kme", "Zsd", "Asd"], spec.classes.map{ |a| a.name }
       spec.classes.each do |klass|
         assert_equal 0, klass.relations.count
-        assert_nil klass.parent
+        assert klass.parents.empty?
       end
       assert_equal 0, spec.actions.count
     end
@@ -44,35 +44,39 @@ module ADSL::Parser
         class Sub extends Super {}
       adsl
       assert_equal 2, spec.classes.length
-      assert_nil spec.classes[0].parent
-      assert_equal spec.classes[0], spec.classes[1].parent
+      assert spec.classes[0].parents.empty?
+      assert_equal [spec.classes[0]], spec.classes[1].parents
       
       spec = parser.parse <<-adsl
         class Sub extends Super {}
         class Super {}
       adsl
       assert_equal 2, spec.classes.length
-      assert_nil spec.classes[1].parent
-      assert_equal spec.classes[1], spec.classes[0].parent
+      assert spec.classes[1].parents.empty?
+      assert_equal [spec.classes[1]], spec.classes[0].parents
 
-      begin
+      spec = parser.parse <<-adsl
+        class Super1 {}
+        class Super2 {}
+        class Sub extends Super1, Super2 {}
+      adsl
+      assert_equal 3, spec.classes.length
+      assert spec.classes[0].parents.empty?
+      assert spec.classes[1].parents.empty?
+      assert_equal [spec.classes[0], spec.classes[1]], spec.classes[2].parents
+      
+      assert_raise ADSLError do
         parser.parse <<-adsl
           class Class extends Class {}
         adsl
-        flunk "No error raised"
-      rescue ADSLError => e
-        assert e.message.include? 'Class -> Class'
       end
       
-      begin
+      assert_raise ADSLError do
         parser.parse <<-adsl
           class First extends Class1 {}
           class Class2 extends Class1 {}
           class Class1 extends Class2 {}
         adsl
-        flunk "No error raised"
-      rescue ADSLError => e
-        assert e.message.include? 'Class1 -> Class2'
       end
     end
 

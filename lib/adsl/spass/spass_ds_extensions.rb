@@ -34,23 +34,29 @@ module ADSL
 
         translation.create_formula FOL::ForAll.new(:o, FOL::Equiv.new(
           translation.is_object[:o],
-          FOL::Or.new(@classes.map{ |c| c[:o] })
+          FOL::Or.new(@classes.map{ |c| c.precisely_of_type :o })
         ))
-        @classes.group_by{ |klass| klass.parent }.each do |common_parent, children|
-          unless common_parent.nil?
-            translation.create_formula FOL::ForAll.new(:o, FOL::Implies.new(
-              FOL::Or.new(children.map{ |c| c[:o] }),
-              common_parent[:o]
-            ))
-          end
-          if children.length > 1
-            children.each do |child|
-              translation.create_formula FOL::ForAll.new(:o, FOL::Implies.new(
-                child[:o],
-                FOL::Not.new(children.select{ |c| c != child}.map{ |c| c[:o] })
-              ))
+        translation.create_formula FOL::ForAll.new(:o, FOL::And.new(@classes.combination(2).map do |c1, c2|
+          FOL::Not.new(FOL::And.new(c1.precisely_of_type(o), c2.precisely_of_type(o)))
+        end))
+        children_rels = Hash.new{[]}
+        @classes.each do |klass|
+          if klass.parents.empty?
+            children_rels[nil] << klass
+          else
+            klass.parents.each do |parent|
+              children_rels[parent] << klass
             end
           end
+        end
+        @classes.each do |klass|
+          translation.create_formula FOL::ForAll.new(:o, FOL::Equiv.new(
+            klass[:o],
+            FOL::Or.new(
+              klass.precisely_of_type(:o),
+              *children_rels[klass].map{ |c| c[:o] }
+            )
+          ))
         end
 
         relations = @classes.map{ |c| c.relations }.flatten.map{ |rel| rel.type_pred }.uniq
@@ -160,8 +166,13 @@ module ADSL
         @type_pred[variable]
       end
 
+      def precisely_of_type(var)
+        @precise_type_pred[var]
+      end
+
       def translate(translation)
         @type_pred = translation.create_predicate "of_#{@name}_type", 1
+        @precise_type_pred = translation.create_predicate "precisely_of_#{@name}_type", 1
       end
     end
 

@@ -158,7 +158,7 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
         ASTBlock.new(:statements => []),
         ASTBlock.new(:statements => [
           ASTEither.new(:blocks => [
-            ASTBlock.new(:statements => [ASTDeleteObj.new(:objset => ASTDummyObjset.new(:type => 1))]),
+            ASTBlock.new(:statements => [ASTDeleteObj.new(:objset => ASTDummyObjset.new(:type_sig => 1))]),
             ASTBlock.new(:statements => [])
           ])
         ]),
@@ -317,7 +317,7 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
       ASTObjsetStmt.new(
         :objset => ASTAssignment.new(:var_name => ASTIdent.new(:text => 'asd'), :objset => ASTEmptyObjset.new)
       ),
-      ASTDummyStmt.new(:type => :blah)
+      ASTDummyStmt.new(:label => :blah)
     ])
     assert_equal 6, ast.adsl_ast_size
 
@@ -354,7 +354,7 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
       :actions => [ASTAction.new(
         :name => ASTIdent.new(:text => 'action'),
         :block => ASTBlock.new(:statements => [
-          ASTDummyStmt.new(:type => :asd),
+          ASTDummyStmt.new(:label => :asd),
           ASTEither.new(:blocks => [
             ASTBlock.new(:statements => []),
             ASTBlock.new(:statements => [

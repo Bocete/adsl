@@ -18,10 +18,14 @@ rule
             | invariant_decl root_elems { val[1][2].unshift val[0]; return val[1] }
             |                           { return [[], [], []] }
 
-  class_decl: class IDENT '{' rel_decls '}' 
-                       { return ASTClass.new :lineno => val[0], :name => val[1], :relations => val[3] }
-            | class IDENT extends IDENT '{' rel_decls '}' 
-                       { return ASTClass.new :lineno => val[0], :name => val[1], :parent_name => val[3], :relations => val[5] }
+  class_decl: class IDENT opt_parents '{' rel_decls '}' 
+                       { return ASTClass.new :lineno => val[0], :name => val[1], :parent_names => val[2],  :relations => val[4] }
+
+  opt_parents: extends IDENT more_parents { val[2].unshift val[1]; return val[2] }
+             |                            { return [] }
+
+  more_parents: more_parents ',' IDENT { val[0] << val[2]; return val[0] }
+              |                        { return [] }
 
   rel_decls: rel_decls rel_decl { val[0] << val[1]; return val[0] }
            |                    { return [] }
