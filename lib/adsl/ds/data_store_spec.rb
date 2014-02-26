@@ -76,8 +76,8 @@ module ADSL
       def compare(other)
         return nil unless other.is_a? DSClass
         return 0  if self == other
-        return 1  if self.superclass_of?(other_class)
-        return -1 if other_class.superclass_of?(self)
+        return 1  if self.superclass_of?(other)
+        return -1 if other.superclass_of?(self)
         return nil
       end
 
@@ -143,8 +143,8 @@ module ADSL
       end
 
       def self.join(*type_sigs)
-        type_sigs.flatten.inject do |sig1, sig2|
-          new_sig = DSTypeSig.new (sig1.all_parents(true) & sig2.all_parents(true))
+        type_sigs.flatten.reject(&:nil_sig?).inject do |memo, sig|
+          new_sig = DSTypeSig.new (memo.all_parents(true) & sig.all_parents(true))
           raise "Incompatible type signatures joined: #{type_sigs.map(&:to_s).join}" if new_sig.nil_sig?
           new_sig
         end

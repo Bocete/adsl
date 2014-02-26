@@ -555,7 +555,7 @@ module ADSL
           @ar_class.singleton_class.send :define_method, :adsl_ast do
             ASTClass.new(
               :name => ASTIdent.new(:text => adsl_ast_class_name),
-              :parent_names => [adsl_ast_parent_name],
+              :parent_names => adsl_ast_parent_name.nil? ? [] : [adsl_ast_parent_name],
               :relations => adsl_ast_relations
             )
           end

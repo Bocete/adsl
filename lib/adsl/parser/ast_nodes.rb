@@ -313,7 +313,7 @@ module ADSL
       end
 
       def to_adsl
-        par_name = @parent_name.nil? ? "" : "extends #{@parent_name.text} "
+        par_names = @parent_names.empty? ? "" : "extends #{@parent_names.map(&:text).join(', ')} "
         "class #{ @name.text } #{ par_name }{\n#{ @relations.map(&:to_adsl).adsl_indent }}\n"
       end
     end
@@ -1237,7 +1237,7 @@ module ADSL
       def typecheck_and_resolve(context)
         objset = @objset.typecheck_and_resolve context
         raise ADSLError, 'Cannot create an object on an empty objset' if objset.type_sig.nil_sig?
-        relation = context.find_relation objset.type_sig.nil_sig?, @rel_name.text, @rel_name.lineno
+        relation = context.find_relation objset.type_sig, @rel_name.text, @rel_name.lineno
        
         create_objset = ASTCreateObjset.new(
           :class_name => ASTIdent.new(:text => relation.to_class.name)

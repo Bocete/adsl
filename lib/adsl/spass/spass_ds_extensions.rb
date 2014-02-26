@@ -37,9 +37,9 @@ module ADSL
           FOL::Or.new(@classes.map{ |c| c.precisely_of_type :o })
         ))
         translation.create_formula FOL::ForAll.new(:o, FOL::And.new(@classes.combination(2).map do |c1, c2|
-          FOL::Not.new(FOL::And.new(c1.precisely_of_type(o), c2.precisely_of_type(o)))
+          FOL::Not.new(FOL::And.new(c1.precisely_of_type(:o), c2.precisely_of_type(:o)))
         end))
-        children_rels = Hash.new{[]}
+        children_rels = Hash.new{|hash, key| hash[key] = []}
         @classes.each do |klass|
           if klass.parents.empty?
             children_rels[nil] << klass
@@ -121,6 +121,16 @@ module ADSL
       end
     end
 
+    class DSTypeSig
+      def [](variable)
+        FOL::And.new(@classes.map{ |c| c[variable] })
+      end
+
+      def to_spass_str
+        @classes.map(&:name).sort.join('_or_')
+      end
+    end
+
     class DSAction < DSNode
       include FOL
 
@@ -140,7 +150,7 @@ module ADSL
 
           translation.create_formula _for_all(:o, _implies(
             arg[:o],
-            _and(translation.existed_initially[:o], arg.type[:o])
+            _and(translation.existed_initially[:o], arg.type_sig[:o])
           ))
 
           translation.create_formula _exists(:o, arg[:o]) if cardinality[0] > 0
@@ -243,14 +253,11 @@ module ADSL
             formula
           end
           created_by_other_create_stmts << translation.existed_initially[o]
-          child_classes = translation.classes.select{ |c| c.parent == @klass }
-          not_of_child_types = _and(child_classes.map{ |c| _not(c[o]) })
           translation.create_formula _for_all(ps, o, _implies(
             @context_creation_link[ps, o], _and(
               context.type_pred(ps),
               _not(created_by_other_create_stmts),
-              @klass[o],
-              not_of_child_types
+              @klass.precisely_of_type(o),
             )
           ))
           translation.create_formula _for_all(ps, _implies(
@@ -304,7 +311,7 @@ module ADSL
       end
 
       def migrate_state_spass(translation)
-        state = translation.create_state "post_delete_#{@objset.type.name}"
+        state = translation.create_state "post_delete_#{@objset.type_sig.to_spass_str}"
         prev_state = translation.state
         context = translation.context
         
@@ -330,7 +337,7 @@ module ADSL
       end
 
       def migrate_state_spass(translation)
-        return if @objset1.type.nil? or @objset2.type.nil?
+        return if @objset1.type_sig.nil_sig? or @objset2.type_sig.nil_sig?
 
         state = translation.create_state "post_create_#{@relation.from_class.name}_#{@relation.name}"
         prev_state = translation.state
@@ -371,7 +378,7 @@ module ADSL
       end
 
       def migrate_state_spass(translation)
-        return if @objset1.type.nil? or @objset2.type.nil?
+        return if @objset1.type_sig.nil_sig? or @objset2.type_sig.nil_sig?
 
         state = translation.create_state "post_deleteref_#{@relation.from_class.name}_#{@relation.name}"
         prev_state = translation.state
@@ -563,7 +570,7 @@ module ADSL
       end
 
       def migrate_state_spass(translation)
-        return if @objset.type.nil?
+        return if @objset.type_sig.nil_sig?
 
         @pre_state = translation.state
         @post_state = translation.create_state :post_for_each
