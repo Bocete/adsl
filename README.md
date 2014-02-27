@@ -46,6 +46,10 @@ You can download the source using our public git clone URL:
 
 Feature requests and bug reports can be made at https://github.com/Bocete/adsl/issues
 
+Publications
+------------
+
+* Ivan Bocic and Tevfik Bultan. "[Inductive Verification of Data Model Invariants for Web Applications.](http://www.cs.ucsb.edu/~bo/papers/icse14.pdf)" To be published at ICSE 2014, Hyderabad, India, June 2014
 
 License
 -------
