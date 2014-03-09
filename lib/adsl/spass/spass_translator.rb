@@ -147,12 +147,14 @@ module ADSL
           translation.create_formula _for_all(ps, :c1, :c2, _implies(@before_pred[ps, :c1, :c2], _and(
             @type_pred[ps, :c1],
             @type_pred[ps, :c2],
-            _not(@before_pred[ps, :c2, :c1]),
+            _not(@before_pred[ps, :c2, :c1])
+          )))
+          translation.create_formula _for_all(ps, :c1, :c2,
             _implies(
               _and(@type_pred[ps, :c1], @type_pred[ps, :c2]),
               _or(_equal(:c1, :c2), @before_pred[ps, :c1, :c2], @before_pred[ps, :c2, :c1])
             )
-          )))
+          )
           translation.create_formula _for_all(ps, :c1, :c2, :c3, _implies(
             _and(@before_pred[ps, :c1, :c2], @before_pred[ps, :c2, :c3]),
             @before_pred[ps, :c1, :c3]

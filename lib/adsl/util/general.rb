@@ -2,6 +2,7 @@ require 'set'
 require 'open3'
 require 'thread'
 require 'active_support'
+require 'tempfile'
 
 class String
   def increment_suffix
@@ -68,6 +69,17 @@ class Array
     self.clear
     array.each{ |e| self << e }
     self
+  end
+end
+
+class Tempfile
+  def self.with_tempfile(content)
+    file = Tempfile.new('adsl_tempfile')
+    file.write content
+    file.close
+    yield file.path
+  ensure
+    file.unlink unless file.nil?
   end
 end
 

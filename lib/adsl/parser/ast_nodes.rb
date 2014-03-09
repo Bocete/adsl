@@ -758,6 +758,15 @@ module ADSL
     class ASTForEach < ASTNode
       node_type :var_name, :objset, :block, :node_type => :statement
 
+      def force_flat(value)
+        @force_flat = value
+      end
+
+      def flat?
+        # this should be a runtime check of dependencies etc
+        @force_flat.nil? ? true : @force_flat
+      end
+
       def typecheck_and_resolve(context)
         before_context = context.dup
         objset = @objset.typecheck_and_resolve context
@@ -789,10 +798,7 @@ module ADSL
           vars_read_before_being_written_to.delete var_name unless vars_written_to.include? var_name
         end
 
-        # this should be a runtime check of dependencies etc
-        flat = true
-
-        if flat
+        if flat?
           for_each = ADSL::DS::DSFlatForEach.new :objset => objset, :block => block
         else
           for_each = ADSL::DS::DSForEach.new :objset => objset, :block => block
@@ -1254,7 +1260,7 @@ module ADSL
       end
 
       def to_adsl
-        "derefcreate(#{@objset.to_adsl}.#{@rel_name.text})"
+        "create(#{@objset.to_adsl}.#{@rel_name.text})"
       end
     end
 

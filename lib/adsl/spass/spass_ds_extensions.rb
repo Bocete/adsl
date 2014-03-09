@@ -117,7 +117,7 @@ module ADSL
           translation.create_conjecture FOL::Not.new(FOL::And.new(invariants_formulae))
         end
 
-        return translation.to_spass_string
+        return translation
       end
     end
 
@@ -598,36 +598,9 @@ module ADSL
         end
 
         create_iteration_formulae translation
+
         translation.context = @context.parent
         translation.state = post_state
-      end
-    end
-
-    class DSForEach < DSForEachCommon
-      def prepare(translation)
-        prepare_with_context(translation, false)
-      end
-
-      def create_iteration_formulae(translation)
-        raise "Not implemented for flexible arities"
-        translation.create_formula _if_then_else_eq(
-          _exists(:c, :o, _and(old_state[:c, :o], @objset.resolve_objset(translation, :c, :o))),
-          _for_all(:parent, :c, :o, _implies(@context.parent_of_link[:parent, :c], _and(
-            _if_then_else(
-              @context.first[:parent, :c],
-              _equiv(old_state[:parent, :o], @pre_iteration_state[:c, :o]),
-              _for_all(:prev, _implies(
-                @context.just_before[:prev, :c],
-                _equiv(@post_iteration_state[:prev, :o], @pre_iteration_state[:c, :o])
-              ))
-            ),
-            _implies(
-              @context.last[:parent, :c],
-              _equiv(@post_state[:parent, :o], @post_iteration_state[:c, :o])
-            )
-          ))),
-          _for_all(:c, :o, _equiv(@pre_state[:c, :o], @post_state[:c, :o]))
-        )
       end
     end
 
@@ -659,6 +632,37 @@ module ADSL
       end
     end
 
+    class DSForEach < DSForEachCommon
+      def prepare(translation)
+        prepare_with_context(translation, false)
+      end
+
+      def create_iteration_formulae(translation)
+        context = translation.context
+        translation.reserve_names context.p_names, :prev, :o do |ps, prev, o|
+          ps_without_last = ps.first(ps.length - 1)
+          translation.create_formula _for_all(ps_without_last, _implies(
+            _not(_exists(ps.last, @context.type_pred(ps))),
+            _for_all(o, _equiv(@pre_state[ps_without_last, o], @post_state[ps_without_last, o]))
+          ))
+          translation.create_formula _for_all(ps, _implies(@context.type_pred(ps), _and(
+            _if_then_else(
+              _exists(prev, context.just_before[ps_without_last, prev, ps.last]),
+              _for_all(prev, _implies(
+                context.just_before[ps_without_last, prev, ps.last],
+                _for_all(o, _equiv(@pre_iteration_state[ps, o], @post_iteration_state[ps_without_last, prev, o]))
+              )),
+              _for_all(o, _equiv(@pre_iteration_state[ps, o], @pre_state[ps_without_last, o]))
+            ),
+            _implies(
+              _and(@context.type_pred(ps), _not(_exists(prev, context.just_before[ps_without_last, ps.last, prev]))),
+              _for_all(o, _equiv(@post_iteration_state[ps, o], @post_state[ps_without_last, o]))
+            )
+          )))
+        end
+      end
+    end
+
     class DSFlatForEach < DSForEachCommon
       def prepare(translation)
         prepare_with_context(translation, true)
@@ -666,18 +670,18 @@ module ADSL
 
       def create_iteration_formulae(translation)
         context = translation.context
-        translation.reserve_names context.p_names, :o, :c1, :c2 do |ps, o, c1, c2|
+        translation.reserve_names context.p_names, :o do |ps, o|
           ps_without_last = ps.first(ps.length - 1)
-          translation.create_formula _for_all(ps, o, _implies(
+          translation.create_formula _for_all(ps, _implies(
             @context.type_pred(ps),
-            _equiv(@pre_state[ps_without_last, o], @pre_iteration_state[ps, o])
+            _for_all(o, _equiv(@pre_state[ps_without_last, o], @pre_iteration_state[ps, o]))
           ))
-          translation.create_formula _for_all(ps_without_last, o, _if_then_else(
+          translation.create_formula _for_all(ps_without_last, _if_then_else(
             _not(_exists(ps.last, @context.type_pred(ps))),
-            _equiv(@pre_state[ps_without_last, o], @post_state[ps_without_last, o]),
+            _for_all(o, _equiv(@pre_state[ps_without_last, o], @post_state[ps_without_last, o])),
             _implies(
               @context.parent.type_pred(ps_without_last),
-              _equiv(
+              _for_all(o, _equiv(
                 @post_state[ps_without_last, o],
                 _or(
                   _and(
@@ -692,7 +696,7 @@ module ADSL
                     _exists(ps.last, @post_iteration_state[ps, o])
                   )
                 )
-              )
+              ))
             )
           ))
         end

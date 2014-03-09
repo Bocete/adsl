@@ -86,6 +86,15 @@ class ADSL::Parser::ADSLParser < Racc::Parser
       when (text = @ss.scan(/foreach\b/))
          action { [:foreach, lineno] }
 
+      when (text = @ss.scan(/flatforeach\b/))
+         action { [:flatforeach, lineno] }
+
+      when (text = @ss.scan(/unflatforeach\b/))
+         action { [:unflatforeach, lineno] }
+
+      when (text = @ss.scan(/foreach\b/))
+         action { [:foreach, lineno] }
+
       when (text = @ss.scan(/either\b/))
          action { [:either, lineno] }
 

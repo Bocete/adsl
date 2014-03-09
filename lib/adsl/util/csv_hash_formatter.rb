@@ -48,9 +48,11 @@ module ADSL
         @row_hashes.each do |row|
           next if row[col].nil?
           if row[col].is_a?(Numeric) && type.nil?
-            type = Numeric
+            type = :numeric
+          elsif row[col] == true || row[col] == false && type.nil?
+            type = :boolean
           elsif row[col].is_a?(String) || row[col].is_a?(Symbol)
-            type = String
+            type = :string
           end
         end
         type
@@ -70,8 +72,12 @@ module ADSL
           columns.map do |col|
             if types[col] == nil
               nil
-            elsif types[col] == Numeric
+            elsif types[col] == :numeric
               row[col] || -Float::INFINITY
+            elsif types[col] == :boolean
+              next 2 if row[col] == true
+              next 1 if row[col] == false
+              next 0
             else
               row[col] || ''
             end
@@ -85,7 +91,11 @@ module ADSL
         output = @columns.map{ |c| escape_str(c) }.join(',') + "\n"
         types = infer_column_types
         @row_hashes.each do |row|
-          output += @columns.map{ |c| types[c] == Numeric ? (row[c] || '') : escape_str(row[c] || '') }.join(',') + "\n"
+          output += @columns.map do |c|
+            next row[c] || '' if types[c] == :numeric
+            next row[c].nil? ? '' : "'#{row[c]}'" if types[c] == :boolean
+            escape_str(row[c] || '')
+          end.join(',') + "\n"
         end
         output
       end

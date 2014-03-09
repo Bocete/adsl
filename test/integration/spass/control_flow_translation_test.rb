@@ -2,6 +2,8 @@ require 'adsl/util/test_helper'
 require 'test/unit'
 
 class ControlFlowTranslationTest < Test::Unit::TestCase
+  include ADSL::FOL
+  
   def test_either__blank
     adsl_assert :correct, <<-ADSL
       class Class{}
@@ -465,6 +467,141 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
     ADSL
   end
 
+  def test__unflat_for_each_no_contradictions
+    adsl_assert :correct, <<-ADSL, :conjecture => true
+      class Class {}
+      action blah() {
+        unflatforeach c: allof(Class) {}
+      }
+    ADSL
+    adsl_assert :incorrect, <<-ADSL, :conjecture => false
+      class Class {}
+      action blah() {
+        unflatforeach c: allof(Class) {}
+      }
+    ADSL
+  end
+  
+  def test__unflat_empty_for_each_no_contradictions
+    adsl_assert :correct, <<-ADSL, :conjecture => true
+      action blah() {
+        unflatforeach c: empty {}
+      }
+    ADSL
+    adsl_assert :incorrect, <<-ADSL, :conjecture => false
+      action blah() {
+        unflatforeach c: empty {}
+      }
+    ADSL
+  end
+  
+  def test__unflat_one_for_each_no_contradictions
+    adsl_assert :correct, <<-ADSL, :conjecture => true
+      class Class {}
+      action blah() {
+        delete allof(Class)
+        create(Class)
+        unflatforeach c: allof(Class) {}
+      }
+    ADSL
+    adsl_assert :incorrect, <<-ADSL, :conjecture => false
+      class Class {}
+      action blah() {
+        delete allof(Class)
+        create(Class)
+        unflatforeach c: allof(Class) {}
+      }
+    ADSL
+  end
+  
+  def test__unflat_two_for_each_no_contradictions
+    adsl_assert :correct, <<-ADSL, :conjecture => true
+      class Class {}
+      action blah() {
+        delete allof(Class)
+        create(Class)
+        create(Class)
+        unflatforeach c: allof(Class) {}
+      }
+    ADSL
+    adsl_assert :incorrect, <<-ADSL, :conjecture => false
+      class Class {}
+      action blah() {
+        delete allof(Class)
+        create(Class)
+        create(Class)
+        unflatforeach c: allof(Class) {}
+      }
+    ADSL
+  end
+  
+  def test__unflat_three_for_each_no_contradictions
+    adsl_assert :correct, <<-ADSL, :conjecture => true
+      class Class {}
+      action blah() {
+        delete allof(Class)
+        create(Class)
+        create(Class)
+        create(Class)
+        unflatforeach c: allof(Class) {}
+      }
+    ADSL
+    adsl_assert :incorrect, <<-ADSL, :conjecture => false
+      class Class {}
+      action blah() {
+        delete allof(Class)
+        create(Class)
+        create(Class)
+        create(Class)
+        unflatforeach c: allof(Class) {}
+      }
+    ADSL
+  end
+
+  def test__unflat_noempty_iterations
+    adsl_assert :incorrect, <<-ADSL
+      class Class {}
+      action blah() {
+        unflatforeach c: allof(Class) {
+          delete c
+        }
+      }
+      invariant exists(Class c)
+    ADSL
+  end
+
+  def test__something_flat_can_do
+    adsl_assert :incorrect, <<-ADSL
+      class Class {
+        0+ Class other
+      }
+      action blah() {
+        flatforeach c: allof(Class) {
+          if not isempty(c.other) {
+            delete c
+          }
+        }
+      }
+      invariant exists(Class c: not isempty(c.other))
+    ADSL
+  end
+  
+  def test__something_unflat_cannot_do
+    adsl_assert :incorrect, <<-ADSL
+      class Class {
+        0+ Class other
+      }
+      action blah() {
+        unflatforeach c: allof(Class) {
+          if not isempty(c.other) {
+            delete c
+          }
+        }
+      }
+      invariant exists(Class c: not isempty(c.other))
+    ADSL
+  end
+  
   def test__all_objects_have_single_ref
     adsl_assert :correct, <<-ADSL
       class Class { 0+ Class rel }

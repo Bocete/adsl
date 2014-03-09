@@ -1,4 +1,5 @@
 #!/usr/bin/env ruby
+
 require 'pathname'
 require 'optparse'
 require 'ostruct'
@@ -12,6 +13,7 @@ options.timeout = 30
 options.output = 'terminal'
 options.actions = nil
 options.invariants = nil
+options.translate = false
 
 OptionParser.new do |opts|
   opts.banner = "Usage: verify-adsl [options] [input_file]"
@@ -23,6 +25,12 @@ OptionParser.new do |opts|
           "  Only 'spass' is supported so far",
           "  Default: #{options.language}") do |lang|
     options.language = lang
+  end
+
+  opts.on("-s", "--translate",
+          "Translate the specification onto the target language, without verification.",
+          "Translates the first action/invariant pair") do |translate|
+    options.translate = true
   end
   
   opts.on("-h", "--[no-]halt-on-error",
@@ -96,7 +104,8 @@ when 'spass'
       :timeout => options.timeout,
       :output => options.output,
       :actions => options.actions,
-      :invariants => options.invariants)
+      :invariants => options.invariants,
+      :translate => options.translate)
   rescue Exception => e
     $stderr.puts "Error thrown"
     $stderr.puts e.message unless e.message.nil? or e.message.strip.length == 0

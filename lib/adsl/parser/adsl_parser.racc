@@ -8,7 +8,7 @@ class ADSLParser
     left '.'
     right '='
   preclow
-  token class extends inverseof action foreach either or create delete if else subset oneof forceoneof allof invariant forall exists in isempty empty true false not and equal equiv implies unknown IDENT
+  token class extends inverseof action foreach flatforeach unflatforeach either or create delete if else subset oneof forceoneof allof invariant forall exists in isempty empty true false not and equal equiv implies unknown IDENT
   start adslspec
 rule
   adslspec: root_elems { return ASTSpec.new :lineno => lineno, :classes => val[0][0], :actions => val[0][1], :invariants => val[0][2] }
@@ -66,11 +66,23 @@ rule
            | objset '.' IDENT '=' objset {
                return ASTSetTup.new :lineno => val[0].lineno, :objset1 => val[0], :rel_name => val[2], :objset2 => val[4]
              }
-           | foreach IDENT ':' objset block {
-               return ASTForEach.new :lineno => val[0], :var_name => val[1], :objset => val[3], :block => val[4]
-             }
+           | foreach_stmt                   { return val[0] }
            | either block or eitherblocks   { val[3].unshift val[1]; return ASTEither.new :lineno => val[0], :blocks => val[3] }
            | if formula block optelse       { return ASTIf.new :lineno => val[0], :condition => val[1], :then_block => val[2], :else_block => val[3] }
+
+  foreach_stmt: foreach IDENT ':' objset block {
+               return ASTForEach.new :lineno => val[0], :var_name => val[1], :objset => val[3], :block => val[4]
+             }
+           | flatforeach IDENT ':' objset block {
+               f = ASTForEach.new :lineno => val[0], :var_name => val[1], :objset => val[3], :block => val[4]
+               f.force_flat(true)
+               return f
+             }
+           | unflatforeach IDENT ':' objset block {
+               f = ASTForEach.new :lineno => val[0], :var_name => val[1], :objset => val[3], :block => val[4]
+               f.force_flat(false)
+               return f
+             }
 
   optelse: else block  { return val[1] }
          |             { return ASTBlock.new :statements => [] }
@@ -86,7 +98,7 @@ rule
         | allof '(' IDENT ')'       { return ASTAllOf.new :lineno => val[0], :class_name => val[2] }
         | create '(' IDENT ')'      { return ASTCreateObjset.new :lineno => val[0], :class_name => val[2] }
         | create '(' objset '.' IDENT ')' {
-            return ASTDereferenceBuild.new :lineno => val[0].lineno, :objset => val[2], :rel_name => val[4]
+            return ASTDereferenceCreate.new :lineno => val[0], :objset => val[2], :rel_name => val[4]
           }
         | objset '.' IDENT         { return ASTDereference.new :lineno => val[0].lineno, :objset => val[0], :rel_name => val[2] }
         | empty                    { return ASTEmptyObjset.new :lineno => val[0] }

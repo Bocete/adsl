@@ -19,7 +19,8 @@ module ADSL
           :timeout => 180,
           :output => :terminal,
           :actions => nil,
-          :invariants => nil
+          :invariants => nil,
+          :translate => false
         }
       end
 
@@ -71,6 +72,14 @@ module ADSL
 
         options = default_options.merge options
 
+        if options[:translate]
+          action = filter_by_name(ds_spec.actions, options[:actions]).first
+          invariant = filter_by_name(ds_spec.invariants, options[:invariants]).first
+          translation = ds_spec.translate_action action.name, invariant
+          puts translation.to_spass_string
+          return
+        end
+
         stop_on_incorrect = options[:halt_on_error]
         check_satisfiability = options[:check_satisfiability]
         timeout = options[:timeout] || -1
@@ -92,7 +101,7 @@ module ADSL
             
             translation = nil
             translation_time = Time.time_execution do
-              translation = ds_spec.translate_action nil
+              translation = ds_spec.translate_action(nil).to_spass_string
             end
 
             result, stats = exec_spass translation, timeout, true
@@ -126,7 +135,7 @@ module ADSL
             begin
               translation = nil
               translation_time = Time.time_execution do
-                translation = ds_spec.translate_action action.name, invariant
+                translation = ds_spec.translate_action(action.name, invariant).to_spass_string
               end
               result, stats = exec_spass translation, timeout, do_stats
               if do_stats

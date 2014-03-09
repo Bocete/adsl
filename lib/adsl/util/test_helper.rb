@@ -15,7 +15,7 @@ class Test::Unit::TestCase
     ds_spec = ADSL::Parser::ADSLParser.new.parse input
     raise "Exactly one action required in ADSL" if ds_spec.actions.length != 1
     action_name = ds_spec.actions.first.name
-    spass = ds_spec.translate_action(action_name)
+    spass = ds_spec.translate_action(action_name).to_spass_string
     spass = replace_conjecture spass, options[:conjecture] if options.include? :conjecture
     result = exec_spass(spass, options[:timeout] || SPASS_TIMEOUT)
     if result == :inconclusive
@@ -48,12 +48,9 @@ class Test::Unit::TestCase
   end
 
   def in_temp_file(content)
-    file = Tempfile.new('test_util')
-    file.write content
-    file.close
-    yield file.path
-  ensure
-    file.unlink unless file.nil?
+    Tempfile.with_tempfile content do |path|
+      yield path
+    end
   end
 
   def assert_set_equal(expected, actual, failure_msg = nil)

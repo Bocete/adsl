@@ -1118,5 +1118,43 @@ module ADSL::Parser
       assert_equal 0, statements[1].then_block.statements.length
       assert_equal 1, statements[1].else_block.statements.length
     end
+
+    def test_action__force_loop_flatness
+      parser = ADSLParser.new
+      spec = nil
+
+      assert_nothing_raised ADSLError do
+        spec = parser.parse <<-ADSL
+          class Class {}
+          action blah() {
+            flatforeach a: allof(Class) {
+            }
+          }
+        ADSL
+      end
+      assert_equal DSFlatForEach, spec.actions.first.block.statements.first.class
+
+      assert_nothing_raised ADSLError do
+        spec = parser.parse <<-ADSL
+          class Class {}
+          action blah() {
+            unflatforeach a: allof(Class) {
+            }
+          }
+        ADSL
+      end
+      assert_equal DSForEach, spec.actions.first.block.statements.first.class
+      
+      assert_nothing_raised ADSLError do
+        spec = parser.parse <<-ADSL
+          class Class {}
+          action blah() {
+            foreach a: allof(Class) {
+            }
+          }
+        ADSL
+      end
+      assert_equal DSFlatForEach, spec.actions.first.block.statements.first.class
+    end
   end
 end
