@@ -3,6 +3,7 @@ require 'active_support'
 require 'pp'
 require 'set'
 require 'adsl/ds/data_store_spec'
+require 'adsl/ds/effect_domain_extensions'
 require 'adsl/util/general'
 
 class Array
@@ -314,7 +315,7 @@ module ADSL
 
       def to_adsl
         par_names = @parent_names.empty? ? "" : "extends #{@parent_names.map(&:text).join(', ')} "
-        "class #{ @name.text } #{ par_name }{\n#{ @relations.map(&:to_adsl).adsl_indent }}\n"
+        "class #{ @name.text } #{ par_names }{\n#{ @relations.map(&:to_adsl).adsl_indent }}\n"
       end
     end
     
@@ -762,11 +763,6 @@ module ADSL
         @force_flat = value
       end
 
-      def flat?
-        # this should be a runtime check of dependencies etc
-        @force_flat.nil? ? true : @force_flat
-      end
-
       def typecheck_and_resolve(context)
         before_context = context.dup
         objset = @objset.typecheck_and_resolve context
@@ -798,7 +794,21 @@ module ADSL
           vars_read_before_being_written_to.delete var_name unless vars_written_to.include? var_name
         end
 
-        if flat?
+        vars_needing_post_lambdas = vars_written_to & Set[*before_context.var_stack.map(&:keys).flatten]
+        
+        flat = if @force_flat.nil?
+          if vars_needing_post_lambdas.empty?
+            info = ADSL::DS::NodeEffectDomainInfo.new
+            block.effect_domain_analysis context, info
+            !info.conflicting?
+          else
+            false
+          end
+        else
+          @force_flat
+        end
+
+        if flat
           for_each = ADSL::DS::DSFlatForEach.new :objset => objset, :block => block
         else
           for_each = ADSL::DS::DSForEach.new :objset => objset, :block => block
@@ -816,7 +826,16 @@ module ADSL
         
         iterator_objset = ADSL::DS::DSForEachIteratorObjset.new :for_each => for_each
         block.replace temp_iterator_objset, iterator_objset
-        return for_each
+
+        post_lambda_assignments = vars_needing_post_lambdas.map do |var_name|
+          before_var_node, before_var = before_context.lookup_var var_name, false
+          inside_var_node, inside_var = context.lookup_var var_name, false
+          lambda_objset = ADSL::DS::DSForEachPostLambdaObjset.new :for_each => for_each, :before_var => before_var, :inside_var => inside_var
+          var = ADSL::DS::DSVariable.new :name => var_name, :type_sig => before_var.type_sig
+          ADSL::DS::DSAssignment.new :var => var, :objset => lambda_objset
+        end
+
+        return [for_each, post_lambda_assignments]
       end
 
       def list_creations

@@ -95,9 +95,7 @@ class ADSL::Verification::RailsVerificationTest < ADSL::Extract::Rails::RailsIns
     AsdsController.class_exec do
       def nothing
         Asd.all.each do |asd|
-          asd.blahs.each do |blah|
-            blah.delete
-          end
+          asd.delete
         end
       end
     end
@@ -113,9 +111,7 @@ class ADSL::Verification::RailsVerificationTest < ADSL::Extract::Rails::RailsIns
     AsdsController.class_exec do
       def nothing
         Asd.all.each do |asd|
-          asd.kmes.each do |kme|
-            kme.delete
-          end
+          asd.delete
         end
       end
     end

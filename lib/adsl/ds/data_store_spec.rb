@@ -98,7 +98,7 @@ module ADSL
       
       def canonize!
         @classes.dup.each do |klass|
-          @classes -= klass.all_parents
+          @classes -= klass.all_parents(false)
         end
       end
 
@@ -107,8 +107,8 @@ module ADSL
         my_full_tree    = self.classes.map{ |k| k.all_parents true }.inject(&:+)
         other_full_tree = other.classes.map{ |k| k.all_parents true }.inject(&:+)
         return 0  if my_full_tree == other_full_tree
-        return -1 if my_full_tree >  other_full_tree
-        return 1  if my_full_tree <  other_full_tree
+        return -1 if my_full_tree.superset? other_full_tree
+        return 1  if my_full_tree.subset?   other_full_tree
         return nil
       end
 
@@ -186,10 +186,6 @@ module ADSL
 
     class DSCreateObj < DSNode
       container_for :klass
-      
-      def entity_class_writes
-        Set[@klass]
-      end
     end
     
     class DSCreateObjset < DSNode
