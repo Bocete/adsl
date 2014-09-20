@@ -56,9 +56,12 @@ module ADSL
           subformula = block.(*block.parameters.map do |param|
             param_types[param[1].to_sym].new :adsl_ast => ASTVariable.new(:var_name => t(param[1]))
           end)
-          subformula = true if subformula.nil?
-          raise "Invalid formula returned by block in `#{quantifier}'" unless subformula.respond_to? :adsl_ast 
-          fb.adsl_stack << adsl_ast_node_klass.new(:vars => vars_and_objsets, :subformula => subformula.adsl_ast)
+          subformula = subformula.adsl_ast if subformula.respond_to? :adsl_ast
+          subformula = ASTBoolean.new(:bool_value => true) if subformula.nil?
+          unless subformula.is_a?(ASTNode) && subformula.class.is_formula? 
+            raise "Invalid formula #{subformula} returned by block in `#{quantifier}'"
+          end
+          fb.adsl_stack << adsl_ast_node_klass.new(:vars => vars_and_objsets, :subformula => subformula)
         end
       end
 

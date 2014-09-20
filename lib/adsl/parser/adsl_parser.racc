@@ -8,7 +8,7 @@ class ADSLParser
     left '.'
     right '='
   preclow
-  token class extends inverseof action foreach flatforeach unflatforeach either or create delete if else subset oneof forceoneof allof invariant forall exists in isempty empty true false not and equal equiv implies unknown IDENT
+  token class extends inverseof action foreach flatforeach unflatforeach either or create delete if else subset oneof tryoneof allof invariant forall exists in isempty empty true false not and equal equiv implies unknown IDENT BASIC_TYPE JS
   start adslspec
 rule
   adslspec: root_elems { return ASTSpec.new :lineno => lineno, :classes => val[0][0], :actions => val[0][1], :invariants => val[0][2] }
@@ -18,8 +18,8 @@ rule
             | invariant_decl root_elems { val[1][2].unshift val[0]; return val[1] }
             |                           { return [[], [], []] }
 
-  class_decl: class IDENT opt_parents '{' rel_decls '}' 
-                       { return ASTClass.new :lineno => val[0], :name => val[1], :parent_names => val[2],  :relations => val[4] }
+  class_decl: class IDENT opt_parents '{' member_decls '}' 
+                       { return ASTClass.new :lineno => val[0], :name => val[1], :parent_names => val[2],  :members => val[4] }
 
   opt_parents: extends IDENT more_parents { val[2].unshift val[1]; return val[2] }
              |                            { return [] }
@@ -27,10 +27,11 @@ rule
   more_parents: more_parents ',' IDENT { val[0] << val[2]; return val[0] }
               |                        { return [] }
 
-  rel_decls: rel_decls rel_decl { val[0] << val[1]; return val[0] }
-           |                    { return [] }
+  member_decls: member_decls member_decl { val[0] << val[1]; return val[0] }
+              |                          { return [] }
 
-  rel_decl: cardinality IDENT IDENT inverse_suffix { return ASTRelation.new :lineno => val[0][2], :cardinality => val[0].first(2), :to_class_name => val[1], :name => val[2], :inverse_of_name => val[3] }
+  member_decl: cardinality IDENT IDENT inverse_suffix { return ASTRelation.new :lineno => val[0][2], :cardinality => val[0].first(2), :to_class_name => val[1], :name => val[2], :inverse_of_name => val[3] }
+             | BASIC_TYPE IDENT { return ASTBasicTypeField.new :lineno => val[0][1], :type_name => val[0][0], :name => val[1] }
 
   cardinality: card_number                  { return [val[0][0], val[0][0], val[0][1]] }
              | card_number '..' card_number { return [val[0][0], val[2][0], val[0][1]] }
@@ -55,30 +56,30 @@ rule
   statements: statement statements { val[1].unshift val[0]; return val[1] }
             |                      { return [] }
 
-  statement: objset                         { return ASTObjsetStmt.new :lineno => val[0].lineno, :objset => val[0] }
-           | delete objset                  { return ASTDeleteObj.new :lineno => val[0], :objset => val[1] }
-           | objset '.' IDENT '+=' objset {
+  statement: expr                         { return ASTExprStmt.new :lineno => val[0].lineno, :expr => val[0] }
+           | delete expr                  { return ASTDeleteObj.new :lineno => val[0], :objset => val[1] }
+           | expr '.' IDENT '+=' expr {
                return ASTCreateTup.new :lineno => val[0].lineno, :objset1 => val[0], :rel_name => val[2], :objset2 => val[4]
              }
-           | objset '.' IDENT '-=' objset {
+           | expr '.' IDENT '-=' expr {
                return ASTDeleteTup.new :lineno => val[0].lineno, :objset1 => val[0], :rel_name => val[2], :objset2 => val[4]
              }
-           | objset '.' IDENT '=' objset {
-               return ASTSetTup.new :lineno => val[0].lineno, :objset1 => val[0], :rel_name => val[2], :objset2 => val[4]
+           | expr '.' IDENT '=' expr {
+               return ASTMemberSet.new :lineno => val[0].lineno, :objset => val[0], :member_name => val[2], :expr => val[4]
              }
            | foreach_stmt                   { return val[0] }
            | either block or eitherblocks   { val[3].unshift val[1]; return ASTEither.new :lineno => val[0], :blocks => val[3] }
            | if formula block optelse       { return ASTIf.new :lineno => val[0], :condition => val[1], :then_block => val[2], :else_block => val[3] }
 
-  foreach_stmt: foreach IDENT ':' objset block {
+  foreach_stmt: foreach IDENT ':' expr block {
                return ASTForEach.new :lineno => val[0], :var_name => val[1], :objset => val[3], :block => val[4]
              }
-           | flatforeach IDENT ':' objset block {
+           | flatforeach IDENT ':' expr block {
                f = ASTForEach.new :lineno => val[0], :var_name => val[1], :objset => val[3], :block => val[4]
                f.force_flat(true)
                return f
              }
-           | unflatforeach IDENT ':' objset block {
+           | unflatforeach IDENT ':' expr block {
                f = ASTForEach.new :lineno => val[0], :var_name => val[1], :objset => val[3], :block => val[4]
                f.force_flat(false)
                return f
@@ -90,18 +91,20 @@ rule
   eitherblocks: eitherblocks or block { val[0] << val[2]; return val[0] }
               | block                 { return [val[0]] }
 
-  objset: IDENT                     { return ASTVariable.new :lineno => val[0].lineno, :var_name => val[0] }
-        | IDENT '=' objset          { return ASTAssignment.new :lineno => val[0].lineno, :var_name => val[0], :objset => val[2] }
-        | subset '(' objset ')'     { return ASTSubset.new :lineno => val[0], :objset => val[2] }
-        | oneof '(' objset ')'      { return ASTOneOf.new :lineno => val[0], :objset => val[2] }
-        | forceoneof '(' objset ')' { return ASTForceOneOf.new :lineno => val[0], :objset => val[2] }
-        | allof '(' IDENT ')'       { return ASTAllOf.new :lineno => val[0], :class_name => val[2] }
-        | create '(' IDENT ')'      { return ASTCreateObjset.new :lineno => val[0], :class_name => val[2] }
-        | create '(' objset '.' IDENT ')' {
-            return ASTDereferenceCreate.new :lineno => val[0], :objset => val[2], :rel_name => val[4]
-          }
-        | objset '.' IDENT         { return ASTDereference.new :lineno => val[0].lineno, :objset => val[0], :rel_name => val[2] }
-        | empty                    { return ASTEmptyObjset.new :lineno => val[0] }
+  expr: IDENT                     { return ASTVariable.new :lineno => val[0].lineno, :var_name => val[0] }
+      | IDENT '=' expr            { return ASTAssignment.new :lineno => val[0].lineno, :var_name => val[0], :expr => val[2] }
+      | subset '(' expr ')'       { return ASTSubset.new :lineno => val[0], :objset => val[2] }
+      | oneof '(' expr ')'        { return ASTOneOf.new :lineno => val[0], :objset => val[2] }
+      | tryoneof '(' expr ')'     { return ASTTryOneOf.new :lineno => val[0], :objset => val[2] }
+      | allof '(' IDENT ')'       { return ASTAllOf.new :lineno => val[0], :class_name => val[2] }
+      | create '(' IDENT ')'      { return ASTCreateObjset.new :lineno => val[0], :class_name => val[2] }
+      | create '(' expr '.' IDENT ')' {
+          return ASTDereferenceCreate.new :lineno => val[0], :objset => val[2], :rel_name => val[4]
+        }
+      | expr '.' IDENT           { return ASTMemberAccess.new :lineno => val[0].lineno, :objset => val[0], :member_name => val[2] }
+      | empty                    { return ASTEmptyObjset.new :lineno => val[0] }
+      | '(' expr ')'             { return val[1] }
+      | JS                       { return ASTJsExpr.new :lineno => val[:lineno], :js => val[:js] }
 
   invariant_decl: invariant formula           { return ASTInvariant.new :lineno => val[0], :name => nil, :formula => val[1] }
                 | invariant IDENT ':' formula { return ASTInvariant.new :lineno => val[0], :name => val[1], :formula => val[3] }
@@ -127,24 +130,26 @@ rule
            { return ASTEquiv.new :lineno => val[0], :subformulae => [val[2], val[4]] + val[5] }
          | implies '(' formula ',' formula ')'
            { return ASTImplies.new :lineno => val[0], :subformula1 => val[2], :subformula2 => val[4] }
-         | objset '==' objset
-           { return ASTEqual.new :lineno => val[0].lineno, :objsets => [val[0], val[2]] }
-         | objset '!=' objset
-           { return ASTNot.new(:lineno => val[0].lineno, :subformula => ASTEqual.new(:lineno => val[0].lineno, :objsets => [val[0], val[2]])) }
-         | equal '(' objset ',' objset additional_objsets ')'
-           { return ASTEqual.new :lineno => val[0], :objsets => [val[2], val[4]] + val[5] }
-         | objset in objset           { return ASTIn.new :lineno => val[0].lineno, :objset1 => val[0], :objset2 => val[2] }
-         | true                       { return ASTBoolean.new :lineno => val[0], :bool_value => true  }
-         | false                      { return ASTBoolean.new :lineno => val[0], :bool_value => false }
-         | '*'                        { return ASTBoolean.new :lineno => val[0], :bool_value => nil   }
-         | isempty '(' objset ')'     { return ASTIsEmpty.new :lineno => val[0], :objset => val[2] }
+         | expr '==' expr
+           { return ASTEqual.new :lineno => val[0].lineno, :exprs => [val[0], val[2]] }
+         | expr '!=' expr
+           { return ASTNot.new(:lineno => val[0].lineno, :subformula => ASTEqual.new(:lineno => val[0].lineno, :exprs => [val[0], val[2]])) }
+         | equal '(' expr ',' expr additional_exprs ')'
+           { return ASTEqual.new :lineno => val[0], :exprs => [val[2], val[4]] + val[5] }
+         | expr in expr          { return ASTIn.new :lineno => val[0].lineno, :objset1 => val[0], :objset2 => val[2] }
+         | true                  { return ASTBoolean.new :lineno => val[0], :bool_value => true  }
+         | false                 { return ASTBoolean.new :lineno => val[0], :bool_value => false }
+         | '*'                   { return ASTBoolean.new :lineno => val[0], :bool_value => nil   }
+         | isempty '(' expr ')'  { return ASTIsEmpty.new :lineno => val[0], :objset => val[2] }
 
   quantifier_parameters_with_commas: quantifier_parameters_with_commas ',' quantifier_parameter
             { val[0] << val[2]; return val[0] }
                                    | quantifier_parameter { return [val[0]] }
 
-  quantifier_parameter: IDENT IDENT { return [val[1], ASTAllOf.new(:lineno => val[0].lineno, :class_name => val[0]), val[0].lineno] }
-                      | IDENT in objset         { return [val[0], val[2], val[0].lineno] }
+  quantifier_parameter: IDENT IDENT {
+                          return [val[1], ASTAllOf.new(:lineno => val[0].lineno, :class_name => val[0]), val[0].lineno]
+                        }
+                      | IDENT in expr { return [val[0], val[2], val[0].lineno] }
 
   optional_formula: ':' formula { return val[1] }
                   |             { return nil }
@@ -152,8 +157,8 @@ rule
   additional_formulae: additional_formulae ',' formula { val[0] << val[2]; return val[0] }
                      |                                 { return [] }
 
-  additional_objsets: additional_objsets ',' objset { val[0] << val[2]; return val[0] }
-                    |                               { return [] }
+  additional_exprs: additional_exprs ',' expr { val[0] << val[2]; return val[0] }
+                  |                           { return [] }
 
 end
 

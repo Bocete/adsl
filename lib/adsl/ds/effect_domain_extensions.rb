@@ -4,54 +4,30 @@ require 'adsl/parser/ast_nodes'
 module ADSL
   module Parser
     class ASTTypecheckResolveContext
-      def children(type_sig)
-        type_sig.classes.map{ |c| c.children(true) }.inject(&:+)
-      end
-
-      def set_children_to_classes
-        @classes.values.map(&:last).each do |klass|
-          klass.to_sig.all_parents(false).each do |parent|
-            parent.children << klass
-          end
-        end
-      end
-
       def relations_around(*classes)
         classes = classes.flatten.map do |c|
           c.respond_to?(:to_a) ? c.to_a : c
         end
         classes = Set[*classes.flatten]
-        Set[*@relations.values.map(&:values).flatten(1).map(&:last).select do |rel|
-          classes.include?(rel.from_class) || classes.include?(rel.to_class)
+        Set[*@members.values.map(&:values).flatten(1).map(&:last).select do |rel|
+          rel.is_a?(ADSL::DS::DSRelation) && (classes.include?(rel.from_class) || classes.include?(rel.to_class))
         end]
       end
     end
 
+    # declaration required because of dependencies
     class ASTNode
     end
 
     class ASTDummyObjset < ::ADSL::Parser::ASTNode
       def objset_effect_domain_analysis(context, info)
-        return @type_sig.children(true), false
+        return [], true if @type_sig.card_none?
+        return @type_sig.all_children(true), false
       end
     end
   end
 
   module DS
-    class DSClass
-      # to be initialized by the context
-      def children(include_self = false)
-        @children ||= Set.new
-        include_self ? @children + [self] : @children
-      end
-    end
-
-    class DSTypeSig
-      def children(include_self = false)
-        @classes.map{ |c| c.children include_self }.inject(&:+)
-      end
-    end
-
     class NodeEffectDomainInfo
       attr_accessor :info
 
@@ -95,7 +71,7 @@ module ADSL
         domain = domain.to_sig if domain.is_a? ADSL::DS::DSClass
 
         domains = nil
-        if domain.is_a?(ADSL::DS::DSTypeSig)
+        if domain.is_a?(ADSL::DS::TypeSig::ObjsetType)
           domains = domain.classes
         elsif domain.respond_to?(:each)
           domains = domain
@@ -121,7 +97,7 @@ module ADSL
       end
     end
 
-    class DSBlock
+    class DSBlock < DSNode
       def effect_domain_analysis(context, info)
         @statements.each do |s|
           s.effect_domain_analysis context, info
@@ -129,19 +105,19 @@ module ADSL
       end
     end
 
-    class DSCreateObj
+    class DSCreateObj < DSNode
       def effect_domain_analysis(context, info)
         info.create [@klass], true
       end
     end
 
-    class DSCreateObjset
+    class DSCreateObjset < DSNode
       def objset_effect_domain_analysis(context, info)
         return [@createobj.klass], true
       end
     end
 
-    class DSDeleteObj
+    class DSDeleteObj < DSNode
       def effect_domain_analysis(context, info)
         objset_types, local = @objset.objset_effect_domain_analysis(context, info)
         info.delete objset_types, local
@@ -154,15 +130,15 @@ module ADSL
       end
     end
 
-    class DSAssignment
+    class DSAssignment < DSNode
       def effect_domain_analysis(context, info)
-        types, local = @objset.objset_effect_domain_analysis context, info
+        types, local = @expr.objset_effect_domain_analysis context, info
         @var.assigned_types = types
         @var.assigned_local = local
       end
     end
 
-    class DSCreateTup
+    class DSCreateTup < DSNode
       def effect_domain_analysis(context, info)
         objset1_types, local1 = @objset1.objset_effect_domain_analysis context, info
         objset2_types, local2 = @objset2.objset_effect_domain_analysis context, info
@@ -173,7 +149,7 @@ module ADSL
       end
     end
     
-    class DSDeleteTup
+    class DSDeleteTup < DSNode
       def effect_domain_analysis(context, info)
         objset1_types, local1 = @objset1.objset_effect_domain_analysis context, info
         objset2_types, local2 = @objset2.objset_effect_domain_analysis context, info
@@ -184,7 +160,12 @@ module ADSL
       end
     end
 
-    class DSEither
+    class DSFieldSet < DSNode
+      def effect_domain_analysis(context, info)
+      end
+    end
+
+    class DSEither < DSNode
       def effect_domain_analysis(context, info)
         @blocks.each do |b|
           b.effect_domain_analysis context, info
@@ -192,7 +173,7 @@ module ADSL
       end
     end
 
-    class DSEitherLambdaObjset
+    class DSEitherLambdaObjset < DSNode
       def objset_effect_domain_analysis(context, info)
         types_aggregate, local_aggregate = Set[], true
         @objsets.each do |o|
@@ -204,7 +185,7 @@ module ADSL
       end
     end
 
-    class DSIf
+    class DSIf < DSNode
       def effect_domain_analysis(context, info)
         @condition.formula_effect_domain_analysis context, info
         @then_block.effect_domain_analysis context, info
@@ -212,7 +193,7 @@ module ADSL
       end
     end
 
-    class DSIfLambdaObjset
+    class DSIfLambdaObjset < DSNode
       def objset_effect_domain_analysis(context, info)
         then_types, then_local = @then_objset.objset_effect_domain_analysis(context, info)
         else_types, else_local = @else_objset.objset_effect_domain_analysis(context, info)
@@ -221,7 +202,7 @@ module ADSL
       end
     end
 
-    class DSForEachCommon
+    class DSForEachCommon < DSNode
       def effect_domain_analysis(context, info)
         types, local = @objset.objset_effect_domain_analysis(context, info)
         info.read types, local
@@ -230,13 +211,13 @@ module ADSL
       end
     end
 
-    class DSForEachIteratorObjset
+    class DSForEachIteratorObjset < DSNode
       def objset_effect_domain_analysis(context, info)
         return @for_each.objset.type_sig.children(true), true
       end
     end
 
-    class DSForEachPreLambdaObjset
+    class DSForEachPreLambdaObjset < DSNode
       def objset_effect_domain_analysis(context, info)
         before_types, before_local = @before_var.objset_effect_domain_analysis(context, info)
         inside_types, inside_local = @inside_var.objset_effect_domain_analysis(context, info)
@@ -245,7 +226,7 @@ module ADSL
       end
     end
 
-    class DSForEachPostLambdaObjset
+    class DSForEachPostLambdaObjset < DSNode
       def objset_effect_domain_analysis(context, info)
         before_types, before_local = @before_var.objset_effect_domain_analysis(context, info)
         inside_types, inside_local = @inside_var.objset_effect_domain_analysis(context, info)
@@ -254,17 +235,17 @@ module ADSL
       end
     end
 
-    class DSVariable
+    class DSVariable < DSNode
       attr_accessor :assigned_types, :assigned_local
 
       def objset_effect_domain_analysis(context, info)
-        @assigned_types ||= type_sig.children(true)
+        @assigned_types ||= type_sig.all_children(true)
         @assigned_local = false if @assigned_local.nil?
         return @assigned_types, @assigned_local
       end
     end
 
-    class DSUnion
+    class DSUnion < DSNode
       def objset_effect_domain_analysis(context, info)
         types_aggregate, local_aggregate = Set[], true
         @objsets.each do |o|
@@ -276,7 +257,7 @@ module ADSL
       end
     end
 
-    class DSJoinObjset
+    class DSJoinObjset < DSNode
       def objset_effect_domain_analysis(context, info)
         types_aggregate, local_aggregate = Set[], true
         @objsets.each do |o|
@@ -288,7 +269,7 @@ module ADSL
       end
     end
 
-    class DSDereference
+    class DSDereference < DSNode
       def objset_effect_domain_analysis(context, info)
         objset_types, local = @objset.objset_effect_domain_analysis context, info
         relation = @relation.inverse_of.nil? ? @relation : @relation.inverse_of
@@ -296,46 +277,46 @@ module ADSL
         info.read objset_types, local
         info.read relation, local
 
-        return relation.to_class.children(true), false
+        return relation.to_class.all_children(true), false
       end
     end
 
-    class DSAllOf
+    class DSAllOf < DSNode
       def objset_effect_domain_analysis(context, info)
-        return @klass.children(true), false
+        return @klass.all_children(true), false
       end
     end
 
-    class DSSubset
+    class DSSubset < DSNode
       def objset_effect_domain_analysis(context, info)
         return @objset.objset_effect_domain_analysis(context, info)
       end
     end
     
-    class DSOneOf
+    class DSOneOf < DSNode
       def objset_effect_domain_analysis(context, info)
         return @objset.objset_effect_domain_analysis(context, info)
       end
     end
     
-    class DSForceOneOf
+    class DSForceOneOf < DSNode
       def objset_effect_domain_analysis(context, info)
         return @objset.objset_effect_domain_analysis(context, info)
       end
     end
 
-    class DSEmptyObjset
+    class DSEmptyObjset < DSNode
       def objset_effect_domain_analysis(context, info)
         return Set[], true
       end
     end
 
-    class DSBoolean
+    class DSBoolean < DSNode
       def formula_effect_domain_analysis(context, info)
       end
     end
 
-    class DSForAll
+    class DSForAll < DSNode
       def formula_effect_domain_analysis(context, info)
         @vars.each_index do |index|
           @vars[index].assigned_types, @vars[index].assigned_local = @objsets[index].objset_effect_domain_analysis(context, info)
@@ -344,7 +325,7 @@ module ADSL
       end
     end
     
-    class DSExists
+    class DSExists < DSNode
       def formula_effect_domain_analysis(context, info)
         @vars.each_index do |index|
           @vars[index].assigned_types, @vars[index].assigned_local = @objsets[index].objset_effect_domain_analysis(context, info)
@@ -353,7 +334,7 @@ module ADSL
       end
     end
 
-    class DSQuantifiedVariable
+    class DSQuantifiedVariable < DSNode
       attr_accessor :assigned_types, :assigned_local
 
       def objset_effect_domain_analysis(context, info)
@@ -363,7 +344,7 @@ module ADSL
       end
     end
 
-    class DSIn
+    class DSIn < DSNode
       def formula_effect_domain_analysis(context, info)
         [@objset1, @objset2].each do |o|
           types, local = o.objset_effect_domain_analysis context, info
@@ -372,20 +353,20 @@ module ADSL
       end
     end
     
-    class DSIsEmpty
+    class DSIsEmpty < DSNode
       def formula_effect_domain_analysis(context, info)
         types, local = @objset.objset_effect_domain_analysis context, info
         info.read types, local
       end
     end
     
-    class DSNot
+    class DSNot < DSNode
       def formula_effect_domain_analysis(context, info)
         @subformula.formula_effect_domain_analysis context, info
       end
     end
 
-    class DSOr
+    class DSOr < DSNode
       def formula_effect_domain_analysis(context, info)
         @subformulae.each do |f|
           f.formula_effect_domain_analysis context, info
@@ -393,7 +374,7 @@ module ADSL
       end
     end
     
-    class DSAnd
+    class DSAnd < DSNode
       def formula_effect_domain_analysis(context, info)
         @subformulae.each do |f|
           f.formula_effect_domain_analysis context, info
@@ -401,7 +382,7 @@ module ADSL
       end
     end
     
-    class DSImplies
+    class DSImplies < DSNode
       def formula_effect_domain_analysis(context, info)
         [@subformula1, @subformula2].each do |f|
           f.formula_effect_domain_analysis context, info
@@ -409,7 +390,7 @@ module ADSL
       end
     end
 
-    class DSEquiv
+    class DSEquiv < DSNode
       def formula_effect_domain_analysis(context, info)
         @subformulae.each do |f|
           f.formula_effect_domain_analysis context, info
@@ -417,7 +398,7 @@ module ADSL
       end
     end
 
-    class DSEqual
+    class DSEqual < DSNode
       def formula_effect_domain_analysis(context, info)
         @objsets.each do |o|
           types, local = o.objset_effect_domain_analysis context, info

@@ -9,10 +9,14 @@ class ADSL::DS::AstNodesTest < Test::Unit::TestCase
 
   def setup
     @parent   = DSClass.new(:name => 'parent')
-    @child1   = ADSL::DS::DSClass.new(:name => 'child1', :parents => Set[@parent])
-    @subchild = ADSL::DS::DSClass.new(:name => 'subchild', :parents => Set[@child1])
-    @child2   = ADSL::DS::DSClass.new(:name => 'child2', :parents => Set[@parent])
-    @diamond  = ADSL::DS::DSClass.new(:name => 'diamond', :parents => Set[@child1, @child2])
+    @child1   = DSClass.new(:name => 'child1', :parents => Set[@parent])
+    @subchild = DSClass.new(:name => 'subchild', :parents => Set[@child1])
+    @child2   = DSClass.new(:name => 'child2', :parents => Set[@parent])
+    @diamond  = DSClass.new(:name => 'diamond', :parents => Set[@child1, @child2])
+
+    @parent.children = [@child1, @child2]
+    @child1.children = [@subchild, @diamond]
+    @child2.children = [@diamond]
     
     @classes = [@parent, @child1, @subchild, @child2, @diamond]
 
@@ -23,11 +27,9 @@ class ADSL::DS::AstNodesTest < Test::Unit::TestCase
     rel     = DSRelation.new(:from_class => @child1, :to_class => @child2, :name => 'child2', :inverse_of => nil)
     inv_rel = DSRelation.new(:from_class => @child2, :to_class => @child1, :name => 'child1', :inverse_of => rel)
     [rel, inv_rel].each do |rel|
-      rel.from_class.relations << rel
-      @context.relations[rel.from_class.name][rel.name] = [nil, rel]
+      rel.from_class.members << rel
+      @context.members[rel.from_class.name][rel.name] = [nil, rel]
     end
-
-    @context.set_children_to_classes
   end
 
   def test_node_effect_info__conflicting?
@@ -55,45 +57,45 @@ class ADSL::DS::AstNodesTest < Test::Unit::TestCase
   end
   
   def test_children_of_class
-    assert_equal Set[@parent, @child1, @child2, @subchild, @diamond], @parent.children(true)
-    assert_equal Set[@child1, @child2, @subchild, @diamond], @parent.children(false)
+    assert_equal Set[@parent, @child1, @child2, @subchild, @diamond], @parent.all_children(true)
+    assert_equal Set[@child1, @child2, @subchild, @diamond], @parent.all_children(false)
 
-    assert_equal Set[@subchild, @diamond, @child1], @child1.children(true)
-    assert_equal Set[@subchild, @diamond], @child1.children(false)
+    assert_equal Set[@subchild, @diamond, @child1], @child1.all_children(true)
+    assert_equal Set[@subchild, @diamond], @child1.all_children(false)
 
-    assert_equal Set[@diamond, @child2], @child2.children(true)
-    assert_equal Set[@diamond], @child2.children(false)
+    assert_equal Set[@diamond, @child2], @child2.all_children(true)
+    assert_equal Set[@diamond], @child2.all_children(false)
 
-    assert_equal Set[@diamond], @diamond.children(true)
-    assert_equal Set[], @diamond.children(false)
+    assert_equal Set[@diamond], @diamond.all_children(true)
+    assert_equal Set[], @diamond.all_children(false)
   end
   
   def test_children_of_type_sig
-    assert_equal Set[@parent, @child1, @child2, @subchild, @diamond], @parent.to_sig.children(true)
-    assert_equal Set[@child1, @child2, @subchild, @diamond], @parent.to_sig.children(false)
+    assert_equal Set[@parent, @child1, @child2, @subchild, @diamond], @parent.to_sig.all_children(true)
+    assert_equal Set[@child1, @child2, @subchild, @diamond], @parent.to_sig.all_children(false)
 
-    assert_equal Set[@subchild, @diamond, @child1], @child1.to_sig.children(true)
-    assert_equal Set[@subchild, @diamond], @child1.to_sig.children(false)
+    assert_equal Set[@subchild, @diamond, @child1], @child1.to_sig.all_children(true)
+    assert_equal Set[@subchild, @diamond], @child1.to_sig.all_children(false)
 
-    assert_equal Set[@diamond, @child2], @child2.to_sig.children(true)
-    assert_equal Set[@diamond], @child2.to_sig.children(false)
+    assert_equal Set[@diamond, @child2], @child2.to_sig.all_children(true)
+    assert_equal Set[@diamond], @child2.to_sig.all_children(false)
 
-    assert_equal Set[@diamond], @diamond.to_sig.children(true)
-    assert_equal Set[], @diamond.to_sig.children(false)
+    assert_equal Set[@diamond], @diamond.to_sig.all_children(true)
+    assert_equal Set[], @diamond.to_sig.all_children(false)
 
-    sig = DSTypeSig.new @child1, @child2
-    assert_equal Set[@child1, @child2, @diamond, @subchild], sig.children(true)
-    assert_equal Set[@diamond, @subchild], sig.children(false)
+    sig = TypeSig::ObjsetType.new @child1, @child2
+    assert_equal Set[@child1, @child2, @diamond, @subchild], sig.all_children(true)
+    assert_equal Set[@diamond, @subchild], sig.all_children(false)
   end
 
   def test_context_relations_around
     assert_equal Set[], @context.relations_around(@parent)
-    assert_equal Set[@child1.relations.first, @child2.relations.first], @context.relations_around(@child1)
-    assert_equal Set[@child1.relations.first, @child2.relations.first], @context.relations_around(@child2)
-    assert_equal Set[@child1.relations.first, @child2.relations.first], @context.relations_around(@child1, @child2)
-    assert_equal Set[@child1.relations.first, @child2.relations.first], @context.relations_around(@child1, @child2, @diamond)
+    assert_equal Set[@child1.members.first, @child2.members.first], @context.relations_around(@child1)
+    assert_equal Set[@child1.members.first, @child2.members.first], @context.relations_around(@child2)
+    assert_equal Set[@child1.members.first, @child2.members.first], @context.relations_around(@child1, @child2)
+    assert_equal Set[@child1.members.first, @child2.members.first], @context.relations_around(@child1, @child2, @diamond)
 
-    assert_equal Set[@child1.relations.first, @child2.relations.first], @context.relations_around(Set[@child1, @subchild, @parent])
+    assert_equal Set[@child1.members.first, @child2.members.first], @context.relations_around(Set[@child1, @subchild, @parent])
   end
   
   def test_node_effect_info__conflicting_with_type_sigs
@@ -109,7 +111,7 @@ class ADSL::DS::AstNodesTest < Test::Unit::TestCase
     
     node_info = NodeEffectDomainInfo.new
     node_info.create @child1
-    node_info.read   @parent.children(true)
+    node_info.read   @parent.all_children(true)
     assert node_info.conflicting?
     
     node_info = NodeEffectDomainInfo.new
@@ -185,7 +187,7 @@ class ADSL::DS::AstNodesTest < Test::Unit::TestCase
       DSCreateObj.new(:klass => @child2),
       DSDeleteObj.new(:objset => DSDereference.new(
         :objset => DSCreateObjset.new(:createobj => child1create),
-        :relation => @child1.relations.first)
+        :relation => @child1.members.first)
       )
     ]
     info = NodeEffectDomainInfo.new
@@ -200,7 +202,7 @@ class ADSL::DS::AstNodesTest < Test::Unit::TestCase
     info = NodeEffectDomainInfo.new
     block.effect_domain_analysis @context, info
     assert_false info.conflicting?
-    info.read @child1.relations.first
+    info.read @child1.members.first
     assert info.conflicting?
   end
 
@@ -209,7 +211,7 @@ class ADSL::DS::AstNodesTest < Test::Unit::TestCase
       create = DSCreateObj.new(:klass => @child1),
       assign = DSAssignment.new(
         :var => (var = DSVariable.new :name => 'var', :type_sig => @child1.to_sig),
-        :objset => DSCreateObjset.new(:createobj => create)
+        :expr => DSCreateObjset.new(:createobj => create)
       ),
       DSDeleteObj.new(:objset => var)
     ]

@@ -67,45 +67,45 @@ module ADSL::Extract::Rails
       initialize_metaclasses
       
       asd = Asd.adsl_ast
-      assert_equal 1, asd.relations.length
-      assert_equal [0, 1.0/0.0], asd.relations.first.cardinality
-      assert_equal 'Mod_Blah', asd.relations.first.to_class_name.text
-      assert_equal 'blahs', asd.relations.first.name.text
-      assert_equal 'asd', asd.relations.first.inverse_of_name.text
+      assert_equal 1, asd.members.length
+      assert_equal [0, 1.0/0.0], asd.members.first.cardinality
+      assert_equal 'Mod_Blah', asd.members.first.to_class_name.text
+      assert_equal 'blahs', asd.members.first.name.text
+      assert_equal 'asd', asd.members.first.inverse_of_name.text
 
       kme = Kme.adsl_ast
-      assert_equal 1, kme.relations.length
-      assert_equal [0, 1], kme.relations.last.cardinality
-      assert_equal 'Mod_Blah', kme.relations.last.to_class_name.text
-      assert_equal 'blah', kme.relations.last.name.text
-      assert_nil kme.relations.last.inverse_of_name
+      assert_equal 1, kme.members.length
+      assert_equal [0, 1], kme.members.last.cardinality
+      assert_equal 'Mod_Blah', kme.members.last.to_class_name.text
+      assert_equal 'blah', kme.members.last.name.text
+      assert_nil kme.members.last.inverse_of_name
 
       blah = Mod::Blah.adsl_ast
-      assert_equal 2, blah.relations.length
+      assert_equal 2, blah.members.length
 
-      assert_equal [0, 1], blah.relations.first.cardinality
-      assert_equal 'Asd', blah.relations.first.to_class_name.text
-      assert_equal 'asd', blah.relations.first.name.text
-      assert_nil blah.relations.first.inverse_of_name
+      assert_equal [0, 1], blah.members.first.cardinality
+      assert_equal 'Asd', blah.members.first.to_class_name.text
+      assert_equal 'asd', blah.members.first.name.text
+      assert_nil blah.members.first.inverse_of_name
 
-      assert_equal [0, 1], blah.relations.second.cardinality
-      assert_equal 'Kme', blah.relations.second.to_class_name.text
-      assert_equal 'kme12', blah.relations.second.name.text
-      assert_equal 'blah', blah.relations.second.inverse_of_name.text
+      assert_equal [0, 1], blah.members.second.cardinality
+      assert_equal 'Kme', blah.members.second.to_class_name.text
+      assert_equal 'kme12', blah.members.second.name.text
+      assert_equal 'blah', blah.members.second.inverse_of_name.text
     end
 
     def test_generate__associations_through
       initialize_metaclasses
      
-      assert Asd.adsl_ast.relations.select{ |rel| rel.name.text == 'kmes' }.empty?
+      assert Asd.adsl_ast.members.select{ |rel| rel.name.text == 'kmes' }.empty?
       objset = Asd.new :adsl_ast => :something_unique
       through = objset.kmes
       assert_equal Kme, through.class
 
-      assert_equal ASTDereference, through.adsl_ast.class
-      assert_equal 'kme12', through.adsl_ast.rel_name.text 
-      assert_equal ASTDereference, through.adsl_ast.objset.class
-      assert_equal 'blahs', through.adsl_ast.objset.rel_name.text 
+      assert_equal ASTMemberAccess, through.adsl_ast.class
+      assert_equal 'kme12', through.adsl_ast.member_name.text 
+      assert_equal ASTMemberAccess, through.adsl_ast.objset.class
+      assert_equal 'blahs', through.adsl_ast.objset.member_name.text 
       assert_equal :something_unique, through.adsl_ast.objset.objset
     end
 
@@ -128,49 +128,49 @@ module ADSL::Extract::Rails
     def test_generate__destroy_propagates_to_delete_but_not_further
       initialize_metaclasses
 
-      sig = ADSL::DS::DSTypeSig.random
+      sig = ADSL::DS::TypeSig.random
 
       asd_delete = Mod::Blah.new(:adsl_ast => ASTDummyObjset.new(:type_sig => sig)).destroy
       assert_equal 2, asd_delete.length
 
-      assert_equal ASTDeleteObj,   asd_delete.first.class
-      assert_equal ASTDereference, asd_delete.first.objset.class
-      assert_equal 'kme12',        asd_delete.first.objset.rel_name.text
-      assert_equal ASTDummyObjset, asd_delete.first.objset.objset.class
+      assert_equal ASTDeleteObj,    asd_delete.first.class
+      assert_equal ASTMemberAccess, asd_delete.first.objset.class
+      assert_equal 'kme12',         asd_delete.first.objset.member_name.text
+      assert_equal ASTDummyObjset,  asd_delete.first.objset.objset.class
 
-      assert_equal ASTDeleteObj,   asd_delete.last.class
-      assert_equal ASTDummyObjset, asd_delete.last.objset.class
+      assert_equal ASTDeleteObj,    asd_delete.last.class
+      assert_equal ASTDummyObjset,  asd_delete.last.objset.class
     end
     
     def test_generate__destroy_through_destroys_the_join_object
       initialize_metaclasses
 
-      sig = ADSL::DS::DSTypeSig.random
+      sig = ADSL::DS::TypeSig.random
       
       asd_delete = Asd.new(:adsl_ast => ASTDummyObjset.new(:type_sig => sig)).destroy
       assert_equal 3, asd_delete.length
       
-      assert_equal ASTDeleteObj,   asd_delete[0].class
-      assert_equal ASTDereference, asd_delete[0].objset.class
-      assert_equal ASTDereference, asd_delete[0].objset.objset.class
-      assert_equal 'kme12',        asd_delete[0].objset.rel_name.text
-      assert_equal 'blahs',        asd_delete[0].objset.objset.rel_name.text
-      assert_equal ASTDummyObjset, asd_delete[0].objset.objset.objset.class
+      assert_equal ASTDeleteObj,    asd_delete[0].class
+      assert_equal ASTMemberAccess, asd_delete[0].objset.class
+      assert_equal ASTMemberAccess, asd_delete[0].objset.objset.class
+      assert_equal 'kme12',         asd_delete[0].objset.member_name.text
+      assert_equal 'blahs',         asd_delete[0].objset.objset.member_name.text
+      assert_equal ASTDummyObjset,  asd_delete[0].objset.objset.objset.class
 
-      assert_equal ASTDeleteObj,   asd_delete[1].class
-      assert_equal ASTDereference, asd_delete[1].objset.class
-      assert_equal 'blahs',        asd_delete[1].objset.rel_name.text
-      assert_equal ASTDummyObjset, asd_delete[1].objset.objset.class
+      assert_equal ASTDeleteObj,    asd_delete[1].class
+      assert_equal ASTMemberAccess, asd_delete[1].objset.class
+      assert_equal 'blahs',         asd_delete[1].objset.member_name.text
+      assert_equal ASTDummyObjset,  asd_delete[1].objset.objset.class
       
-      assert_equal ASTDeleteObj,   asd_delete[2].class
-      assert_equal ASTDummyObjset, asd_delete[2].objset.class
+      assert_equal ASTDeleteObj,    asd_delete[2].class
+      assert_equal ASTDummyObjset,  asd_delete[2].objset.class
     end
   
     def test_generate__include_subset_ops
       initialize_metaclasses
 
-      type_sig1 = ADSL::DS::DSTypeSig.random
-      type_sig2 = ADSL::DS::DSTypeSig.random
+      type_sig1 = ADSL::DS::TypeSig.random
+      type_sig2 = ADSL::DS::TypeSig.random
       
       asd = Asd.new :adsl_ast => ASTDummyObjset.new(:type_sig => type_sig1)
       assert asd.respond_to? :include?
@@ -261,12 +261,12 @@ module ADSL::Extract::Rails
       initialize_metaclasses
 
       assert_equal Mod::Blah, Asd.all.blahs.class
-      assert_equal ASTDereference, Asd.all.blahs.adsl_ast.class
+      assert_equal ASTMemberAccess, Asd.all.blahs.adsl_ast.class
 
       ss = Asd.all.blahs.blah_scope.adsl_ast
 
-      assert_equal ASTSubset,      ss.class
-      assert_equal ASTDereference, ss.objset.class
+      assert_equal ASTSubset,       ss.class
+      assert_equal ASTMemberAccess, ss.objset.class
     end
 
     def test_generate__conditions_scopes_work_on_relations
@@ -281,9 +281,9 @@ module ADSL::Extract::Rails
 
       assert_equal ASTSubset,      Mod::Blah.new.blah_scope.adsl_ast.class
 
-      assert_equal ASTAllOf,       Asd.asd_scope.adsl_ast.class
-      assert_equal ASTDereference, Asd.asd_scope.blahs.adsl_ast.class
-      assert_equal ASTSubset,      Asd.asd_scope.blahs.blah_scope.adsl_ast.class
+      assert_equal ASTAllOf,        Asd.asd_scope.adsl_ast.class
+      assert_equal ASTMemberAccess, Asd.asd_scope.blahs.adsl_ast.class
+      assert_equal ASTSubset,       Asd.asd_scope.blahs.blah_scope.adsl_ast.class
     end
 
     def test_generate__association_scope_count_by_group_is_unknown

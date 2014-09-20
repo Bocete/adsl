@@ -1,8 +1,11 @@
 require 'adsl/fol/first_order_logic'
+require 'adsl/translation/typed_string'
 require 'test/unit'
 require 'pp'
 
 class ADSL::FOL::FirstOrderLogicTest < Test::Unit::TestCase
+  include ADSL::FOL
+
   def teardown
     if Object.constants.include?(:Foo)
       Object.send(:remove_const, :Foo)
@@ -25,203 +28,261 @@ class ADSL::FOL::FirstOrderLogicTest < Test::Unit::TestCase
         end
       end
     ruby
-    assert_equal "and(a, b)", Foo.new.asd.resolve_spass
+    assert_equal And.new(:a, :b), Foo.new.asd
+
+    assert_equal And.new(:a, :b), And[:a, :b]
+    assert_equal Or.new(:a, :b),  Or[:a, :b]
   end
 
-  def test_literals
-    assert_equal "true", true.resolve_spass
-    assert_equal "false", false.resolve_spass
-    assert_equal "symbol_here", :symbol_here.resolve_spass
-    assert_equal "sometext", "sometext".resolve_spass
-  end
-
-  def test_split_by_zero_level_comma
-    assert_equal [""], "".split_by_zero_level_comma
-    assert_equal ["asd"], "asd".split_by_zero_level_comma
-    assert_equal ["asd", "kme"], "asd,kme".split_by_zero_level_comma
-    assert_equal ["asd", ""], "asd,".split_by_zero_level_comma
-    assert_equal ["", ""], ",".split_by_zero_level_comma
-    assert_equal ["(asd, asd)"], "(asd, asd)".split_by_zero_level_comma
-    assert_equal ["(a,a,a,()((()())))", ""], "(a,a,a,()((()()))),".split_by_zero_level_comma
-    assert_raise do
-      ")(".split_by_zero_level_comma
+  def test_predicate_extensions
+    assert_raise ArgumentError do
+      Predicate.new :name, :type
+    end
+    assert_nothing_raised do 
+      ADSL::FOL::Predicate.new :pred_name, ADSL::FOL::Sort.new('sort1'), ADSL::FOL::Sort.new('sort2')
     end
   end
 
   def test_not
-    assert_raise ArgumentError do
-      ADSL::FOL::Not.new
-    end
-    assert_equal "not(a)", ADSL::FOL::Not.new(:a).resolve_spass
-    assert_equal "and(not(a), not(b))".gsub(/\s+/, ''), \
-        ADSL::FOL::Not.new(:a, :b).resolve_spass.gsub(/\s+/, '')
-    assert_equal "true", ADSL::FOL::Not.new(false).resolve_spass
-    assert_equal "false", ADSL::FOL::Not.new(true).resolve_spass
-    assert_equal "false", ADSL::FOL::Not.new(true, false).resolve_spass
-    assert_equal "a", ADSL::FOL::Not.new(ADSL::FOL::Not.new(:a)).resolve_spass
-    assert_equal "and(a, not(b))", ADSL::FOL::Not.new(ADSL::FOL::Not.new(:a), ADSL::FOL::Not.new(ADSL::FOL::Not.new(:b))).resolve_spass
+    assert_nothing_raised{ Not.new }
+    assert_nothing_raised{ Not.new :a }
+    assert_nothing_raised{ Not.new :a, :b }
+  end
+
+  def test_not__optimize
+    assert_equal true, Not.new(false).optimize
+    assert_equal false, Not.new(true).optimize
+    assert_equal false, Not.new(true, false).optimize
+    assert_equal false, Not.new(false, true).optimize
+    assert_equal :a, Not.new(Not.new(:a)).optimize
   end
 
   def test_and
-    assert_equal "true", ADSL::FOL::And.new.resolve_spass
+    assert_nothing_raised{ And.new }
+    assert_nothing_raised{ And.new(:a) }
+    assert_nothing_raised{ And.new(:a, :b) }
+    assert_nothing_raised{ And.new(:a, :b, :c) }
+  end
 
-    assert_equal "a", ADSL::FOL::And.new("a").resolve_spass
-    assert_equal "and(a, b)", ADSL::FOL::And.new("a", "b").resolve_spass
-    
-    assert_equal "a", ADSL::FOL::And.new(true, 'a').resolve_spass
-    assert_equal "and(a, b)", ADSL::FOL::And.new(true, "a", "b").resolve_spass
-    assert_equal "false", ADSL::FOL::And.new(true, false).resolve_spass
-    assert_equal "true", ADSL::FOL::And.new(true).resolve_spass
-
-    assert_equal "and(a, b, c)", ADSL::FOL::And.new(ADSL::FOL::And.new(:a, :b), :c).resolve_spass
+  def test_and__optimize
+    assert_equal true, And.new(true, true).optimize
+    assert_equal false, And.new(:a, false).optimize
+    assert_equal :a, And.new(true, :a).optimize
+    assert_equal And.new(:a, :b), And.new(:a, :b, :a, :b, :a).optimize
+    assert_equal And.new(:a, :b, :c), And.new(And.new(:a, :b), :c).optimize
+    assert_equal And.new(:a, :c), And.new(And.new(:a, true), :c).optimize
+    assert_equal false, And.new(And.new(:a, false), :c).optimize
   end
   
   def test_or
-    assert_equal "false", ADSL::FOL::Or.new.resolve_spass
-
-    assert_equal "a", ADSL::FOL::Or.new("a").resolve_spass
-    assert_equal "or(a, b)", ADSL::FOL::Or.new("a", "b").resolve_spass
-    
-    assert_equal "a", ADSL::FOL::Or.new(false, 'a').resolve_spass
-    assert_equal "or(a, b)", ADSL::FOL::Or.new(false, "a", "b").resolve_spass
-    assert_equal "true", ADSL::FOL::Or.new(true, false).resolve_spass
-    assert_equal "false", ADSL::FOL::Or.new(false).resolve_spass
-    
-    assert_equal "or(a, b, c)", ADSL::FOL::Or.new(ADSL::FOL::Or.new(:a, :b), :c).resolve_spass
+    assert_nothing_raised{ Or.new }
+    assert_nothing_raised{ Or.new(:a) }
+    assert_nothing_raised{ Or.new(:a, :b) }
+    assert_nothing_raised{ Or.new(:a, :b, :c) }
   end
-  
+
+  def test_or__optimize
+    assert_equal false, Or.new(false, false).optimize
+    assert_equal true, Or.new(:a, true).optimize
+    assert_equal :a, Or.new(false, :a).optimize
+    assert_equal Or.new(:a, :b), Or.new(:a, :b, :a, :b, :a).optimize
+    assert_equal Or.new(:a, :b, :c), Or.new(Or.new(:a, :b), :c).optimize
+    assert_equal Or.new(:a, :c), Or.new(Or.new(:a, false), :c).optimize
+    assert_equal true, Or.new(Or.new(:a, true), :c).optimize
+  end
+
   def test_forall
     assert_raise ArgumentError do
-      ADSL::FOL::ForAll.new
+      ForAll.new
     end
+    assert_raise ArgumentError do
+      ForAll.new :a, :b
+    end
+    assert_nothing_raised{ ForAll.new :a }
+    assert_nothing_raised{ ForAll.new :type, :var, :a }
+  end
 
-    assert_equal "a", ADSL::FOL::ForAll.new(:a).resolve_spass
-    assert_equal "true", ADSL::FOL::ForAll.new(:a, :b, true).resolve_spass
-    assert_equal "false", ADSL::FOL::ForAll.new(:a, :b, false).resolve_spass
-    assert_equal "forall([a], blah(a))".gsub(/\s+/, ''), \
-        ADSL::FOL::ForAll.new(:a, "blah(a)").resolve_spass.gsub(/\s+/, '')
-    assert_equal "forall([a, b], blah(a))".gsub(/\s+/, ''), \
-        ADSL::FOL::ForAll.new(:a, :b, "blah(a)").resolve_spass.gsub(/\s+/, '')
+  def test_forall__optimize
+    assert_equal :a, ForAll.new(:a).optimize
+    assert_equal true, ForAll.new(:type, :var, true).optimize
   end
   
   def test_exists
     assert_raise ArgumentError do
-      ADSL::FOL::Exists.new
+      Exists.new
     end
-
-    assert_equal "a", ADSL::FOL::Exists.new(:a).resolve_spass
-    assert_equal "true", ADSL::FOL::ForAll.new(:a, :b, true).resolve_spass
-    assert_equal "false", ADSL::FOL::ForAll.new(:a, :b, false).resolve_spass
-    assert_equal "exists([a], true(a))".gsub(/\s+/, ''), \
-        ADSL::FOL::Exists.new(:a, "true(a)").resolve_spass.gsub(/\s+/, '')
-    assert_equal "exists([a, b], true(a))".gsub(/\s+/, ''), \
-        ADSL::FOL::Exists.new(:a, :b, "true(a)").resolve_spass.gsub(/\s+/, '')
+    assert_nothing_raised{ Exists.new :a }
+    assert_nothing_raised{ Exists.new :type, :var }
+    assert_equal Exists.new(:type, :var), Exists.new(:type, :var, true)
+    assert_nothing_raised{ Exists.new :type, :var, :a }
   end
+
+  def test_exists__optimize
+    assert_equal :a, Exists.new(:a).optimize
+    # exists is a positive statement about existance
+    # and shouldn't be optimized like this
+    assert_not_equal true, Exists.new(:type, :var, true).optimize
+  end
+
+  def test_quantification__typed_string_support
+    sort = Sort.new :sort
+    v1 = ADSL::Translation::TypedString.new sort, :v1
+    v2 = ADSL::Translation::TypedString.new sort, :v2
+    v3 = ADSL::Translation::TypedString.new sort, :v3
+    v4 = ADSL::Translation::TypedString.new sort, :v4
+    v5 = ADSL::Translation::TypedString.new sort, :v5
+    [ForAll, Exists].each do |q|
+      5.times do |a|
+        args = [v1, v2, v3, v4, v5].first(a+1), true
+        assert_nothing_raised "Error raised for #{q.name}, arguments #{args}" do
+          q.new args
+        end
+        assert_nothing_raised "Error raised for #{q.name}, splashed arguments #{args}" do
+          q.new *args
+        end
+      end
+    end
+  end
+  
 
   def test_equiv
     assert_raise ArgumentError do
-      ADSL::FOL::Equiv.new
+      Equiv.new
     end
     assert_raise ArgumentError do
-      ADSL::FOL::Equiv.new :a
+      Equiv.new :a
     end
+    assert_nothing_raised{ Equiv.new :a, :b }
+    assert_nothing_raised{ Equiv.new :a, :b, :c }
+  end
 
-    assert_equal 'a', ADSL::FOL::Equiv.new(true, :a).resolve_spass
-    assert_equal 'and(a, b)', ADSL::FOL::Equiv.new(:a, true, :b).resolve_spass
-    assert_equal 'and(not(a), not(b))', ADSL::FOL::Equiv.new(:a, false, :b).resolve_spass
-    assert_equal 'false', ADSL::FOL::Equiv.new(:a, false, :b, true).resolve_spass
-    assert_equal "equiv(a, b)".gsub(/\s+/, ''), \
-        ADSL::FOL::Equiv.new(:a, :b).resolve_spass.gsub(/\s+/, '')
-    assert_equal "and(equiv(a, b), equiv(b, c))".gsub(/\s+/, ''), \
-        ADSL::FOL::Equiv.new(:a, :b, :c).resolve_spass.gsub(/\s+/, '')
+  def test_equiv__optimize
+    assert_equal :a, Equiv.new(true, :a).optimize
+    assert_equal true, Equiv.new(:a, :a).optimize
+    assert_equal Equiv.new(:a, :b), Equiv.new(:a, :b, :a, :b).optimize
+    assert_equal And.new(:a, :b), Equiv.new(:a, true, :b).optimize
+    assert_equal And.new(:a, :b), Equiv.new(:a, true, :b).optimize
+    assert_equal Not.new(:a), Equiv.new(:a, false).optimize
+    assert_equal Not.new(:a, :b), Equiv.new(:a, false, :b).optimize
+    assert_equal false, Equiv.new(:a, false, :b, true).optimize
   end
   
   def test_implies
     assert_raise ArgumentError do
-      ADSL::FOL::Implies.new
+      Implies.new
     end
     assert_raise ArgumentError do
-      ADSL::FOL::Implies.new :a
+      Implies.new :a
     end
     assert_raise ArgumentError do
-      ADSL::FOL::Implies.new :a, :b, :c
+      Implies.new :a, :b, :c
     end
-
-    assert_equal "implies(a, b)".gsub(/\s+/, ''), \
-        ADSL::FOL::Implies.new(:a, :b).resolve_spass.gsub(/\s+/, '')
-    assert_equal "a".gsub(/\s+/, ''), \
-        ADSL::FOL::Implies.new(true, :a).resolve_spass.gsub(/\s+/, '')
-    assert_equal "true".gsub(/\s+/, ''), \
-        ADSL::FOL::Implies.new(:a, true).resolve_spass.gsub(/\s+/, '')
-    assert_equal "true".gsub(/\s+/, ''), \
-        ADSL::FOL::Implies.new(false, :a).resolve_spass.gsub(/\s+/, '')
-    assert_equal "not(a)".gsub(/\s+/, ''), \
-        ADSL::FOL::Implies.new(:a, false).resolve_spass.gsub(/\s+/, '')
-
-    assert_equal 'true', ADSL::FOL::Implies.new(true, true).resolve_spass
-    assert_equal 'false', ADSL::FOL::Implies.new(true, false).resolve_spass
-    assert_equal 'true', ADSL::FOL::Implies.new(false, true).resolve_spass
-    assert_equal 'true', ADSL::FOL::Implies.new(false, false).resolve_spass
+    assert_nothing_raised{ Implies.new :a, :b }
   end
-  
+
+  def test_implies__optimize
+    assert_equal :a, Implies.new(true, :a).optimize
+    assert_equal Not.new(:a), Implies.new(:a, false).optimize
+    assert_equal true, Implies.new(:a, true).optimize
+    assert_equal true, Implies.new(false, :a).optimize
+    assert_equal Implies.new(And.new(:a, :b), :c), Implies.new(:a, Implies.new(:b, :c)).optimize
+
+    assert_equal true,  Implies.new(true, true).optimize
+    assert_equal false, Implies.new(true, false).optimize
+    assert_equal true,  Implies.new(false, true).optimize
+    assert_equal true,  Implies.new(false, false).optimize
+  end
+
   def test_equal
     assert_raise ArgumentError do
-      ADSL::FOL::Equal.new
+      Equal.new
     end
     assert_raise ArgumentError do
-      ADSL::FOL::Equal.new :a
+      Equal.new :a
     end
+    assert_nothing_raised{ Equal.new :a, :b }
+    assert_nothing_raised{ Equal.new :a, :b, :c }
+  end
 
-    assert_equal "equal(a, b)".gsub(/\s+/, ''), \
-        ADSL::FOL::Equal.new(:a, :b).resolve_spass.gsub(/\s+/, '')
-    assert_equal "and(equal(a, b), equal(b, c))".gsub(/\s+/, ''), \
-        ADSL::FOL::Equal.new(:a, :b, :c).resolve_spass.gsub(/\s+/, '')
+  def test_equal_optimize
+    assert_equal Equal.new(:a, :b), Equal.new(:a, :b, :a, :b, :a).optimize
+    assert_equal true, Equal.new(:a, :a).optimize
   end
 
   def test_one_of
-    assert_equal 'false', ADSL::FOL::OneOf.new.resolve_spass
-    assert_equal "a".gsub(/\s+/, ''), \
-        ADSL::FOL::OneOf.new(:a).resolve_spass.gsub(/\s+/, '')
-    assert_equal "equiv(not(a), b)".gsub(/\s+/, ''), \
-        ADSL::FOL::OneOf.new(:a, :b).resolve_spass.gsub(/\s+/, '')
-    assert_equal "and(or(a, b, c), implies(a, and(not(b), not(c))), implies(b, and(not(a), not(c))), implies(c, and(not(a), not(b))))".gsub(/\s+/, ''), \
-        ADSL::FOL::OneOf.new(:a, :b, :c).resolve_spass.gsub(/\s+/, '')
+    assert_nothing_raised{ OneOf.new }
+    assert_nothing_raised{ OneOf.new :a }
+    assert_nothing_raised{ OneOf.new :a, :b }
+    assert_nothing_raised{ OneOf.new :a, :b, :c }
+  end
+
+  def test_one_of__optimize
+    assert_equal false, OneOf.new.optimize
+    assert_equal :a, OneOf.new(:a).optimize
   end
 
   def test_if_then_else
-    assert_equal "and(implies(a, b), implies(not(a), c))".gsub(/\s+/, ''), \
-        ADSL::FOL::IfThenElse.new(:a, :b, :c).resolve_spass.gsub(/\s+/, '')
+    assert_raise ArgumentError do
+      IfThenElse.new
+    end
+    assert_raise ArgumentError do
+      IfThenElse.new :a
+    end
+    assert_raise ArgumentError do
+      IfThenElse.new :a, :b
+    end
+    assert_raise ArgumentError do
+      IfThenElse.new :a, :b, :c, :d
+    end
   end
 
+  def test_if_then_else__optimize
+    assert_equal :b, IfThenElse.new(true, :b, :c).optimize
+    assert_equal :c, IfThenElse.new(false, :b, :c).optimize
+  end
+  
   def test_if_then_else_eq
-    assert_equal "and(equiv(a, b), equiv(not(a), c))".gsub(/\s+/, ''), \
-        ADSL::FOL::IfThenElseEq.new(:a, :b, :c).resolve_spass.gsub(/\s+/, '')
+    assert_raise ArgumentError do
+      IfThenElseEq.new
+    end
+    assert_raise ArgumentError do
+      IfThenElseEq.new :a
+    end
+    assert_raise ArgumentError do
+      IfThenElseEq.new :a, :b
+    end
+    assert_raise ArgumentError do
+      IfThenElseEq.new :a, :b, :c, :d
+    end
+  end
+
+  def test_if_then_else_eq__optimize
+    assert_equal :b, IfThenElseEq.new(true, :b, :c).optimize
+    assert_equal :c, IfThenElseEq.new(false, :b, :c).optimize
   end
 
   def test_pairwise_equal__explicit_lists
     assert_raise ArgumentError do
-      ADSL::FOL::PairwiseEqual.new [], [:a]
+      PairwiseEqual.new [], [:a]
     end
     assert_raise ArgumentError do
-      ADSL::FOL::PairwiseEqual.new [:b, :c], [:a]
+      PairwiseEqual.new [:b, :c], [:a]
     end
-
-    assert_equal "true", ADSL::FOL::PairwiseEqual.new([], []).resolve_spass
-    assert_equal "equal(a1, b1)", ADSL::FOL::PairwiseEqual.new([:a1], [:b1]).resolve_spass
-    assert_equal "and(equal(a1, b1), equal(a2, b2))", ADSL::FOL::PairwiseEqual.new([:a1, :a2], [:b1, :b2]).resolve_spass
+    assert_nothing_raised{ PairwiseEqual.new([], []) }
+    assert_nothing_raised{ PairwiseEqual.new([:a1], [:b1]) }
+    assert_nothing_raised{ PairwiseEqual.new([:a1, :a2], [:b1, :b2]) }
   end
   
   def test_pairwise_equal__implicit_lists
     assert_raise ArgumentError do
-      ADSL::FOL::PairwiseEqual.new :a
+      PairwiseEqual.new :a
     end
     assert_raise ArgumentError do
-      ADSL::FOL::PairwiseEqual.new :b, [[:c]], :a
+      PairwiseEqual.new :b, [[:c]], :a
     end
-
-    assert_equal "true", ADSL::FOL::PairwiseEqual.new().resolve_spass
-    assert_equal "equal(a1, b1)", ADSL::FOL::PairwiseEqual.new(:a1, :b1).resolve_spass
-    assert_equal "and(equal(a1, b1), equal(a2, b2))", ADSL::FOL::PairwiseEqual.new(:a1, :a2, :b1, [:b2]).resolve_spass
+    assert_nothing_raised{ PairwiseEqual.new }
+    assert_nothing_raised{ PairwiseEqual.new(:a1, :b1) }
+    assert_nothing_raised{ PairwiseEqual.new(:a1, :a2, :b1, [:b2]) }
   end
 end
 

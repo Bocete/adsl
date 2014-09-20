@@ -1,35 +1,35 @@
+require 'active_support/core_ext/numeric/time'
 require 'test/unit'
 require 'adsl/parser/adsl_parser.tab'
-require 'adsl/spass/bin'
-require 'adsl/spass/spass_ds_extensions'
-require 'adsl/spass/util'
+require 'adsl/prover/engine'
 require 'adsl/util/general'
+require 'adsl/ds/data_store_spec'
+require 'adsl/translation/ds_extensions'
 
 class Test::Unit::TestCase
-  include ADSL::Spass::Bin
-  include ADSL::Spass::Util
-
-  SPASS_TIMEOUT = 5
+  TESTING_TIMEOUT = 5.seconds
   
   def adsl_assert(expected_result, input, options={})
+    options[:timeout] ||= TESTING_TIMEOUT
+
     ds_spec = ADSL::Parser::ADSLParser.new.parse input
     raise "Exactly one action required in ADSL" if ds_spec.actions.length != 1
     action_name = ds_spec.actions.first.name
-    spass = ds_spec.translate_action(action_name).to_spass_string
-    spass = replace_conjecture spass, options[:conjecture] if options.include? :conjecture
-    result = exec_spass(spass, options[:timeout] || SPASS_TIMEOUT)
-    if result == :inconclusive
-      puts "inconclusive result on testcase #{self.class.name}.#{method_name}"
-    else
-      assert_equal expected_result, result 
-    end
-  rescue Exception => e
-    puts spass unless spass.nil?
-    raise e
-  end
+    provers = (options[:prover] || ['spass', 'z3']).to_a
+    provers.each do |prover|
+      translation = ds_spec.translate_action(action_name)
+      fol = translation.to_fol.optimize!
+      fol.conjecture = options[:conjecture] if options.include? :conjecture
 
-  def spass_assert(expected_result, input, timeout = SPASS_TIMEOUT)
-    adsl_assert expected_result, input, :timeout => timeout
+      engine = ADSL::Prover::Engine.new prover, fol, :timeout => options[:timeout]
+      
+      result = engine.run[:result]
+      if result == :inconclusive || result == :timeout
+        puts "inconclusive result on testcase #{self.class.name}.#{method_name}"
+      else
+        assert_equal expected_result, result 
+      end
+    end
   end
 
   def unload_class(*classes)
@@ -72,5 +72,17 @@ class Test::Unit::TestCase
     counts.each do |object, names|
       assert_equal 1, names.length, "Multiple identical objects found. Keys: #{ names.map(&:to_s).join(', ') }"
     end
+  end
+
+  def assert_equal_nospace(s1, s2)
+    s1nospace = s1.gsub /\s+/, ''
+    s2nospace = s2.gsub /\s+/, ''
+    assert_equal s1nospace, s2nospace, "#{s1} expected, but was #{s2}"
+  end
+
+  def assert_include_nospace(s1, s2)
+    s1nospace = s1.gsub /\s+/, ''
+    s2nospace = s2.gsub /\s+/, ''
+    assert s1nospace.include?(s2nospace), "#{s1} does not include #{s2}"
   end
 end

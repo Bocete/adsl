@@ -45,7 +45,7 @@ module ADSL::Parser
       assert_equal 1, spec.actions.length
       assert_equal 2, spec.actions.first.block.statements.length
       var1 = spec.actions.first.statements.first.var
-      assert_equal var1, spec.actions.first.statements.last.objset
+      assert_equal var1, spec.actions.first.statements.last.expr
       var2 = spec.actions.first.statements.last.var
       assert var1 != var2
     end
@@ -55,7 +55,7 @@ module ADSL::Parser
       context1.push_frame
 
       klass = DSClass.new :name => 'klass'
-      sig = DSTypeSig.new klass
+      sig = TypeSig::ObjsetType.new klass
 
       a1 = DSVariable.new :name => 'a', :type_sig => sig
       a2 = DSVariable.new :name => 'a', :type_sig => sig
@@ -97,7 +97,7 @@ module ADSL::Parser
       assert_equal 'do_something', spec.actions.first.name
       statements = spec.actions.first.block.statements
       assert_equal 6, statements.length
-      relation = spec.classes.first.relations.first
+      relation = spec.classes.first.members.first
       
       assert_equal spec.classes.first, statements[0].klass
 
@@ -188,7 +188,7 @@ module ADSL::Parser
         stmt = spec.actions.first.block.statements.first
         assert_equal spec.classes.first, stmt.objset1.klass
         assert_equal spec.classes.first, stmt.objset2.klass
-        assert_equal spec.classes.first.relations.first, stmt.relation
+        assert_equal spec.classes.first.members.first, stmt.relation
         
         assert_raise ADSLError do
           parser.parse <<-adsl
@@ -228,7 +228,7 @@ module ADSL::Parser
         stmt = spec.actions.first.block.statements.first
         assert_equal spec.classes[0], stmt.objset1.klass
         assert_equal spec.classes[1], stmt.objset2.klass
-        assert_equal spec.classes[0].relations.first, stmt.relation
+        assert_equal spec.classes[0].members.first, stmt.relation
         
         assert_nothing_raised ADSLError do
           spec = parser.parse <<-adsl
@@ -242,7 +242,7 @@ module ADSL::Parser
         stmt = spec.actions.first.block.statements.first
         assert_equal spec.classes[1], stmt.objset1.klass
         assert_equal spec.classes[1], stmt.objset2.klass
-        assert_equal spec.classes[0].relations.first, stmt.relation
+        assert_equal spec.classes[0].members.first, stmt.relation
         
         assert_nothing_raised ADSLError do
           spec = parser.parse <<-adsl
@@ -256,7 +256,7 @@ module ADSL::Parser
         stmt = spec.actions.first.block.statements.first
         assert_equal spec.classes[1], stmt.objset1.klass
         assert_equal spec.classes[1], stmt.objset2.klass
-        assert_equal spec.classes[1].relations.first, stmt.relation
+        assert_equal spec.classes[1].members.first, stmt.relation
 
         assert_raise ADSLError do
           parser.parse <<-adsl
@@ -297,10 +297,10 @@ module ADSL::Parser
       stmt2 = spec.actions.first.block.statements.last
       assert_equal spec.classes[0], stmt1.objset1.klass
       assert_equal spec.classes[0], stmt1.objset2.klass
-      assert_equal spec.classes[0].relations.first, stmt1.relation
+      assert_equal spec.classes[0].members.first, stmt1.relation
       assert_equal spec.classes[0], stmt2.objset1.klass
       assert_equal spec.classes[1], stmt2.objset2.klass
-      assert_equal spec.classes[0].relations.first, stmt2.relation
+      assert_equal spec.classes[0].members.first, stmt2.relation
       
       assert_nothing_raised ADSLError do
         spec = parser.parse <<-adsl
@@ -315,10 +315,10 @@ module ADSL::Parser
       stmt2 = spec.actions.first.block.statements.last
       assert_equal spec.classes[1], stmt1.objset1.klass
       assert_equal spec.classes[0], stmt1.objset2.klass
-      assert_equal spec.classes[0].relations.first, stmt1.relation
+      assert_equal spec.classes[0].members.first, stmt1.relation
       assert_equal spec.classes[1], stmt2.objset1.klass
       assert_equal spec.classes[1], stmt2.objset2.klass
-      assert_equal spec.classes[0].relations.first, stmt2.relation
+      assert_equal spec.classes[0].members.first, stmt2.relation
       
       assert_nothing_raised ADSLError do
         spec = parser.parse <<-adsl
@@ -333,10 +333,10 @@ module ADSL::Parser
       stmt2 = spec.actions.first.block.statements.last
       assert_equal spec.classes[1], stmt1.objset1.klass
       assert_equal spec.classes[0], stmt1.objset2.klass
-      assert_equal spec.classes[1].relations.first, stmt1.relation
+      assert_equal spec.classes[1].members.first, stmt1.relation
       assert_equal spec.classes[1], stmt2.objset1.klass
       assert_equal spec.classes[1], stmt2.objset2.klass
-      assert_equal spec.classes[1].relations.first, stmt2.relation
+      assert_equal spec.classes[1].members.first, stmt2.relation
 
       assert_raise ADSLError do
         parser.parse <<-adsl
@@ -443,7 +443,7 @@ module ADSL::Parser
 
       assert_equal 1, spec.actions.length
       klass = spec.classes.first
-      relation = spec.classes.first.relations.first
+      relation = spec.classes.first.members.first
 
       assert_equal relation, spec.actions.first.block.statements.last.relation
       
@@ -475,7 +475,7 @@ module ADSL::Parser
 
       assert_equal 1, spec.actions.length
       klass = spec.classes.first
-      relation = spec.classes.first.relations.first
+      relation = spec.classes.first.members.first
 
       assert_equal relation, spec.actions.first.block.statements.last.relation
       
@@ -493,7 +493,7 @@ module ADSL::Parser
     end
     
     def test_action__oneof_typecheck
-      [:oneof, :forceoneof].each do |op|
+      [:oneof, :tryoneof].each do |op|
         parser = ADSLParser.new
         spec = nil
         assert_nothing_raised ADSLError do
@@ -508,7 +508,7 @@ module ADSL::Parser
 
         assert_equal 1, spec.actions.length
         klass = spec.classes.first
-        relation = spec.classes.first.relations.first
+        relation = spec.classes.first.members.first
 
         assert_equal relation, spec.actions.first.block.statements.last.relation
         
@@ -541,7 +541,7 @@ module ADSL::Parser
 
       assert_equal 1, spec.actions.length
       klass2 = spec.classes.last
-      relation = klass2.relations.first
+      relation = klass2.members.first
 
       stmt = spec.actions.first.block.statements.last
       assert_equal klass2.to_sig, stmt.objset1.type_sig
@@ -572,7 +572,7 @@ module ADSL::Parser
         adsl
       end
       klass2 = spec.classes.last
-      relation = klass2.relations.first
+      relation = klass2.members.first
       stmt = spec.actions.first.block.statements.last
       assert_equal klass2.to_sig, stmt.objset1.type_sig
       assert_equal relation, stmt.relation
@@ -587,7 +587,7 @@ module ADSL::Parser
         adsl
       end
       klass2 = spec.classes.last
-      relation = klass2.relations.first
+      relation = klass2.members.first
       stmt = spec.actions.first.block.statements.last
       assert_equal klass2.to_sig, stmt.objset1.type_sig
       assert_equal relation, stmt.relation
@@ -819,8 +819,8 @@ module ADSL::Parser
         :final_def   => final_def.var
       )
 
-      assert_equal lambda_def.objset.objsets[0], inside_def1.var
-      assert_equal lambda_def.objset.objsets[1], inside_def2.var
+      assert_equal lambda_def.expr.exprs[0], inside_def1.var
+      assert_equal lambda_def.expr.exprs[1], inside_def2.var
     end
     
     def test_action__if_lambda_works
@@ -860,8 +860,8 @@ module ADSL::Parser
         :final_def  => final_def.var
       )
 
-      assert_equal lambda_def.objset.then_objset, then_def.var
-      assert_equal lambda_def.objset.else_objset, else_def.var
+      assert_equal lambda_def.expr.then_expr, then_def.var
+      assert_equal lambda_def.expr.else_expr, else_def.var
     end
 
     def test_action__if_condition_var_definition
@@ -904,7 +904,7 @@ module ADSL::Parser
     def test_action__foreach_pre_lambda
       get_pre_lambdas = lambda do |for_each|
         for_each.block.statements.select do |stat|
-          stat.kind_of?(DSAssignment) and stat.objset.kind_of?(DSForEachPreLambdaObjset)
+          stat.kind_of?(DSAssignment) and stat.expr.kind_of?(DSForEachPreLambdaExpr)
         end
       end
 
@@ -939,9 +939,9 @@ module ADSL::Parser
       adsl
       pre_lambdas = get_pre_lambdas.call(spec.actions.first.block.statements[1])
       assert_equal 1, pre_lambdas.length
-      assert_equal spec.actions.first.block.statements[0].var, pre_lambdas.first.objset.before_var
-      assert_equal spec.actions.first.block.statements[1], pre_lambdas.first.objset.for_each
-      assert_equal spec.actions.first.block.statements[1].block.statements.last.var, pre_lambdas.first.objset.inside_var
+      assert_equal spec.actions.first.block.statements[0].var, pre_lambdas.first.expr.before_var
+      assert_equal spec.actions.first.block.statements[1],     pre_lambdas.first.expr.for_each
+      assert_equal spec.actions.first.block.statements[1].block.statements.last.var, pre_lambdas.first.expr.inside_var
 
       spec = parser.parse <<-adsl
         class Class {}
@@ -1084,7 +1084,7 @@ module ADSL::Parser
       assert_equal klass, statements[0].klass
       assert_equal 'b',   statements[1].var.name
       assert_equal 'a',   statements[2].var.name
-      assert_equal 'b',   statements[2].objset.name
+      assert_equal 'b',   statements[2].expr.name
       assert_equal 'a',   statements[3].objset.name
       assert_equal 'b',   statements[4].objset.name
     end

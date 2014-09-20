@@ -58,9 +58,9 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     statements = ast.block.statements
 
     assert_equal 1, statements.length
-    assert_equal ASTObjsetStmt, statements.first.class
-    assert_equal ASTCreateObjset, statements.first.objset.class
-    assert_equal 'Asd', statements.first.objset.class_name.text
+    assert_equal ASTExprStmt, statements.first.class
+    assert_equal ASTCreateObjset, statements.first.expr.class
+    assert_equal 'Asd', statements.first.expr.class_name.text
   end
 
   def test_action_extraction__create_within_expression_action
@@ -76,9 +76,9 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     statements = ast.block.statements
 
     assert_equal 1, statements.length
-    assert_equal ASTObjsetStmt, statements.first.class
-    assert_equal ASTCreateObjset, statements.first.objset.class
-    assert_equal 'Asd', statements.first.objset.class_name.text
+    assert_equal ASTExprStmt, statements.first.class
+    assert_equal ASTCreateObjset, statements.first.expr.class
+    assert_equal 'Asd', statements.first.expr.class_name.text
   end
 
   def test_action_extraction__variable_assignment
@@ -95,11 +95,11 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     statements = ast.block.statements
 
     assert_equal 2, statements.length
-    assert_equal ASTObjsetStmt,   statements.first.class
-    assert_equal ASTAssignment,   statements.first.objset.class
-    assert_equal 'a',             statements.first.objset.var_name.text
-    assert_equal ASTCreateObjset, statements.first.objset.objset.class
-    assert_equal 'Asd',           statements.first.objset.objset.class_name.text
+    assert_equal ASTExprStmt,   statements.first.class
+    assert_equal ASTAssignment,   statements.first.expr.class
+    assert_equal 'a',             statements.first.expr.var_name.text
+    assert_equal ASTCreateObjset, statements.first.expr.expr.class
+    assert_equal 'Asd',           statements.first.expr.expr.class_name.text
   end
 
   def test_action_extraction__nil_assignment
@@ -118,16 +118,16 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
 
     assert_equal 3, statements.length
 
-    assert_equal ASTObjsetStmt,  statements[0].class
-    assert_equal ASTAssignment,  statements[0].objset.class
-    assert_equal 'a',            statements[0].objset.var_name.text
-    assert_equal ASTEmptyObjset, statements[0].objset.objset.class
+    assert_equal ASTExprStmt,  statements[0].class
+    assert_equal ASTAssignment,  statements[0].expr.class
+    assert_equal 'a',            statements[0].expr.var_name.text
+    assert_equal ASTEmptyObjset, statements[0].expr.expr.class
 
-    assert_equal ASTObjsetStmt,   statements[1].class
-    assert_equal ASTAssignment,   statements[1].objset.class
-    assert_equal 'a',             statements[1].objset.var_name.text
-    assert_equal ASTCreateObjset, statements[1].objset.objset.class
-    assert_equal 'Asd',           statements[1].objset.objset.class_name.text
+    assert_equal ASTExprStmt,   statements[1].class
+    assert_equal ASTAssignment,   statements[1].expr.class
+    assert_equal 'a',             statements[1].expr.var_name.text
+    assert_equal ASTCreateObjset, statements[1].expr.expr.class
+    assert_equal 'Asd',           statements[1].expr.expr.class_name.text
   end
 
   def test_action_extraction__instance_variable_assignment
@@ -148,16 +148,16 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 3, statements.length
     
     # all instance variables are initialized to empty
-    assert_equal ASTObjsetStmt,   statements[0].class
-    assert_equal ASTAssignment,   statements[0].objset.class
-    assert_equal 'at__a',         statements[0].objset.var_name.text
-    assert_equal ASTEmptyObjset,  statements[0].objset.objset.class
+    assert_equal ASTExprStmt,   statements[0].class
+    assert_equal ASTAssignment,   statements[0].expr.class
+    assert_equal 'at__a',         statements[0].expr.var_name.text
+    assert_equal ASTEmptyObjset,  statements[0].expr.expr.class
 
-    assert_equal ASTObjsetStmt,   statements[1].class
-    assert_equal ASTAssignment,   statements[1].objset.class
-    assert_equal 'at__a',         statements[1].objset.var_name.text
-    assert_equal ASTCreateObjset, statements[1].objset.objset.class
-    assert_equal 'Asd',           statements[1].objset.objset.class_name.text
+    assert_equal ASTExprStmt,   statements[1].class
+    assert_equal ASTAssignment,   statements[1].expr.class
+    assert_equal 'at__a',         statements[1].expr.var_name.text
+    assert_equal ASTCreateObjset, statements[1].expr.expr.class
+    assert_equal 'Asd',           statements[1].expr.expr.class_name.text
 
     assert_equal ASTDeleteObj, statements[2].class
     assert_equal 'at__a',      statements[2].objset.var_name.text
@@ -182,16 +182,16 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_false statements.empty?
     assert_equal 3, statements.length
     
-    assert_equal ASTObjsetStmt,   statements[0].class
-    assert_equal ASTAssignment,   statements[0].objset.class
-    assert_equal 'atat__a',       statements[0].objset.var_name.text
-    assert_equal ASTEmptyObjset,  statements[0].objset.objset.class
+    assert_equal ASTExprStmt,   statements[0].class
+    assert_equal ASTAssignment,   statements[0].expr.class
+    assert_equal 'atat__a',       statements[0].expr.var_name.text
+    assert_equal ASTEmptyObjset,  statements[0].expr.expr.class
     
-    assert_equal ASTObjsetStmt,   statements[1].class
-    assert_equal ASTAssignment,   statements[1].objset.class
-    assert_equal 'atat__a',       statements[1].objset.var_name.text
-    assert_equal ASTCreateObjset, statements[1].objset.objset.class
-    assert_equal 'Asd',           statements[1].objset.objset.class_name.text
+    assert_equal ASTExprStmt,   statements[1].class
+    assert_equal ASTAssignment,   statements[1].expr.class
+    assert_equal 'atat__a',       statements[1].expr.var_name.text
+    assert_equal ASTCreateObjset, statements[1].expr.expr.class
+    assert_equal 'Asd',           statements[1].expr.expr.class_name.text
 
     assert_equal ASTDeleteObj, statements[2].class
     assert_equal ASTVariable,  statements[2].objset.class
@@ -212,15 +212,15 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
 
     assert_equal 2, statements.length
 
-    assert_equal ASTObjsetStmt,   statements[0].class
-    assert_equal ASTAssignment,   statements[0].objset.class
-    assert_equal ASTCreateObjset, statements[0].objset.objset.class
-    assert_equal 'Mod_Blah',      statements[0].objset.objset.class_name.text
-    assert_equal 'a',             statements[0].objset.var_name.text
+    assert_equal ASTExprStmt,     statements[0].class
+    assert_equal ASTAssignment,   statements[0].expr.class
+    assert_equal ASTCreateObjset, statements[0].expr.expr.class
+    assert_equal 'Mod_Blah',      statements[0].expr.expr.class_name.text
+    assert_equal 'a',             statements[0].expr.var_name.text
     
     assert_equal ASTDeleteObj,    statements[1].class
-    assert_equal ASTDereference,  statements[1].objset.class
-    assert_equal 'asd',           statements[1].objset.rel_name.text
+    assert_equal ASTMemberAccess, statements[1].objset.class
+    assert_equal 'asd',           statements[1].objset.member_name.text
     assert_equal ASTVariable,     statements[1].objset.objset.class
     assert_equal 'a',             statements[1].objset.objset.var_name.text
   end
@@ -258,7 +258,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
 
     assert_equal 2, either.blocks.length
     assert_equal 1, either.blocks.first.statements.length
-    assert_equal ASTCreateObjset, either.blocks.first.statements.first.objset.class
+    assert_equal ASTCreateObjset, either.blocks.first.statements.first.expr.class
     assert_equal 1, either.blocks.second.statements.length
     assert_equal ASTDeleteObj, either.blocks.second.statements.first.class
   end
@@ -286,9 +286,9 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
 
     assert_equal 2, either.blocks.length
     assert_equal 1,               either.blocks.first.statements.length
-    assert_equal ASTCreateObjset, either.blocks.first.statements.first.objset.class
+    assert_equal ASTCreateObjset, either.blocks.first.statements.first.expr.class
     assert_equal 2,               either.blocks.second.statements.length
-    assert_equal ASTCreateObjset, either.blocks.second.statements.first.objset.class
+    assert_equal ASTCreateObjset, either.blocks.second.statements.first.expr.class
     assert_equal ASTDeleteObj,    either.blocks.second.statements.second.class
   end
   
@@ -307,8 +307,8 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     statements = ast.block.statements
 
     assert_equal 1, statements.length
-    assert_equal ASTObjsetStmt, statements.first.class
-    assert_equal ASTCreateObjset, statements.first.objset.class
+    assert_equal ASTExprStmt, statements.first.class
+    assert_equal ASTCreateObjset, statements.first.expr.class
   end
   
   def test_action_extraction__statements_after_return_are_ignored
@@ -325,8 +325,8 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     statements = ast.block.statements
 
     assert_equal 1, statements.length
-    assert_equal ASTObjsetStmt, statements.first.class
-    assert_equal ASTCreateObjset, statements.first.objset.class
+    assert_equal ASTExprStmt, statements.first.class
+    assert_equal ASTCreateObjset, statements.first.expr.class
   end
 
   def test_action_extraction__statements_after_return_in_branches_are_ignored
@@ -348,11 +348,11 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 1, statements.length
     assert_equal ASTEither,       statements.first.class
     assert_equal 1,               statements.first.blocks[0].statements.length
-    assert_equal ASTCreateObjset, statements.first.blocks[0].statements.first.objset.class
-    assert_equal 'Asd',           statements.first.blocks[0].statements.first.objset.class_name.text
+    assert_equal ASTCreateObjset, statements.first.blocks[0].statements.first.expr.class
+    assert_equal 'Asd',           statements.first.blocks[0].statements.first.expr.class_name.text
     assert_equal 1,               statements.first.blocks[1].statements.length
-    assert_equal ASTCreateObjset, statements.first.blocks[1].statements.first.objset.class
-    assert_equal 'Kme',           statements.first.blocks[1].statements.first.objset.class_name.text
+    assert_equal ASTCreateObjset, statements.first.blocks[1].statements.first.expr.class
+    assert_equal 'Kme',           statements.first.blocks[1].statements.first.expr.class_name.text
   end
   
   def test_action_extraction__calls_of_method_with_multiple_paths
@@ -377,13 +377,13 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
 
     assert_equal 2, statements.length
     assert_equal ASTEither, statements.first.class
-    assert_equal ASTCreateObjset, statements.second.objset.class
+    assert_equal ASTCreateObjset, statements.second.expr.class
 
     either = statements.first
 
     assert_equal 2, either.blocks.length
     assert_equal 1,               either.blocks.first.statements.length
-    assert_equal ASTCreateObjset, either.blocks.first.statements.first.objset.class
+    assert_equal ASTCreateObjset, either.blocks.first.statements.first.expr.class
     assert_equal 1,               either.blocks.second.statements.length
     assert_equal ASTDeleteObj,    either.blocks.second.statements.first.class
   end
@@ -412,11 +412,11 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
 
     assert_equal ASTEither,       statements.first.class
     assert_equal 1,               statements.first.blocks[0].statements.length
-    assert_equal ASTCreateObjset, statements.first.blocks[0].statements.first.objset.class
+    assert_equal ASTCreateObjset, statements.first.blocks[0].statements.first.expr.class
     assert_equal 0,               statements.first.blocks[1].statements.length
 
-    assert_equal ASTObjsetStmt,   statements.second.class
-    assert_equal ASTCreateObjset, statements.second.objset.class
+    assert_equal ASTExprStmt,   statements.second.class
+    assert_equal ASTCreateObjset, statements.second.expr.class
   end
 
   def test_action_extraction__deep_call_chain
@@ -439,9 +439,9 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     # 4 because of the destroy dependency
     assert_equal 4, statements.length
 
-    assert_equal ASTObjsetStmt,   statements[0].class
-    assert_equal ASTCreateObjset, statements[0].objset.class
-    assert_equal 'Asd',           statements[0].objset.class_name.text
+    assert_equal ASTExprStmt,   statements[0].class
+    assert_equal ASTCreateObjset, statements[0].expr.class
+    assert_equal 'Asd',           statements[0].expr.class_name.text
 
     assert_equal ASTDeleteObj,    statements.last.class
     assert_equal ASTOneOf,        statements.last.objset.class
@@ -466,11 +466,11 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
 
     assert_equal 2, statements.length
 
-    assert_equal ASTCreateObjset, statements.first.objset.class
-    assert_equal 'Asd', statements.first.objset.class_name.text
+    assert_equal ASTCreateObjset, statements.first.expr.class
+    assert_equal 'Asd', statements.first.expr.class_name.text
     
-    assert_equal ASTCreateObjset, statements.second.objset.class
-    assert_equal 'Kme', statements.second.objset.class_name.text
+    assert_equal ASTCreateObjset, statements.second.expr.class
+    assert_equal 'Kme', statements.second.expr.class_name.text
   end
 
   def test_action_extraction__multiple_assignment
@@ -487,17 +487,17 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
 
     assert_equal 4, statements.length
 
-    assert_equal ASTObjsetStmt,   statements[0].class
-    assert_equal ASTAssignment,   statements[0].objset.class
-    assert_equal 'a',             statements[0].objset.var_name.text
-    assert_equal ASTCreateObjset, statements[0].objset.objset.class
-    assert_equal 'Asd',           statements[0].objset.objset.class_name.text
+    assert_equal ASTExprStmt,   statements[0].class
+    assert_equal ASTAssignment,   statements[0].expr.class
+    assert_equal 'a',             statements[0].expr.var_name.text
+    assert_equal ASTCreateObjset, statements[0].expr.expr.class
+    assert_equal 'Asd',           statements[0].expr.expr.class_name.text
     
-    assert_equal ASTObjsetStmt,   statements[1].class
-    assert_equal ASTAssignment,   statements[1].objset.class
-    assert_equal 'b',             statements[1].objset.var_name.text
-    assert_equal ASTCreateObjset, statements[1].objset.objset.class
-    assert_equal 'Kme',           statements[1].objset.objset.class_name.text
+    assert_equal ASTExprStmt,   statements[1].class
+    assert_equal ASTAssignment,   statements[1].expr.class
+    assert_equal 'b',             statements[1].expr.var_name.text
+    assert_equal ASTCreateObjset, statements[1].expr.expr.class
+    assert_equal 'Kme',           statements[1].expr.expr.class_name.text
     
     assert_equal ASTDeleteObj, statements[2].class
     assert_equal 'a', statements[2].objset.var_name.text
@@ -527,18 +527,18 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 2,               statements[1].blocks.length
     assert                        statements[1].blocks[0].statements.empty?
     assert_equal 1,               statements[1].blocks[1].statements.length
-    assert_equal ASTObjsetStmt,   statements[1].blocks[1].statements[0].class
-    assert_equal ASTAssignment,   statements[1].blocks[1].statements[0].objset.class
-    assert_equal 'a',             statements[1].blocks[1].statements[0].objset.var_name.text
-    assert_equal ASTCreateObjset, statements[1].blocks[1].statements[0].objset.objset.class
-    assert_equal 'Asd',           statements[1].blocks[1].statements[0].objset.objset.class_name.text
+    assert_equal ASTExprStmt,   statements[1].blocks[1].statements[0].class
+    assert_equal ASTAssignment,   statements[1].blocks[1].statements[0].expr.class
+    assert_equal 'a',             statements[1].blocks[1].statements[0].expr.var_name.text
+    assert_equal ASTCreateObjset, statements[1].blocks[1].statements[0].expr.expr.class
+    assert_equal 'Asd',           statements[1].blocks[1].statements[0].expr.expr.class_name.text
 
-    assert_equal ASTObjsetStmt, statements[2].class
-    assert_equal ASTAssignment, statements[2].objset.class
-    assert_equal 'a',           statements[2].objset.var_name.text
-    assert_equal ASTOneOf,      statements[2].objset.objset.class
-    assert_equal ASTAllOf,      statements[2].objset.objset.objset.class
-    assert_equal 'Asd',         statements[2].objset.objset.objset.class_name.text
+    assert_equal ASTExprStmt, statements[2].class
+    assert_equal ASTAssignment, statements[2].expr.class
+    assert_equal 'a',           statements[2].expr.var_name.text
+    assert_equal ASTOneOf,      statements[2].expr.expr.class
+    assert_equal ASTAllOf,      statements[2].expr.expr.objset.class
+    assert_equal 'Asd',         statements[2].expr.expr.objset.class_name.text
   end
   
   def test_action_extraction__optional_assignment_of_nonnil_variable
@@ -556,11 +556,11 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
 
     assert_equal 4, statements.length
 
-    assert_equal ASTObjsetStmt,   statements[0].class
-    assert_equal ASTAssignment,   statements[0].objset.class
-    assert_equal 'a',             statements[0].objset.var_name.text
-    assert_equal ASTCreateObjset, statements[0].objset.objset.class
-    assert_equal 'Asd',           statements[0].objset.objset.class_name.text
+    assert_equal ASTExprStmt,   statements[0].class
+    assert_equal ASTAssignment,   statements[0].expr.class
+    assert_equal 'a',             statements[0].expr.var_name.text
+    assert_equal ASTCreateObjset, statements[0].expr.expr.class
+    assert_equal 'Asd',           statements[0].expr.expr.class_name.text
 
     assert_equal ASTDeclareVar, statements[1].class
     assert_equal 'a',           statements[1].var_name.text
@@ -568,12 +568,12 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 2,             statements[2].blocks.length
     assert                      statements[2].blocks[0].statements.empty?
     assert_equal 1,             statements[2].blocks[1].statements.length
-    assert_equal ASTObjsetStmt, statements[2].blocks[1].statements[0].class
-    assert_equal ASTAssignment, statements[2].blocks[1].statements[0].objset.class
-    assert_equal 'a',           statements[2].blocks[1].statements[0].objset.var_name.text
-    assert_equal ASTOneOf,      statements[2].blocks[1].statements[0].objset.objset.class
-    assert_equal ASTAllOf,      statements[2].blocks[1].statements[0].objset.objset.objset.class
-    assert_equal 'Asd',         statements[2].blocks[1].statements[0].objset.objset.objset.class_name.text
+    assert_equal ASTExprStmt, statements[2].blocks[1].statements[0].class
+    assert_equal ASTAssignment, statements[2].blocks[1].statements[0].expr.class
+    assert_equal 'a',           statements[2].blocks[1].statements[0].expr.var_name.text
+    assert_equal ASTOneOf,      statements[2].blocks[1].statements[0].expr.expr.class
+    assert_equal ASTAllOf,      statements[2].blocks[1].statements[0].expr.expr.objset.class
+    assert_equal 'Asd',         statements[2].blocks[1].statements[0].expr.expr.objset.class_name.text
   end
   
   def test_action_extraction__multiple_assignment_of_return
@@ -595,17 +595,17 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
 
     assert_equal 4, statements.length
 
-    assert_equal ASTObjsetStmt,   statements[0].class
-    assert_equal ASTAssignment,   statements[0].objset.class
-    assert_equal 'a',             statements[0].objset.var_name.text
-    assert_equal ASTCreateObjset, statements[0].objset.objset.class
-    assert_equal 'Asd',           statements[0].objset.objset.class_name.text
+    assert_equal ASTExprStmt,   statements[0].class
+    assert_equal ASTAssignment,   statements[0].expr.class
+    assert_equal 'a',             statements[0].expr.var_name.text
+    assert_equal ASTCreateObjset, statements[0].expr.expr.class
+    assert_equal 'Asd',           statements[0].expr.expr.class_name.text
     
-    assert_equal ASTObjsetStmt,   statements[1].class
-    assert_equal ASTAssignment,   statements[1].objset.class
-    assert_equal 'b',             statements[1].objset.var_name.text
-    assert_equal ASTCreateObjset, statements[1].objset.objset.class
-    assert_equal 'Kme',           statements[1].objset.objset.class_name.text
+    assert_equal ASTExprStmt,   statements[1].class
+    assert_equal ASTAssignment,   statements[1].expr.class
+    assert_equal 'b',             statements[1].expr.var_name.text
+    assert_equal ASTCreateObjset, statements[1].expr.expr.class
+    assert_equal 'Kme',           statements[1].expr.expr.class_name.text
     
     assert_equal ASTDeleteObj, statements[2].class
     assert_equal 'a', statements[2].objset.var_name.text
@@ -656,8 +656,8 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     statements = ast.block.statements
 
     assert_equal 2, statements.length
-    assert_equal 'Asd', statements[0].objset.class_name.text
-    assert_equal 'Kme', statements[1].objset.class_name.text
+    assert_equal 'Asd', statements[0].expr.class_name.text
+    assert_equal 'Kme', statements[1].expr.class_name.text
   end
   
   def test_after_callbacks__instrumented
@@ -676,8 +676,8 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     statements = ast.block.statements
 
     assert_equal 2, statements.length
-    assert_equal 'Kme', statements[0].objset.class_name.text
-    assert_equal 'Asd', statements[1].objset.class_name.text
+    assert_equal 'Kme', statements[0].expr.class_name.text
+    assert_equal 'Asd', statements[1].expr.class_name.text
   end
   
   def test_before_callbacks__can_have_branches_normally
@@ -712,22 +712,22 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 2, statements[0].blocks.length
     blocks = statements[0].blocks
     assert_equal 1,             blocks[0].statements.length
-    assert_equal ASTObjsetStmt, blocks[0].statements[0].class
-    assert_equal 'Kme',         blocks[0].statements[0].objset.class_name.text
+    assert_equal ASTExprStmt, blocks[0].statements[0].class
+    assert_equal 'Kme',         blocks[0].statements[0].expr.class_name.text
     assert_equal 1,             blocks[1].statements.length
-    assert_equal ASTObjsetStmt, blocks[1].statements[0].class
-    assert_equal 'Asd',         blocks[1].statements[0].objset.class_name.text
+    assert_equal ASTExprStmt, blocks[1].statements[0].class
+    assert_equal 'Asd',         blocks[1].statements[0].expr.class_name.text
     
     assert_equal ASTEither, statements[1].class
     assert_equal 2, statements[1].blocks.length
     blocks = statements[1].blocks
     assert_equal 1,             blocks[0].statements.length
-    assert_equal ASTObjsetStmt, blocks[0].statements[0].class
-    assert_equal 'Kme',         blocks[0].statements[0].objset.class_name.text
+    assert_equal ASTExprStmt, blocks[0].statements[0].class
+    assert_equal 'Kme',         blocks[0].statements[0].expr.class_name.text
     assert_equal 0,             blocks[1].statements.length
 
-    assert_equal ASTObjsetStmt, statements[2].class
-    assert_equal 'Mod_Blah',    statements[2].objset.class_name.text
+    assert_equal ASTExprStmt, statements[2].class
+    assert_equal 'Mod_Blah',    statements[2].expr.class_name.text
   end
   
   def test_after_callbacks__can_have_branches_normally
@@ -751,18 +751,18 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
 
     assert_equal 2, statements.length
     
-    assert_equal ASTObjsetStmt, statements[0].class
-    assert_equal 'Mod_Blah',    statements[0].objset.class_name.text
+    assert_equal ASTExprStmt, statements[0].class
+    assert_equal 'Mod_Blah',    statements[0].expr.class_name.text
 
     assert_equal ASTEither, statements[1].class
     assert_equal 2,         statements[1].blocks.length
     blocks = statements[1].blocks
     assert_equal 1,             blocks[0].statements.length
-    assert_equal ASTObjsetStmt, blocks[0].statements[0].class
-    assert_equal 'Kme',         blocks[0].statements[0].objset.class_name.text
+    assert_equal ASTExprStmt, blocks[0].statements[0].class
+    assert_equal 'Kme',         blocks[0].statements[0].expr.class_name.text
     assert_equal 1,             blocks[1].statements.length
-    assert_equal ASTObjsetStmt, blocks[1].statements[0].class
-    assert_equal 'Asd',         blocks[1].statements[0].objset.class_name.text
+    assert_equal ASTExprStmt, blocks[1].statements[0].class
+    assert_equal 'Asd',         blocks[1].statements[0].expr.class_name.text
   end
 
   def test_callbacks__multiple_branched_callbacks
@@ -804,11 +804,11 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
       blocks =                statements[index].blocks
       assert_equal 2,         blocks.length
       assert_equal 1,                          blocks[0].statements.length
-      assert_equal ASTObjsetStmt,              blocks[0].statements[0].class
-      assert_equal 'Kme',                      blocks[0].statements[0].objset.class_name.text
+      assert_equal ASTExprStmt,              blocks[0].statements[0].class
+      assert_equal 'Kme',                      blocks[0].statements[0].expr.class_name.text
       assert_equal 1,                          blocks[1].statements.length
-      assert_equal ASTObjsetStmt,              blocks[1].statements[0].class
-      assert_equal expected_classnames[index], blocks[1].statements[0].objset.class_name.text
+      assert_equal ASTExprStmt,              blocks[1].statements[0].class
+      assert_equal expected_classnames[index], blocks[1].statements[0].expr.class_name.text
     end
   end
 
@@ -865,12 +865,12 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 3, blocks[1].statements.length
     types = ['Asd', 'Kme', 'Mod_Blah']
     3.times do |i|
-      assert_equal ASTObjsetStmt,    blocks[1].statements[i].class
-      assert_equal types[i],         blocks[1].statements[i].objset.class_name.text
+      assert_equal ASTExprStmt,    blocks[1].statements[i].class
+      assert_equal types[i],         blocks[1].statements[i].expr.class_name.text
     end
 
     assert_equal 1,     blocks[0].statements.length
-    assert_equal 'Asd', blocks[0].statements[0].objset.class_name.text
+    assert_equal 'Asd', blocks[0].statements[0].expr.class_name.text
   end
 
   def test_before_callbacks__affect_after
@@ -904,12 +904,12 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 3, blocks[1].statements.length
     types = ['Asd', 'Kme', 'Mod_Blah']
     3.times do |i|
-      assert_equal ASTObjsetStmt,    blocks[1].statements[i].class
-      assert_equal types[i],         blocks[1].statements[i].objset.class_name.text
+      assert_equal ASTExprStmt, blocks[1].statements[i].class
+      assert_equal types[i],    blocks[1].statements[i].expr.class_name.text
     end
 
     assert_equal 1,     blocks[0].statements.length
-    assert_equal 'Asd', blocks[0].statements[0].objset.class_name.text
+    assert_equal 'Asd', blocks[0].statements[0].expr.class_name.text
   end
 
   def test_before_callbacks__render_in_action_does_not_halt_after
@@ -923,7 +923,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
       
       def nothing
         Kme.new
-        instance_eval "render :text => 'blah'"
+        render :text => 'blah'
       end
 
       def after_nothing
@@ -944,12 +944,12 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 3, blocks[1].statements.length
     types = ['Asd', 'Kme', 'Mod_Blah']
     3.times do |i|
-      assert_equal ASTObjsetStmt,    blocks[1].statements[i].class
-      assert_equal types[i],         blocks[1].statements[i].objset.class_name.text
+      assert_equal ASTExprStmt,      blocks[1].statements[i].class
+      assert_equal types[i],         blocks[1].statements[i].expr.class_name.text
     end
 
     assert_equal 1,     blocks[0].statements.length
-    assert_equal 'Asd', blocks[0].statements[0].objset.class_name.text
+    assert_equal 'Asd', blocks[0].statements[0].expr.class_name.text
   end
 
   def test_extract_action__instrumentation_filters_work
@@ -1006,9 +1006,9 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     statements = ast.block.statements
 
     assert_equal 1, statements.length
-    assert_equal ASTObjsetStmt,   statements[0].class
-    assert_equal ASTCreateObjset, statements[0].objset.class
-    assert_equal 'Asd',           statements[0].objset.class_name.text
+    assert_equal ASTExprStmt,   statements[0].class
+    assert_equal ASTCreateObjset, statements[0].expr.class
+    assert_equal 'Asd',           statements[0].expr.class_name.text
   end
   
   def test_extract_action__exceptions_in_callbacks_stop_the_chain
@@ -1054,11 +1054,11 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
 
     block_stmts = foreach.block.statements
     assert_equal 2,             block_stmts.length
-    assert_equal ASTObjsetStmt, block_stmts[0].class
-    assert_equal ASTAssignment, block_stmts[0].objset.class
-    assert_equal ASTVariable,   block_stmts[0].objset.objset.class
-    assert_equal 'asd',         block_stmts[0].objset.objset.var_name.text
-    assert_equal 'a',           block_stmts[0].objset.var_name.text
+    assert_equal ASTExprStmt, block_stmts[0].class
+    assert_equal ASTAssignment, block_stmts[0].expr.class
+    assert_equal ASTVariable,   block_stmts[0].expr.expr.class
+    assert_equal 'asd',         block_stmts[0].expr.expr.var_name.text
+    assert_equal 'a',           block_stmts[0].expr.var_name.text
     assert_equal ASTDeleteObj,  block_stmts[1].class
     assert_equal 'a',           block_stmts[1].objset.var_name.text
   end
@@ -1076,13 +1076,13 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     
     assert_equal 1, statements.length
 
-    assert_equal ASTSetTup,       statements[0].class
-    assert_equal ASTCreateObjset, statements[0].objset1.class
-    assert_equal 'Kme',           statements[0].objset1.class_name.text
-    assert_equal 'blah',          statements[0].rel_name.text
-    assert_equal ASTSetTup,       statements[0].class
-    assert_equal ASTCreateObjset, statements[0].objset2.class
-    assert_equal 'Mod_Blah',      statements[0].objset2.class_name.text
+    assert_equal ASTMemberSet,    statements[0].class
+    assert_equal ASTCreateObjset, statements[0].objset.class
+    assert_equal 'Kme',           statements[0].objset.class_name.text
+    assert_equal 'blah',          statements[0].member_name.text
+    assert_equal ASTMemberSet,    statements[0].class
+    assert_equal ASTCreateObjset, statements[0].expr.class
+    assert_equal 'Mod_Blah',      statements[0].expr.class_name.text
   end
 
   def test_extract_action__association_setter_through
@@ -1098,25 +1098,25 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     
     assert_equal 4, statements.length
 
-    assert_equal ASTObjsetStmt, statements[0].class
-    assert_equal ASTAssignment, statements[0].objset.class
-    origin_name =               statements[0].objset.var_name.text
-    assert_equal ASTOneOf,      statements[0].objset.objset.class
-    assert_equal ASTAllOf,      statements[0].objset.objset.objset.class
-    assert_equal 'Asd',         statements[0].objset.objset.objset.class_name.text
+    assert_equal ASTExprStmt,   statements[0].class
+    assert_equal ASTAssignment, statements[0].expr.class
+    origin_name =               statements[0].expr.var_name.text
+    assert_equal ASTOneOf,      statements[0].expr.expr.class
+    assert_equal ASTAllOf,      statements[0].expr.expr.objset.class
+    assert_equal 'Asd',         statements[0].expr.expr.objset.class_name.text
     
-    assert_equal ASTObjsetStmt,   statements[1].class
-    assert_equal ASTAssignment,   statements[1].objset.class
-    target_name =                 statements[1].objset.var_name.text
-    assert_equal ASTCreateObjset, statements[1].objset.objset.class
-    assert_equal 'Kme',           statements[1].objset.objset.class_name.text
+    assert_equal ASTExprStmt,     statements[1].class
+    assert_equal ASTAssignment,   statements[1].expr.class
+    target_name =                 statements[1].expr.var_name.text
+    assert_equal ASTCreateObjset, statements[1].expr.expr.class
+    assert_equal 'Kme',           statements[1].expr.expr.class_name.text
 
-    assert_equal ASTDeleteObj,   statements[2].class
-    assert_equal ASTDereference, statements[2].objset.class
-    assert_equal ASTVariable,    statements[2].objset.objset.class
-    assert_equal origin_name,    statements[2].objset.objset.var_name.text
-    assert_equal 'blahs',        statements[2].objset.rel_name.text
-
+    assert_equal ASTDeleteObj,    statements[2].class
+    assert_equal ASTMemberAccess, statements[2].objset.class
+    assert_equal ASTVariable,     statements[2].objset.objset.class
+    assert_equal origin_name,     statements[2].objset.objset.var_name.text
+    assert_equal 'blahs',         statements[2].objset.member_name.text
+ 
     assert_equal ASTForEach,  statements[3].class
     iter_name =               statements[3].var_name.text
     assert_equal ASTVariable, statements[3].objset.class
@@ -1125,11 +1125,11 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
 
     assert_equal 3, block.statements.length
 
-    assert_equal ASTObjsetStmt,   block.statements[0].class
-    assert_equal ASTAssignment,   block.statements[0].objset.class
-    temp_name =                   block.statements[0].objset.var_name.text
-    assert_equal ASTCreateObjset, block.statements[0].objset.objset.class
-    assert_equal 'Mod_Blah',      block.statements[0].objset.objset.class_name.text
+    assert_equal ASTExprStmt,   block.statements[0].class
+    assert_equal ASTAssignment,   block.statements[0].expr.class
+    temp_name =                   block.statements[0].expr.var_name.text
+    assert_equal ASTCreateObjset, block.statements[0].expr.expr.class
+    assert_equal 'Mod_Blah',      block.statements[0].expr.expr.class_name.text
 
     assert_equal ASTCreateTup, block.statements[1].class
     assert_equal ASTVariable,  block.statements[1].objset1.class
@@ -1176,13 +1176,13 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
 
     block_stmts = statements.first.block.statements
 
-    assert_equal 1,              block_stmts.length
-    assert_equal ASTForEach,     block_stmts.first.class
-    assert_equal ASTDereference, block_stmts.first.objset.class
-    assert_equal ASTVariable,    block_stmts.first.objset.objset.class
-    assert_equal 'asd',          block_stmts.first.objset.objset.var_name.text
-    assert_equal 'blahs',        block_stmts.first.objset.rel_name.text
-    assert_equal 'blah',         block_stmts.first.var_name.text
+    assert_equal 1,               block_stmts.length
+    assert_equal ASTForEach,      block_stmts.first.class
+    assert_equal ASTMemberAccess, block_stmts.first.objset.class
+    assert_equal ASTVariable,     block_stmts.first.objset.objset.class
+    assert_equal 'asd',           block_stmts.first.objset.objset.var_name.text
+    assert_equal 'blahs',         block_stmts.first.objset.member_name.text
+    assert_equal 'blah',          block_stmts.first.var_name.text
 
     final_block_stmts = block_stmts.first.block.statements
 
@@ -1208,11 +1208,11 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
 
     assert_equal 3, statements.length
 
-    assert_equal ASTObjsetStmt,   statements[0].class
-    assert_equal ASTAssignment,   statements[0].objset.class
-    assert_equal 'asd',           statements[0].objset.var_name.text
-    assert_equal ASTCreateObjset, statements[0].objset.objset.class
-    assert_equal 'Asd',           statements[0].objset.objset.class_name.text
+    assert_equal ASTExprStmt,   statements[0].class
+    assert_equal ASTAssignment,   statements[0].expr.class
+    assert_equal 'asd',           statements[0].expr.var_name.text
+    assert_equal ASTCreateObjset, statements[0].expr.expr.class
+    assert_equal 'Asd',           statements[0].expr.expr.class_name.text
 
     assert_equal ASTEither,       statements[1].class
     assert_equal 2,               statements[1].blocks.length
@@ -1241,12 +1241,12 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
 
     assert_equal 2, statements.length
 
-    assert_equal ASTObjsetStmt,  statements[0].class
-    assert_equal ASTAssignment,  statements[0].objset.class
-    assert_equal 'a',            statements[0].objset.var_name.text
-    assert_equal ASTOneOfObjset, statements[0].objset.objset.class
-    assert_equal ASTAllOf,       statements[0].objset.objset.objsets[0].class
-    assert_equal ASTEmptyObjset, statements[0].objset.objset.objsets[1].class
+    assert_equal ASTExprStmt,      statements[0].class
+    assert_equal ASTAssignment,    statements[0].expr.class
+    assert_equal 'a',              statements[0].expr.var_name.text
+    assert_equal ASTPickOneObjset, statements[0].expr.expr.class
+    assert_equal ASTAllOf,         statements[0].expr.expr.objsets[0].class
+    assert_equal ASTEmptyObjset,   statements[0].expr.expr.objsets[1].class
 
     assert_equal ASTDeleteObj, statements[1].class
     assert_equal ASTVariable,  statements[1].objset.class
@@ -1267,12 +1267,12 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
 
     assert_equal 2, statements.length
 
-    assert_equal ASTObjsetStmt,  statements[0].class
-    assert_equal ASTAssignment,  statements[0].objset.class
-    assert_equal 'a',            statements[0].objset.var_name.text
-    assert_equal ASTOneOfObjset, statements[0].objset.objset.class
-    assert_equal ASTAllOf,       statements[0].objset.objset.objsets[0].class
-    assert_equal ASTEmptyObjset, statements[0].objset.objset.objsets[1].class
+    assert_equal ASTExprStmt,      statements[0].class
+    assert_equal ASTAssignment,    statements[0].expr.class
+    assert_equal 'a',              statements[0].expr.var_name.text
+    assert_equal ASTPickOneObjset, statements[0].expr.expr.class
+    assert_equal ASTAllOf,         statements[0].expr.expr.objsets[0].class
+    assert_equal ASTEmptyObjset,   statements[0].expr.expr.objsets[1].class
 
     assert_equal ASTDeleteObj, statements[1].class
     assert_equal ASTVariable,  statements[1].objset.class
@@ -1293,12 +1293,12 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
 
     assert_equal 2, statements.length
 
-    assert_equal ASTObjsetStmt,  statements[0].class
-    assert_equal ASTAssignment,  statements[0].objset.class
-    assert_equal 'a',            statements[0].objset.var_name.text
-    assert_equal ASTOneOfObjset, statements[0].objset.objset.class
-    assert_equal ASTEmptyObjset, statements[0].objset.objset.objsets[0].class
-    assert_equal ASTAllOf,       statements[0].objset.objset.objsets[1].class
+    assert_equal ASTExprStmt,      statements[0].class
+    assert_equal ASTAssignment,    statements[0].expr.class
+    assert_equal 'a',              statements[0].expr.var_name.text
+    assert_equal ASTPickOneObjset, statements[0].expr.expr.class
+    assert_equal ASTEmptyObjset,   statements[0].expr.expr.objsets[0].class
+    assert_equal ASTAllOf,         statements[0].expr.expr.objsets[1].class
 
     assert_equal ASTDeleteObj, statements[1].class
     assert_equal ASTVariable,  statements[1].objset.class
@@ -1325,15 +1325,15 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
 
     assert_equal 3, statements.length
 
-    assert_equal ASTObjsetStmt,   statements[0].class
-    assert_equal ASTCreateObjset, statements[0].objset.class
-    assert_equal 'Kme',           statements[0].objset.class_name.text
-    assert_equal ASTObjsetStmt,   statements[1].class
-    assert_equal ASTCreateObjset, statements[1].objset.class
-    assert_equal 'Asd',           statements[1].objset.class_name.text
-    assert_equal ASTObjsetStmt,   statements[2].class
-    assert_equal ASTCreateObjset, statements[2].objset.class
-    assert_equal 'Mod_Blah',      statements[2].objset.class_name.text
+    assert_equal ASTExprStmt,   statements[0].class
+    assert_equal ASTCreateObjset, statements[0].expr.class
+    assert_equal 'Kme',           statements[0].expr.class_name.text
+    assert_equal ASTExprStmt,   statements[1].class
+    assert_equal ASTCreateObjset, statements[1].expr.class
+    assert_equal 'Asd',           statements[1].expr.class_name.text
+    assert_equal ASTExprStmt,   statements[2].class
+    assert_equal ASTCreateObjset, statements[2].expr.class
+    assert_equal 'Mod_Blah',      statements[2].expr.class_name.text
   end
 
   def test_extract_action__foreign_key_reads_and_writes_propagate_kinda
@@ -1352,26 +1352,26 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
 
     assert_equal 3, statements.length
 
-    assert_equal ASTObjsetStmt, statements[0].class
-    assert_equal ASTAssignment, statements[0].objset.class
-    assert_equal 'blah',        statements[0].objset.var_name.text
-    assert_equal ASTOneOf,      statements[0].objset.objset.class
-    assert_equal ASTAllOf,      statements[0].objset.objset.objset.class
-    assert_equal 'Mod_Blah',    statements[0].objset.objset.objset.class_name.text
+    assert_equal ASTExprStmt,   statements[0].class
+    assert_equal ASTAssignment, statements[0].expr.class
+    assert_equal 'blah',        statements[0].expr.var_name.text
+    assert_equal ASTOneOf,      statements[0].expr.expr.class
+    assert_equal ASTAllOf,      statements[0].expr.expr.objset.class
+    assert_equal 'Mod_Blah',    statements[0].expr.expr.objset.class_name.text
 
-    assert_equal ASTObjsetStmt, statements[1].class
-    assert_equal ASTAssignment, statements[1].objset.class
-    assert_equal 'asd',         statements[1].objset.var_name.text
-    assert_equal ASTOneOf,      statements[1].objset.objset.class
-    assert_equal ASTAllOf,      statements[1].objset.objset.objset.class
-    assert_equal 'Asd',         statements[1].objset.objset.objset.class_name.text
+    assert_equal ASTExprStmt,   statements[1].class
+    assert_equal ASTAssignment, statements[1].expr.class
+    assert_equal 'asd',         statements[1].expr.var_name.text
+    assert_equal ASTOneOf,      statements[1].expr.expr.class
+    assert_equal ASTAllOf,      statements[1].expr.expr.objset.class
+    assert_equal 'Asd',         statements[1].expr.expr.objset.class_name.text
 
-    assert_equal ASTSetTup,     statements[2].class
-    assert_equal ASTVariable,   statements[2].objset1.class
-    assert_equal 'blah',        statements[2].objset1.var_name.text
-    assert_equal 'asd',         statements[2].rel_name.text
-    assert_equal ASTVariable,   statements[2].objset2.class
-    assert_equal 'asd',         statements[2].objset2.var_name.text
+    assert_equal ASTMemberSet,  statements[2].class
+    assert_equal ASTVariable,   statements[2].objset.class
+    assert_equal 'blah',        statements[2].objset.var_name.text
+    assert_equal 'asd',         statements[2].member_name.text
+    assert_equal ASTVariable,   statements[2].expr.class
+    assert_equal 'asd',         statements[2].expr.var_name.text
   end
 
   def test_extract_action__has_many_delete_removes_one
@@ -1388,20 +1388,20 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
 
     assert_equal 2, statements.length
 
-    assert_equal ASTObjsetStmt,   statements[0].class
-    assert_equal ASTAssignment,   statements[0].objset.class
-    assert_equal 'a',             statements[0].objset.var_name.text
-    assert_equal ASTCreateObjset, statements[0].objset.objset.class
-    assert_equal 'Asd',           statements[0].objset.objset.class_name.text
+    assert_equal ASTExprStmt,   statements[0].class
+    assert_equal ASTAssignment,   statements[0].expr.class
+    assert_equal 'a',             statements[0].expr.var_name.text
+    assert_equal ASTCreateObjset, statements[0].expr.expr.class
+    assert_equal 'Asd',           statements[0].expr.expr.class_name.text
 
     assert_equal ASTDeleteTup,    statements[1].class
     assert_equal ASTVariable,     statements[1].objset1.class
     assert_equal 'a',             statements[1].objset1.var_name.text
     assert_equal 'blahs',         statements[1].rel_name.text
     assert_equal ASTOneOf,        statements[1].objset2.class
-    assert_equal ASTDereference,  statements[1].objset2.objset.class
+    assert_equal ASTMemberAccess, statements[1].objset2.objset.class
+    assert_equal 'blahs',         statements[1].objset2.objset.member_name.text
     assert_equal ASTVariable,     statements[1].objset2.objset.objset.class
     assert_equal 'a',             statements[1].objset2.objset.objset.var_name.text
-    assert_equal 'blahs',         statements[1].objset2.objset.rel_name.text
   end
 end

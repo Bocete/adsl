@@ -14,10 +14,22 @@ class Array
   end
 end
 
+class Fixnum
+  alias_method :to_adsl, :to_s
+end
+
+class NilClass
+  alias_method :to_adsl, :to_s
+end
+
 module ADSL
   module Parser
    
     class ASTNode
+      def expr_has_side_effects?
+        false
+      end
+
       def self.is_statement?
         @is_statement
       end
@@ -30,31 +42,20 @@ module ADSL
         @is_formula
       end
 
-      def objset_has_side_effects?
-        false
+      def self.is_base_type?
+        @is_base_type
       end
 
-      def self.node_type(*fields)
-        options = {}
-        if fields.last.is_a? Hash
-          options.merge! fields.pop
-        end
-
-        if options.include?(:node_type) and !options.include?(:node_types)
-          options[:node_types] = [options[:node_type]]
-        end
-        if options.include?(:node_types)
-          @is_statement = options[:node_types].include? :statement
-          @is_objset    = options[:node_types].include? :objset
-          @is_formula   = options[:node_types].include? :formula
-        end
-
-        container_for *fields
-        container_for :lineno
+      def self.node_type(*types)
+        @is_statement = types.include? :statement
+        @is_objset    = types.include? :objset
+        @is_formula   = types.include? :formula
+        @is_base_type = types.include? :base_type
       end
 
-      def adsl_ast
-        self
+      def self.node_fields(*fields)
+        container_for *[*fields, :lineno]
+        recursively_comparable
       end
 
       def optimize
@@ -66,19 +67,6 @@ module ADSL
           copy.send "#{child_name}=", new_value unless new_value.equal? child
         end
         copy
-      end
-
-      def dup
-        new_values = {}
-        self.class.container_for_fields.each do |field_name|
-          value = send field_name
-          new_values[field_name] = if value.is_a?(Symbol) || value.nil?
-            value
-          else
-            value.dup
-          end
-        end
-        self.class.new new_values
       end
 
       def block_replace(&block)
@@ -101,21 +89,6 @@ module ADSL
         end
         new_value = block[self]
         new_value.nil? ? self.dup : new_value
-      end
-
-      def ==(other)
-        return false unless self.class == other.class
-        self.class.container_for_fields.each do |field_name|
-          child1 = self.send field_name
-          child2 = other.send field_name
-          return false unless child1 == child2
-        end
-        true
-      end
-      alias_method :eql?, :==
-
-      def hash
-        [self.class, *self.class.container_for_fields.map{ |field_name| send field_name }].hash
       end
 
       def preorder_traverse(&block)
@@ -150,191 +123,9 @@ module ADSL
     end
 
     class ADSLError < StandardError; end
-
-    class ASTDummyObjset < ASTNode
-      node_type :type_sig, :node_type => :objset
-
-      def typecheck_and_resolve(context)
-        self
-      end
-
-      def to_adsl
-        "DummyObjset(#{ @type_sig })"
-      end
-    end
-
-    class ASTDummyStmt < ASTNode
-      node_type :label, :node_type => :statement
-
-      def typecheck_and_resolve(context)
-      end
-
-      def to_adsl
-        "DummyStmt(#{ @label })\n"
-      end
-    end
-
-    class ASTSpec < ASTNode
-      node_type :classes, :actions, :invariants
-
-      def typecheck_and_resolve
-        context = ASTTypecheckResolveContext.new
-
-        # make sure class names are unique
-        @classes.each do |class_node|
-          if context.classes.include? class_node.name.text
-            raise ADSLError, "Duplicate class name '#{class_node.name.text}' on line #{class_node.name.lineno} (first definition on line #{context.classes[class_node.name.text][0].name.lineno}"
-          end
-          klass = ADSL::DS::DSClass.new :name => class_node.name.text
-          context.classes[klass.name] = [class_node, klass]
-        end
-
-        # make sure the parent classes are declared properly and that the inheritance graph is non-cyclic
-        parents = Hash.new{}
-        context.classes.values.each do |class_node, klass|
-          class_node.parent_names.map(&:text).each do |parent_name|
-            parent_node, parent = context.classes[parent_name]
-            raise ADSLError, "Unknown parent class name #{parent_name} for class #{class_node.name.text}" if parent.nil?
-            klass.parents << parent
-          end
-        end
-
-        context.classes.values.each do |class_node, klass|
-          raise ADSLError, "Cyclic inheritance detected with class #{klass.name}" if klass.all_parents.include? klass
-        end
-
-        # make sure relations are valid and refer to existing classes
-        context.classes.values.each do |class_node, klass|
-          class_node.relations.each do |rel_node|
-            klass.all_parents(true).each do |superclass|
-              if context.relations[superclass.name].include? rel_node.name.text
-                raise ADSLError, "Duplicate relation name '#{class_node.name.text}' under class '#{klass.name}' on line #{rel_node.lineno} (first definition on line #{context.relations[superclass.name][rel_node.name.text][0].lineno}"
-              end
-            end
-            
-            rel = ADSL::DS::DSRelation.new :name => rel_node.name.text, :from_class => klass
-            context.relations[klass.name][rel.name] = [rel_node, rel]
-            klass.relations << rel
-          end
-        end
-
-        # now that classes and rels are initialized, check them
-        @classes.each do |class_node|
-          class_node.typecheck_and_resolve context
-        end
-
-        @actions.each do |action_node|
-          action_node.typecheck_and_resolve context
-        end
-
-        # make sure invariants have unique names; add names to unnamed invariants
-        names = Set.new
-        @invariants.each do |invariant_node|
-          invariant = invariant_node.typecheck_and_resolve context
-          if invariant.name && names.include?(invariant.name)
-            raise ADSLError, "Duplicate invariant name #{invariant.name} on line #{invariant_node.lineno}"
-          end
-          name = invariant.name || "unnamed_line_#{invariant_node.lineno}"
-          while names.include? name
-            name = name.increment_suffix
-          end
-          invariant.name = name
-          context.invariants << invariant
-          names << name
-        end
-
-        @invariants.each do |invariant_node|
-          invariant = invariant_node.typecheck_and_resolve context
-        end
-
-        ADSL::DS::DSSpec.new(
-          :classes => context.classes.map{ |a, b| b[1] }, 
-          :actions => context.actions.map{ |a, b| b[1] },
-          :invariants => context.invariants.dup
-        )
-      end
-
-      def to_adsl
-        "#{ @classes.map(&:to_adsl).join }\n#{ @actions.map(&:to_adsl).join }\n#{ @invariants.map(&:to_adsl).join }"
-      end
-
-      def adsl_ast_size(options = {})
-        sum = 1
-        @classes.each do |c|
-          sum += c.adsl_ast_size
-        end
-        actions = options[:action_name].nil? ? @actions : @actions.select{ |a| a.name.text == options[:action_name] }
-        actions.each do |a|
-          sum += options[:pre_optimize] ? a.pre_optimize_adsl_ast_size : a.adsl_ast_size
-        end
-        invs = options[:invariant_name].nil? ? @invariants : @invariants.select{ |a| a.name.text == options[:invariant_name] }
-        invs.each do |i|
-          sum += i.adsl_ast_size
-        end
-        sum
-      end
-    end
     
-    class ASTClass < ASTNode
-      node_type :name, :parent_names, :relations
-
-      def typecheck_and_resolve(context)
-        klass = context.classes[@name.text][1]
-        @relations.each do |rel_node|
-          rel = context.relations[@name.text][rel_node.name.text][1]
-          
-          if rel_node.cardinality[0] > rel_node.cardinality[1]
-            raise ADSLError, "Invalid cardinality of relation #{klass.name}.#{rel_node.name.text} on line #{rel_node.cardinality[2]}: minimum cardinality #{rel_node.cardinality[0]} must not be greater than the maximum cardinality #{rel_node.cardinality[1]}"
-          end
-          if rel_node.cardinality[1] == 0
-            raise ADSLError, "Invalid cardinality of relation #{klass.name}.#{rel_node.name.text} on line #{rel_node.cardinality[2]}: maximum cardinality #{rel_node.cardinality[1]} must be positive"
-          end
-          unless context.classes.include? rel_node.to_class_name.text
-            raise ADSLError, "Unknown class name #{rel_node.to_class_name.text} in relation #{klass.name}.#{rel_node.name.text} on line #{rel_node.to_class_name.lineno}"
-          end
-
-          rel.to_class = context.classes[rel_node.to_class_name.text][1]
-          rel.cardinality = rel_node.cardinality
-
-          if rel_node.inverse_of_name
-            target_class = context.classes[rel.to_class.name][1]
-            target_rel = (Set[target_class] + target_class.all_parents).map{ |klass| klass.relations }.flatten.select{ |rel| rel.name == rel_node.inverse_of_name.text}.first
-           
-            if target_rel.nil?
-              raise ADSLError, "Unknown relation to which #{rel.from_class.name}.#{rel.name} relation is inverse to: #{rel.to_class.name}.#{rel_node.inverse_of_name.text} on line #{rel_node.inverse_of_name.lineno}"
-            end
-
-            rel.inverse_of = target_rel
-
-            if target_rel.inverse_of
-              raise ADSLError, "Relation #{rel.from_class.name}.#{rel.name} cannot be inverse to an inverse relation #{rel.to_class.name}.#{rel_node.inverse_of_name.text} on line #{rel_node.inverse_of_name.lineno}"
-            end
-          end
-        end
-      end
-
-      def to_adsl
-        par_names = @parent_names.empty? ? "" : "extends #{@parent_names.map(&:text).join(', ')} "
-        "class #{ @name.text } #{ par_names }{\n#{ @relations.map(&:to_adsl).adsl_indent }}\n"
-      end
-    end
-    
-    class ASTRelation < ASTNode
-      node_type :cardinality, :to_class_name, :name, :inverse_of_name
-
-      def to_adsl
-        card_str = cardinality[1] == Float::INFINITY ? "#{cardinality[0]}+" : "#{cardinality[0]}..#{cardinality[1]}"
-        inv_str = inverse_of_name.nil? ? "" : " inverseof #{inverse_of_name.text}"
-        "#{ card_str } #{ @to_class_name.text } #{ @name.text }#{ inv_str }\n"
-      end
-    end
-
-    class ASTIdent < ASTNode
-      node_type :text
-    end
-
     class ASTTypecheckResolveContext
-      attr_accessor :classes, :relations, :actions, :invariants, :var_stack, :pre_stmts 
+      attr_accessor :classes, :members, :actions, :invariants, :var_stack, :pre_stmts 
 
       class ASTStackFrame < ActiveSupport::OrderedHash
         attr_accessor :var_write_listeners
@@ -390,7 +181,7 @@ module ADSL
         @classes = ActiveSupport::OrderedHash.new
 
         # classname => name => [astnode, dsobj]
-        @relations = ActiveSupport::OrderedHash.new{ |hash, key| hash[key] = ActiveSupport::OrderedHash.new }
+        @members = ActiveSupport::OrderedHash.new{ |hash, key| hash[key] = ActiveSupport::OrderedHash.new }
 
         # stack of name => [astnode, dsobj]
         @actions = ActiveSupport::OrderedHash.new
@@ -405,8 +196,8 @@ module ADSL
         source.classes.each do |name, value|
           @classes[name] = value.dup
         end
-        source.relations.each do |class_name, class_entry|
-          entries = @relations[class_name]
+        source.members.each do |class_name, class_entry|
+          entries = @members[class_name]
           class_entry.each do |name, value|
             entries[name] = value.dup
           end
@@ -455,14 +246,11 @@ module ADSL
           next unless frame.include? var.name
           
           old_var = frame[var.name][1]
-        
-          if old_var.type_sig.nil_sig?
-            # nothing
-          elsif var.type_sig.nil_sig?
-            var.type_sig = old_var.type_sig
-          elsif var.type_sig != old_var.type_sig
+          type_sig = old_var.type_sig.join var.type_sig, false
+          if type_sig.nil?
             raise ADSLError, "Unmatched type signatures '#{ old_var.type_sig }' and  '#{ var.type_sig }' for variable '#{var.name}' on line #{node.lineno}"
           end
+          var.type_sig = type_sig
 
           frame[var.name][1] = var
 
@@ -493,21 +281,25 @@ module ADSL
         nil
       end
     
-      def find_relation(from_type_sig, rel_name, lineno, to_type_sig=nil)
-        origin_classes = from_type_sig.all_parents(true).map(&:name)
-        relation_map = @relations.select{ |klass_name, rel_map| origin_classes.include? klass_name }.values.inject(&:merge) || {}
+      def find_member(from_type_sig, name, lineno, to_type_sig=nil)
+        unless from_type_sig.is_a? ADSL::DS::TypeSig::ObjsetType
+          raise ADSLError, "#{from_type_sig}.#{name} is not a class type (on line #{lineno})"
+        end
+        origin_class_names = from_type_sig.all_parents(true).map(&:name)
+
+        member_map = @members.select{ |klass_name, rel_map| origin_class_names.include? klass_name }.values.inject(&:merge) || {}
         
-        unless relation_map.include? rel_name
-          raise ADSLError, "Unknown relation #{rel_name} from type signature #{from_type_sig} on line #{lineno}"
+        unless member_map.include? name
+          raise ADSLError, "Unknown relation #{name} from type signature #{from_type_sig} on line #{lineno}"
         end
 
-        relation = relation_map[rel_name][1]
+        member = member_map[name][1]
         
-        if to_type_sig && !(relation.to_class.to_sig >= to_type_sig)
-          raise ADSLError, "Mismatched right-hand-side type for relation #{from_type_sig}.#{rel_name} on line #{lineno}. Expected #{to_type_sig} but was #{relation.to_class.to_sig}"
+        if to_type_sig && !(member.type_sig >= to_type_sig)
+          raise ADSLError, "Mismatched right-hand-side type for member #{from_type_sig}.#{name} on line #{lineno}. Expected #{to_type_sig} but was #{member.type_sig}"
         end
 
-        relation
+        member
       end
 
       def self.context_vars_that_differ(*contexts)
@@ -525,8 +317,228 @@ module ADSL
       end
     end
 
+
+    class ASTDummyObjset < ASTNode
+      node_fields :type_sig
+      node_type :objset
+
+      def expr_has_side_effects?
+        false
+      end
+
+      def typecheck_and_resolve(context)
+        self
+      end
+
+      def to_adsl
+        "DummyObjset(#{ @type_sig })"
+      end
+    end
+
+    class ASTDummyStmt < ASTNode
+      node_fields :label
+      node_type :statement
+
+      def typecheck_and_resolve(context)
+      end
+
+      def to_adsl
+        "DummyStmt(#{ @label })\n"
+      end
+    end
+
+    class ASTSpec < ASTNode
+      node_fields :classes, :actions, :invariants
+
+      def typecheck_and_resolve
+        context = ASTTypecheckResolveContext.new
+
+        # make sure class names are unique
+        @classes.each do |class_node|
+          if context.classes.include? class_node.name.text
+            raise ADSLError, "Duplicate class name '#{class_node.name.text}' on line #{class_node.name.lineno} (first definition on line #{context.classes[class_node.name.text][0].name.lineno}"
+          end
+          klass = ADSL::DS::DSClass.new :name => class_node.name.text
+          context.classes[klass.name] = [class_node, klass]
+        end
+
+        # make sure the parent classes are declared properly and that the inheritance graph is non-cyclic
+        parents = Hash.new{}
+        context.classes.values.each do |class_node, klass|
+          class_node.parent_names.map(&:text).each do |parent_name|
+            parent_node, parent = context.classes[parent_name]
+            raise ADSLError, "Unknown parent class name #{parent_name} for class #{class_node.name.text}" if parent.nil?
+            klass.parents << parent
+          end
+        end
+        context.classes.values.each do |class_node, klass|
+          raise ADSLError, "Cyclic inheritance detected with class #{klass.name}" if klass.all_parents.include? klass
+        end
+
+        # setup children of said classes
+        context.classes.values.each do |class_node, klass|
+          klass.parents.each do |parent|
+            parent.children << klass
+          end
+        end
+
+        # make sure relations are valid and refer to existing classes
+        context.classes.values.each do |class_node, klass|
+          class_node.members.each do |rel_node|
+            klass.all_parents(true).each do |superclass|
+              if context.members[superclass.name].include? rel_node.name.text
+                raise ADSLError, "Duplicate member name '#{class_node.name.text}' under class '#{klass.name}' on line #{rel_node.lineno} (first definition on line #{context.members[superclass.name][rel_node.name.text][0].lineno}"
+              end
+            end
+            
+            rel_node.class_name = klass.name
+            if rel_node.is_a? ADSL::Parser::ASTRelation
+              ds_obj = ADSL::DS::DSRelation.new :name => rel_node.name.text, :from_class => klass
+            else
+              ds_obj = ADSL::DS::DSBasicTypeField.new :name => rel_node.name.text, :from_class => klass
+            end
+            context.members[klass.name][ds_obj.name] = [rel_node, ds_obj]
+            klass.members << ds_obj
+          end
+        end
+
+        # now that classes and rels are initialized, check them
+        @classes.each do |class_node|
+          class_node.typecheck_and_resolve context
+        end
+
+        @actions.each do |action_node|
+          action_node.typecheck_and_resolve context
+        end
+
+        # make sure invariants have unique names; create names for unnamed invariants
+        names = Set.new
+        @invariants.each do |invariant_node|
+          invariant = invariant_node.typecheck_and_resolve context
+          if invariant.name && names.include?(invariant.name)
+            raise ADSLError, "Duplicate invariant name #{invariant.name} on line #{invariant_node.lineno}"
+          end
+          name = invariant.name || "unnamed_line_#{invariant_node.lineno}"
+          while names.include? name
+            name = name.increment_suffix
+          end
+          invariant.name = name
+          context.invariants << invariant
+          names << name
+        end
+
+        @invariants.each do |invariant_node|
+          invariant = invariant_node.typecheck_and_resolve context
+        end
+
+        ADSL::DS::DSSpec.new(
+          :classes => context.classes.map{ |a, b| b[1] }, 
+          :actions => context.actions.map{ |a, b| b[1] },
+          :invariants => context.invariants.dup
+        )
+      end
+
+      def to_adsl
+        "#{ @classes.map(&:to_adsl).join }\n#{ @actions.map(&:to_adsl).join }\n#{ @invariants.map(&:to_adsl).join }"
+      end
+
+      def adsl_ast_size(options = {})
+        sum = 1
+        @classes.each do |c|
+          sum += c.adsl_ast_size
+        end
+        actions = options[:action_name].nil? ? @actions : @actions.select{ |a| a.name.text == options[:action_name] }
+        actions.each do |a|
+          sum += options[:pre_optimize] ? a.pre_optimize_adsl_ast_size : a.adsl_ast_size
+        end
+        invs = options[:invariant_name].nil? ? @invariants : @invariants.select{ |a| a.name.text == options[:invariant_name] }
+        invs.each do |i|
+          sum += i.adsl_ast_size
+        end
+        sum
+      end
+    end
+    
+    class ASTClass < ASTNode
+      node_fields :name, :parent_names, :members
+
+      def typecheck_and_resolve(context)
+        klass = context.classes[@name.text][1]
+        @members.each do |member_node|
+          member_node.typecheck_and_resolve context
+        end
+      end
+
+      def to_adsl
+        par_names = @parent_names.empty? ? "" : "extends #{@parent_names.map(&:text).join(', ')} "
+        "class #{ @name.text } #{ par_names }{\n#{ @members.map(&:to_adsl).adsl_indent }}\n"
+      end
+    end
+    
+    class ASTRelation < ASTNode
+      node_fields :cardinality, :to_class_name, :name, :inverse_of_name
+      attr_accessor :class_name
+
+      def to_adsl
+        card_str = cardinality[1] == Float::INFINITY ? "#{cardinality[0]}+" : "#{cardinality[0]}..#{cardinality[1]}"
+        inv_str = inverse_of_name.nil? ? "" : " inverseof #{inverse_of_name.text}"
+        "#{ card_str } #{ @to_class_name.text } #{ @name.text }#{ inv_str }\n"
+      end
+
+      def typecheck_and_resolve(context)
+        rel = context.members[@class_name][@name.text][1]
+          
+        if @cardinality[0] > @cardinality[1]
+          raise ADSLError, "Invalid cardinality of relation #{@class_name}.#{@name.text} on line #{@cardinality[2]}: minimum cardinality #{@cardinality[0]} must not be greater than the maximum cardinality #{@cardinality[1]}"
+        end
+        if @cardinality[1] == 0
+          raise ADSLError, "Invalid cardinality of relation #{@class_name}.#{@name.text} on line #{@cardinality[2]}: maximum cardinality #{@cardinality[1]} must be positive"
+        end
+        unless context.classes.include? @to_class_name.text
+          raise ADSLError, "Unknown class name #{@to_class_name.text} in relation #{@class_name}.#{@name.text} on line #{@to_class_name.lineno}"
+        end
+
+        rel.to_class = context.classes[@to_class_name.text][1]
+        rel.cardinality = @cardinality
+
+        if @inverse_of_name
+          target_class = rel.to_class
+          target_rel = (target_class.all_parents(true)).map{ |klass| klass.members }.flatten.select{ |rel| rel.name == @inverse_of_name.text}.first
+           
+          if target_rel.nil?
+            raise ADSLError, "Unknown relation to which #{@class_name}.#{rel.name} relation is inverse to: #{rel.to_class.name}.#{@inverse_of_name.text} on line #{@inverse_of_name.lineno}"
+          end
+          unless target_rel.is_a? ADSL::DS::DSRelation
+            raise ADSLError, "Inverse relation of #{@class_name}.#{rel.name} is not a relation (#{rel.to.class.name}.#{@inverse_of_name.text}) on line #{@inverse_of_name.lineno}"
+          end
+
+          rel.inverse_of = target_rel
+
+          if target_rel.inverse_of
+            raise ADSLError, "Relation #{@class_name}.#{rel.name} cannot be inverse to an inverse relation #{rel.to_class.name}.#{@inverse_of_name.text} on line #{@inverse_of_name.lineno}"
+          end
+        end
+      end
+    end
+
+    class ASTField < ASTNode
+      node_fields :name, :type_name
+      attr_accessor :class_name
+
+      def to_adsl
+        "#{ @type_name } #{ @name }\n"
+      end
+
+      def typecheck_and_resolve(context)
+      end
+    end
+
+    class ASTIdent < ASTNode
+      node_fields :text
+    end
+
     class ASTAction < ASTNode
-      node_type :name, :arg_cardinalities, :arg_names, :arg_types, :block
+      node_fields :name, :arg_cardinalities, :arg_names, :arg_types, :block
 
       def typecheck_and_resolve(context)
         old_action_node, old_action = context.actions[@name.text]
@@ -579,7 +591,7 @@ module ADSL
           block.block_replace do |node|
             next unless node.is_a? ASTAssignment
             next if node.var_name.nil? || variables_read.include?(node.var_name.text)
-            node.objset
+            node.expr
           end
 
           next block if block.statements.length != 1
@@ -614,9 +626,9 @@ module ADSL
           variable_names << name if regexes.map{ |r| r =~ name ? true : false }.include? true
         end
         variable_names.each do |name|
-          @block.statements.unshift ASTObjsetStmt.new(:objset => ASTAssignment.new(
+          @block.statements.unshift ASTExprStmt.new(:expr => ASTAssignment.new(
             :var_name => ASTIdent.new(:text => name),
-            :objset => ASTEmptyObjset.new
+            :expr => ASTEmptyObjset.new
           ))
         end
       end
@@ -636,7 +648,8 @@ module ADSL
     end
 
     class ASTBlock < ASTNode
-      node_type :statements, :node_type => :statement
+      node_fields :statements
+      node_type :statement
 
       def typecheck_and_resolve(context, open_subcontext=true)
         context.push_frame if open_subcontext
@@ -677,38 +690,40 @@ module ADSL
       end
 
       def to_adsl
-        @statements.map(&:to_adsl).join
+        @statements.map(&:to_adsl).join("")
       end
     end
 
     class ASTAssignment < ASTNode
-      node_type :var_name, :objset, :node_type => :objset
+      node_fields :var_name, :expr
+      node_type :objset
       
-      def objset_has_side_effects?; true; end
+      def expr_has_side_effects?; true; end
 
       def typecheck_and_resolve(context)
-        objset = @objset.typecheck_and_resolve context
-        @var = ADSL::DS::DSVariable.new :name => @var_name.text, :type_sig => objset.type_sig
+        expr = @expr.typecheck_and_resolve context
+        @var = ADSL::DS::DSVariable.new :name => @var_name.text, :type_sig => expr.type_sig
         context.redefine_var @var, @var_name
-        create_prestmt = ADSL::DS::DSAssignment.new :var => @var, :objset => objset
+        create_prestmt = ADSL::DS::DSAssignment.new :var => @var, :expr => expr
         context.pre_stmts << create_prestmt
         @var
       end
 
       def to_adsl
-        "#{ @var_name.text } = #{ @objset.to_adsl }"
+        "#{ @var_name.text } = #{ @expr.to_adsl }"
       end
     end
 
     class ASTDeclareVar < ASTNode
-      node_type :var_name, :node_type => :statement
+      node_fields :var_name
+      node_type :statement
 
       def typecheck_and_resolve(context)
         var = context.lookup_var @var_name.text, false
         if var.nil?
-          ASTObjsetStmt.new(
-            :objset => ASTAssignment.new(:var_name => @var_name.dup, :objset => ASTEmptyObjset.new).typecheck_and_resolve(context)
-          )
+          ASTExprStmt.new(
+            :expr => ASTAssignment.new(:var_name => @var_name.dup, :expr => ASTEmptyObjset.new)
+          ).typecheck_and_resolve(context)
         else
           []
         end
@@ -719,27 +734,29 @@ module ADSL
       end
     end
 
-    class ASTObjsetStmt < ASTNode
-      node_type :objset, :node_type => :statement
+    class ASTExprStmt < ASTNode
+      node_fields :expr
+      node_type :statement
 
       def typecheck_and_resolve(context)
-        @objset.typecheck_and_resolve(context)
+        @expr.typecheck_and_resolve(context)
         return nil
       end
 
       def optimize(last_stmt = false)
-        @objset.objset_has_side_effects? ? self : ASTDummyStmt.new
+        @expr.expr_has_side_effects? ? self : ASTDummyStmt.new
       end
 
       def to_adsl
-        "#{ @objset.to_adsl }\n"
+        "#{ @expr.to_adsl }\n"
       end
     end
 
     class ASTCreateObjset < ASTNode
-      node_type :class_name, :node_type => :objset
+      node_fields :class_name
+      node_type :objset
       
-      def objset_has_side_effects?; true; end
+      def expr_has_side_effects?; true; end
 
       def typecheck_and_resolve(context)
         klass_node, klass = context.classes[@class_name.text]
@@ -757,7 +774,8 @@ module ADSL
     end
 
     class ASTForEach < ASTNode
-      node_type :var_name, :objset, :block, :node_type => :statement
+      node_fields :var_name, :objset, :block
+      node_type :statement
 
       def force_flat(value)
         @force_flat = value
@@ -768,8 +786,8 @@ module ADSL
         objset = @objset.typecheck_and_resolve context
 
         temp_iterator_objset = ASTDummyObjset.new :type_sig => objset.type_sig
-        assignment = ASTObjsetStmt.new(
-          :objset => ASTAssignment.new(:lineno => @lineno, :var_name => @var_name, :objset => temp_iterator_objset)
+        assignment = ASTExprStmt.new(
+          :expr => ASTAssignment.new(:lineno => @lineno, :var_name => @var_name, :expr => temp_iterator_objset)
         )
         @block.statements = [assignment, @block.statements].flatten
         
@@ -817,9 +835,9 @@ module ADSL
         vars_read_before_being_written_to.each do |var_name|
           before_var_node, before_var = before_context.lookup_var var_name, false
           inside_var_node, inside_var = context.lookup_var var_name, false
-          lambda_objset = ADSL::DS::DSForEachPreLambdaObjset.new :for_each => for_each, :before_var => before_var, :inside_var => inside_var
+          lambda_expr = ADSL::DS::DSForEachPreLambdaExpr.new :for_each => for_each, :before_var => before_var, :inside_var => inside_var
           var = ADSL::DS::DSVariable.new :name => var_name, :type_sig => before_var.type_sig
-          assignment = ADSL::DS::DSAssignment.new :var => var, :objset => lambda_objset
+          assignment = ADSL::DS::DSAssignment.new :var => var, :expr => lambda_expr
           block.replace before_var, var
           block.statements.unshift assignment
         end
@@ -830,9 +848,9 @@ module ADSL
         post_lambda_assignments = vars_needing_post_lambdas.map do |var_name|
           before_var_node, before_var = before_context.lookup_var var_name, false
           inside_var_node, inside_var = context.lookup_var var_name, false
-          lambda_objset = ADSL::DS::DSForEachPostLambdaObjset.new :for_each => for_each, :before_var => before_var, :inside_var => inside_var
+          lambda_expr = ADSL::DS::DSForEachPostLambdaExpr.new :for_each => for_each, :before_var => before_var, :inside_var => inside_var
           var = ADSL::DS::DSVariable.new :name => var_name, :type_sig => before_var.type_sig
-          ADSL::DS::DSAssignment.new :var => var, :objset => lambda_objset
+          ADSL::DS::DSAssignment.new :var => var, :expr => lambda_expr
         end
 
         return [for_each, post_lambda_assignments]
@@ -845,18 +863,19 @@ module ADSL
       def optimize
         optimized = super
         if optimized.block.statements.empty?
-          return ASTObjsetStmt.new(:objset => optimized.objset).optimize
+          return ASTExprStmt.new(:expr => optimized.objset).optimize
         end
         optimized
       end
 
       def to_adsl
-        "foreach #{ @var_name.text } : #{ @objset.to_adsl } {\n#{ @block.to_adsl.adsl_indent }}\n"
+        "foreach #{ @var_name.text } : #{ @expr.to_adsl } {\n#{ @block.to_adsl.adsl_indent }}\n"
       end
     end
 
     class ASTEither < ASTNode
-      node_type :blocks, :node_type => :statement
+      node_fields :blocks
+      node_type :statement
 
       def typecheck_and_resolve(context)
         context.push_frame
@@ -879,11 +898,11 @@ module ADSL
 
         lambdas = []
 
-        ASTTypecheckResolveContext::context_vars_that_differ(*contexts).each do |var_name, objsets|
-          type_sig = ADSL::DS::DSTypeSig.join objsets.map(&:type_sig)
+        ASTTypecheckResolveContext::context_vars_that_differ(*contexts).each do |var_name, exprs|
+          type_sig = ADSL::DS::TypeSig.join exprs.map(&:type_sig)
           var = ADSL::DS::DSVariable.new :name => var_name, :type_sig => type_sig
-          objset = ADSL::DS::DSEitherLambdaObjset.new :either => either, :objsets => objsets
-          assignment = ADSL::DS::DSAssignment.new :var => var, :objset => objset
+          expr = ADSL::DS::DSEitherLambdaExpr.new :either => either, :exprs => exprs
+          assignment = ADSL::DS::DSAssignment.new :var => var, :expr => expr
           context.redefine_var var, nil
           lambdas << assignment
         end
@@ -916,7 +935,8 @@ module ADSL
     end
 
     class ASTIf < ASTNode
-      node_type :condition, :then_block, :else_block, :node_type => :statement
+      node_fields :condition, :then_block, :else_block
+      node_type :statement
 
       def blocks
         [@then_block, @else_block]
@@ -933,17 +953,20 @@ module ADSL
         context.push_frame
         
         contexts = [context, context.dup]
-        blocks = [@then_block.typecheck_and_resolve(contexts[0]), @else_block.typecheck_and_resolve(contexts[1])]
+        blocks = [
+          @then_block.typecheck_and_resolve(contexts[0]),
+          @else_block.typecheck_and_resolve(contexts[1])
+        ]
         contexts.each{ |c| c.pop_frame; c.pop_frame }
 
         ds_if = ADSL::DS::DSIf.new :condition => condition, :then_block => blocks[0], :else_block => blocks[1]
 
         lambdas = []
-        ASTTypecheckResolveContext::context_vars_that_differ(*contexts).each do |var_name, objsets|
-          type_sig = ADSL::DS::DSTypeSig.join objsets.map(&:type_sig)
+        ASTTypecheckResolveContext::context_vars_that_differ(*contexts).each do |var_name, exprs|
+          type_sig = ADSL::DS::TypeSig.join exprs.map(&:type_sig)
           var = ADSL::DS::DSVariable.new :name => var_name, :type_sig => type_sig
-          objset = ADSL::DS::DSIfLambdaObjset.new :if => ds_if, :then_objset => objsets[0], :else_objset => objsets[1]
-          assignment = ADSL::DS::DSAssignment.new :var => var, :objset => objset
+          expr = ADSL::DS::DSIfLambdaExpr.new :if => ds_if, :then_expr => exprs[0], :else_expr => exprs[1]
+          assignment = ADSL::DS::DSAssignment.new :var => var, :expr => expr
           context.redefine_var var, nil
           lambdas << assignment
         end
@@ -981,11 +1004,12 @@ module ADSL
     end
 
     class ASTDeleteObj < ASTNode
-      node_type :objset, :node_type => :statement
+      node_fields :objset
+      node_type :statement
 
       def typecheck_and_resolve(context)
         objset = @objset.typecheck_and_resolve context
-        return [] if objset.type_sig.nil_sig?
+        return [] if objset.type_sig.card_none?
         return ADSL::DS::DSDeleteObj.new :objset => objset
       end
 
@@ -995,14 +1019,16 @@ module ADSL
     end
 
     class ASTCreateTup < ASTNode
-      node_type :objset1, :rel_name, :objset2, :node_type => :statement
+      node_fields :objset1, :rel_name, :objset2
+      node_type :statement
 
       def typecheck_and_resolve(context)
         objset1 = @objset1.typecheck_and_resolve context
         objset2 = @objset2.typecheck_and_resolve context
-        raise ADSLError, "Ambiguous type on the left hand side on line #{@objset1.lineno}" if objset1.type_sig.nil_sig?
-        return [] if objset2.type_sig.nil_sig?
-        relation = context.find_relation objset1.type_sig, @rel_name.text, @rel_name.lineno, objset2.type_sig
+        raise ADSLError, "Ambiguous type on the left hand side on line #{@objset1.lineno}" if objset1.type_sig.unknown_sig?
+        return [] if objset1.type_sig.card_none? || objset2.type_sig.card_none?
+        relation = context.find_member objset1.type_sig, @rel_name.text, @rel_name.lineno, objset2.type_sig
+        raise ADSLError, "#{objset1.type_sig}.#{@rel_name.text} is not a relation" unless relation.is_a? ADSL::DS::DSRelation
         return ADSL::DS::DSCreateTup.new :objset1 => objset1, :relation => relation, :objset2 => objset2
       end
 
@@ -1012,14 +1038,16 @@ module ADSL
     end
 
     class ASTDeleteTup < ASTNode
-      node_type :objset1, :rel_name, :objset2, :node_type => :statement
+      node_fields :objset1, :rel_name, :objset2
+      node_type :statement
       
       def typecheck_and_resolve(context)
         objset1 = @objset1.typecheck_and_resolve context
         objset2 = @objset2.typecheck_and_resolve context
-        raise ADSLError, "Ambiguous type on the left hand side on line #{@objset1.lineno}" if objset1.type_sig.nil_sig?
-        return [] if objset2.type_sig.nil_sig?
-        relation = context.find_relation objset1.type_sig, @rel_name.text, @rel_name.lineno, objset2.type_sig
+        raise ADSLError, "Ambiguous type on the left hand side on line #{@objset1.lineno}" if objset1.type_sig.unknown_sig?
+        return [] if objset1.type_sig.card_none? || objset2.type_sig.card_none?
+        relation = context.find_member objset1.type_sig, @rel_name.text, @rel_name.lineno, objset2.type_sig
+        raise ADSLError, "#{objset1.type_sig}.#{@rel_name.text} is not a relation" unless relation.is_a? ADSL::DS::DSRelation
         return ADSL::DS::DSDeleteTup.new :objset1 => objset1, :relation => relation, :objset2 => objset2
       end
 
@@ -1028,19 +1056,24 @@ module ADSL
       end
     end
 
-    class ASTSetTup < ASTNode
-      node_type :objset1, :rel_name, :objset2, :node_type => :statement
+    class ASTMemberSet < ASTNode
+      node_fields :objset, :member_name, :expr
+      node_type :statement
 
       def typecheck_and_resolve(context)
-        objset1 = @objset1.typecheck_and_resolve context
-        objset2 = @objset2.typecheck_and_resolve context
-        raise ADSLError, "Ambiguous type on the left hand side on line #{@objset1.lineno}" if objset1.type_sig.nil_sig?
-        return [] if objset2.type_sig.nil_sig?
-        relation = context.find_relation objset1.type_sig, @rel_name.text, @rel_name.lineno, objset2.type_sig
-        return [
-          ADSL::DS::DSDeleteTup.new(:objset1 => objset1, :relation => relation, :objset2 => ADSL::DS::DSAllOf.new(:klass => relation.to_class)),
-          ADSL::DS::DSCreateTup.new(:objset1 => objset1, :relation => relation, :objset2 => objset2)
-        ]
+        objset = @objset.typecheck_and_resolve context
+        expr   = @expr.typecheck_and_resolve context
+        raise ADSLError, "Ambiguous type on the left hand side on line #{@objset.lineno}" if objset.type_sig.unknown_sig?
+        member = context.find_member objset.type_sig, @member_name.text, @member_name.lineno, expr.type_sig
+        if member.is_a?(ADSL::DS::DSRelation)
+          stmts = member.type_sig.classes.map do |c|
+            ADSL::DS::DSDeleteTup.new(:objset1 => objset, :relation => member, :objset2 => ADSL::DS::DSAllOf.new(:klass => c))
+          end
+          stmts << ADSL::DS::DSCreateTup.new(:objset1 => objset, :relation => member, :objset2 => expr)
+          stmts
+        else
+          ADSL::DS::DSFieldSet.new(:objset => objset, :field => member, :expr => expr)
+        end
       end
 
       def to_adsl
@@ -1049,7 +1082,8 @@ module ADSL
     end
 
     class ASTAllOf < ASTNode
-      node_type :class_name, :node_type => :objset
+      node_fields :class_name
+      node_type :objset
 
       def typecheck_and_resolve(context)
         klass_node, klass = context.classes[@class_name.text]
@@ -1067,15 +1101,17 @@ module ADSL
     end
 
     class ASTSubset < ASTNode
-      node_type :objset, :node_type => :objset
+      node_fields :objset
+      node_type :objset
 
-      def objset_has_side_effects?
-        @objset.nil? ? false : @objset.objset_has_side_effects?
+      def expr_has_side_effects?
+        @objset.nil? ? false : @objset.expr_has_side_effects?
       end
 
       def typecheck_and_resolve(context)
         objset = @objset.typecheck_and_resolve context
-        return ADSL::DS::DSEmptyObjset.new if objset.type_sig.nil_sig?
+        return ADSL::DS::DSEmptyObjset.new if objset.type_sig.card_none?
+        return objset if objset.type_sig.card_one?
         return ADSL::DS::DSSubset.new :objset => objset
       end
 
@@ -1093,50 +1129,53 @@ module ADSL
       end
     end
     
-    class ASTOneOf < ASTNode
-      node_type :objset, :node_type => :objset
+    class ASTTryOneOf < ASTNode
+      node_fields :objset
+      node_type :objset
       
-      def objset_has_side_effects?
-        @objset.nil? ? false : @objset.objset_has_side_effects?
+      def expr_has_side_effects?
+        @objset.nil? ? false : @objset.expr_has_side_effects?
       end
 
       def typecheck_and_resolve(context)
         objset = @objset.typecheck_and_resolve context
-        return ADSL::DS::DSEmptyObjset.new if objset.type_sig.nil_sig?
+        return ADSL::DS::DSEmptyObjset.new if objset.type_sig.card_none?
+        return ADSL::DS::DSTryOneOf.new :objset => objset
+      end
+
+      def optimize
+        until_no_change super do |oneof|
+          next oneof.optimize unless oneof.is_a?(ASTTryOneOf)
+          next oneof.objset.optimize if oneof.objset.is_a?(ASTOneOf) or oneof.objset.is_a?(ASTTryOneOf)
+          next ASTTryOneOf.new(:objset => oneof.objset.objset) if oneof.objset.is_a?(ASTSubset)
+          ASTTryOneOf.new :objset => oneof.objset.optimize
+        end
+      end
+
+      def to_adsl
+        "tryoneof(#{ @objset.to_adsl })"
+      end
+    end
+
+    class ASTOneOf < ASTNode
+      node_fields :objset
+      node_type :objset
+      
+      def expr_has_side_effects?
+        @objset.nil? ? false : @objset.expr_has_side_effects?
+      end
+
+      def typecheck_and_resolve(context)
+        objset = @objset.typecheck_and_resolve context
         return ADSL::DS::DSOneOf.new :objset => objset
       end
 
       def optimize
         until_no_change super do |oneof|
           next oneof.optimize unless oneof.is_a?(ASTOneOf)
-          next oneof.objset if oneof.objset.is_a?(ASTOneOf) || oneof.objset.is_a?(ASTSubset)
+          next oneof.objset.optimize if oneof.objset.is_a?(ASTOneOf) or oneof.objset.is_a?(ASTTryOneOf)
+          next ASTOneOf.new(:objset => oneof.objset.objset) if oneof.objset.is_a?(ASTSubset)
           ASTOneOf.new :objset => oneof.objset.optimize
-        end
-      end
-
-      def to_adsl
-        "oneof(#{ @objset.to_adsl })"
-      end
-    end
-
-    class ASTForceOneOf < ASTNode
-      node_type :objset, :node_type => :objset
-      
-      def objset_has_side_effects?
-        @objset.nil? ? false : @objset.objset_has_side_effects?
-      end
-
-      def typecheck_and_resolve(context)
-        objset = @objset.typecheck_and_resolve context
-        raise ADSLError, "Unknown forced oneof type at line #{lineno}" if objset.type_sig.nil_sig?
-        return ADSL::DS::DSForceOneOf.new :objset => objset
-      end
-
-      def optimize
-        until_no_change super do |oneof|
-          next oneof.optimize unless oneof.is_a?(ASTForceOneOf)
-          next oneof.objset if oneof.objset.is_a?(ASTOneOf) || oneof.objset.is_a?(ASTForceOneOf)
-          ASTForceOneof.new :objset => oneof.objset.optimize
         end
       end
 
@@ -1146,21 +1185,22 @@ module ADSL
     end
     
     class ASTUnion < ASTNode
-      node_type :objsets, :node_type => :objset
+      node_fields :objsets
+      node_type :objset
       
-      def objset_has_side_effects?
-        @objsets.nil? ? false : @objsets.map{ |o| o.objset_has_side_effects? }.include?(true)
+      def expr_has_side_effects?
+        @objsets.nil? ? false : @objsets.map{ |o| o.expr_has_side_effects? }.include?(true)
       end
 
       def typecheck_and_resolve(context)
         objsets = @objsets.map{ |o| o.typecheck_and_resolve context }
-        objsets.reject!{ |o| o.type_sig.nil_sig? }
+        objsets.reject!{ |o| o.type_sig.card_none? }
         
         return ADSL::DS::DSEmptyObjset.new if objsets.length == 0
         return objsets.first if objsets.length == 1
 
         # will raise an error if no single common supertype exists
-        ADSL::DS::DSTypeSig.join objsets.map(&:type_sig)
+        ADSL::DS::TypeSig.join objsets.map(&:type_sig)
 
         return ADSL::DS::DSUnion.new :objsets => objsets
       end
@@ -1180,38 +1220,39 @@ module ADSL
       end
     end
 
-    class ASTOneOfObjset < ASTNode
-      node_type :objsets, :node_type => :objset
+    class ASTPickOneObjset < ASTNode
+      node_fields :objsets
+      node_type :objset
       
-      def objset_has_side_effects?
-        @objsets.nil? ? false : @objsets.map{ |o| o.objset_has_side_effects? }.include?(true)
+      def expr_has_side_effects?
+        @objsets.nil? ? false : @objsets.map{ |o| o.expr_has_side_effects? }.include?(true)
       end
 
       def typecheck_and_resolve(context)
         objsets = @objsets.map{ |o| o.typecheck_and_resolve context }
         
         # will raise an error if no single common supertype exists
-        ADSL::DS::DSTypeSig.join objsets.map(&:type_sig)
+        ADSL::DS::TypeSig.join objsets.map(&:type_sig)
         
         if objsets.length == 0
           ADSL::DS::DSEmptyObjset.new
         elsif objsets.length == 1
           objsets.first
         else
-          ADSL::DS::DSOneOfObjset.new :objsets => objsets
+          ADSL::DS::DSPickOneObjset.new :objsets => objsets
         end
       end
 
       def optimize
         until_no_change super do |o|
-          if !o.is_a?(ASTOneOfObjset)
+          if !o.is_a?(ASTPickOneObjset)
             o
           elsif o.objsets.empty?
             ASTEmptyObjset.new
           elsif o.objsets.length == 1
             o.objsets.first
           else
-            ASTOneOfObjset.new(:objsets => o.objsets.uniq)
+            ASTPickOneObjset.new(:objsets => o.objsets.uniq)
           end
         end
       end
@@ -1222,7 +1263,8 @@ module ADSL
     end
     
     class ASTVariable < ASTNode
-      node_type :var_name, :node_type => :objset
+      node_fields :var_name
+      node_type :objset
 
       def typecheck_and_resolve(context)
         var_node, var = context.lookup_var @var_name.text
@@ -1235,18 +1277,32 @@ module ADSL
       end
     end
 
-    class ASTDereference < ASTNode
-      node_type :objset, :rel_name, :node_type => :objset
+    class ASTJSExpr < ASTNode
+      node_fields :js
+      node_type :base_type
+
+      def typecheck_and_resolve(context)
+        ADSL::DS::DSAnything.new
+      end
+    end
+
+    class ASTMemberAccess < ASTNode
+      node_fields :objset, :member_name
+      node_type :base_type
       
-      def objset_has_side_effects?
-        @objset.nil? ? false : @objset.objset_has_side_effects?
+      def expr_has_side_effects?
+        @objset.nil? ? false : @objset.expr_has_side_effects?
       end
 
       def typecheck_and_resolve(context)
         objset = @objset.typecheck_and_resolve context
-        raise ADSLError, 'Empty objset dereference' if objset.type_sig.nil_sig?
-        relation = context.find_relation objset.type_sig, @rel_name.text, @rel_name.lineno
-        return ADSL::DS::DSDereference.new :objset => objset, :relation => relation
+        raise ADSLError, "Origin type of member access unknown on line #{lineno}" if objset.type_sig.unknown_sig?
+        member = context.find_member objset.type_sig, @member_name.text, @member_name.lineno
+        if member.is_a?(ADSL::DS::DSRelation)
+          ADSL::DS::DSDereference.new :objset => objset, :relation => member
+        else
+          ADSL::DS::DSFieldRead.new :objset => objset, :field => member
+        end
       end
 
       def to_adsl
@@ -1255,24 +1311,27 @@ module ADSL
     end
 
     class ASTDereferenceCreate < ASTNode
-      node_type :objset, :rel_name, :empty_first, :node_type => :objset
+      node_fields :objset, :rel_name, :empty_first
+      node_type :statement
 
-      def objset_has_side_effects?; true; end
+      def expr_has_side_effects?; true; end
 
       def typecheck_and_resolve(context)
         objset = @objset.typecheck_and_resolve context
-        raise ADSLError, 'Cannot create an object on an empty objset' if objset.type_sig.nil_sig?
-        relation = context.find_relation objset.type_sig, @rel_name.text, @rel_name.lineno
+        raise ADSLError, 'Cannot create an object on an empty objset' if objset.type_sig.card_empty?
+        member = context.find_member objset.type_sig, @rel_name.text, @rel_name.lineno
+        raise ADSLError, "#{rel_name} is not a relation on class #{objset.type_sig} (line #{@lineno})" unless relation.is_a? ADSL::DS::DSRelation
        
         create_objset = ASTCreateObjset.new(
           :class_name => ASTIdent.new(:text => relation.to_class.name)
         )
         
-        assoc_builder = (@empty_first ? ASTSetTup : ASTCreateTup).new(
-          :objset1 => @objset,
-          :rel_name => @rel_name,
-          :objset2 => create_objset
-        )
+        if @empty_first
+          assoc_builder = ASTMemberSet.new(:objset => @objset, :member_name => @rel_name, :expr => create_objset)
+        else
+          assoc_builder = ASTCreateTup.new(:objset1 => @objset, :rel_name => @rel_name, :objset2 => create_objset)
+        end
+
         context.pre_stmts << assoc_builder.typecheck_and_resolve(context)
 
         create_objset.typecheck_and_resolve(context)
@@ -1284,7 +1343,8 @@ module ADSL
     end
 
     class ASTEmptyObjset < ASTNode
-      node_type :node_type => :objset
+      node_fields
+      node_type :objset
 
       def typecheck_and_resolve(context)
         return ADSL::DS::DSEmptyObjset.new
@@ -1296,12 +1356,12 @@ module ADSL
     end
 
     class ASTInvariant < ASTNode
-      node_type :name, :formula, :node_type => :formula
+      node_fields :name, :formula
 
       def typecheck_and_resolve(context)
         @formula.preorder_traverse do |node|
-          if node.class.is_objset?
-            raise ADSLError, "Object set cannot have sideeffects at line #{node.lineno}" if node.objset_has_side_effects?
+          if node.respond_to? :expr_has_side_effects?
+            raise ADSLError, "Object set cannot have sideeffects at line #{node.lineno}" if node.expr_has_side_effects?
           end
           if node.class.is_a?(ASTBoolean)
             raise ADSLError, "Star cannot be used in invariants (line #{node.lineno})" if node.bool_value.nil?
@@ -1328,7 +1388,8 @@ module ADSL
     end
 
     class ASTBoolean < ASTNode
-      node_type :bool_value, :node_type => :formula
+      node_fields :bool_value
+      node_type :formula
 
       def typecheck_and_resolve(context)
         case @bool_value
@@ -1349,7 +1410,8 @@ module ADSL
     end
 
     class ASTForAll < ASTNode
-      node_type :vars, :subformula, :node_type => :formula
+      node_fields :vars, :subformula
+      node_type :formula
 
       def typecheck_and_resolve(context)
         context.in_stack_frame do
@@ -1387,7 +1449,8 @@ module ADSL
     end
 
     class ASTExists < ASTNode
-      node_type :vars, :subformula, :node_type => :formula
+      node_fields :vars, :subformula
+      node_type :formula
 
       def typecheck_and_resolve(context)
         context.in_stack_frame do
@@ -1424,7 +1487,8 @@ module ADSL
     end
 
     class ASTNot < ASTNode
-      node_type :subformula, :node_type => :formula
+      node_fields :subformula 
+      node_type :formula
 
       def typecheck_and_resolve(context)
         subformula = @subformula.typecheck_and_resolve context
@@ -1451,7 +1515,8 @@ module ADSL
     end
 
     class ASTAnd < ASTNode
-      node_type :subformulae, :node_type => :formula
+      node_fields :subformulae
+      node_type :formula
 
       def typecheck_and_resolve(context)
         subformulae = @subformulae.map{ |o| o.typecheck_and_resolve context }
@@ -1486,7 +1551,8 @@ module ADSL
     end
     
     class ASTOr < ASTNode
-      node_type :subformulae, :node_type => :formula
+      node_fields :subformulae
+      node_type :formula
 
       def typecheck_and_resolve(context)
         subformulae = @subformulae.map{ |o| o.typecheck_and_resolve context }
@@ -1529,7 +1595,8 @@ module ADSL
     end
 
     class ASTEquiv < ASTNode
-      node_type :subformulae, :node_type => :formula
+      node_fields :subformulae
+      node_type :formula
 
       def typecheck_and_resolve(context)
         subformulae = @subformulae.map{ |o| o.typecheck_and_resolve context }
@@ -1557,7 +1624,8 @@ module ADSL
     end
 
     class ASTImplies < ASTNode
-      node_type :subformula1, :subformula2, :node_type => :formula
+      node_fields :subformula1, :subformula2
+      node_type :formula
 
       def typecheck_and_resolve(context)
         subformula1 = @subformula1.typecheck_and_resolve context
@@ -1571,15 +1639,18 @@ module ADSL
     end
 
     class ASTEqual < ASTNode
-      node_type :objsets, :node_type => :formula
+      node_fields :exprs
+      node_type :formula
       
       def typecheck_and_resolve(context)
-        objsets = @objsets.map{ |o| o.typecheck_and_resolve context }
+        exprs = @exprs.map{ |o| o.typecheck_and_resolve context }
 
         # will raise an error if no single common supertype exists
-        ADSL::DS::DSTypeSig.join objsets.map(&:type_sig)
+        if ADSL::DS::TypeSig.join(exprs.map(&:type_sig), false).nil?
+          raise ADSLError, "Comparison of incompatible types #{exprs.map(&:type_sig).map(&:to_s).join ' and '} on line #{@lineno}"
+        end
           
-        return ADSL::DS::DSEqual.new :objsets => objsets
+        return ADSL::DS::DSEqual.new :exprs => exprs
       end
       
       def to_adsl
@@ -1588,14 +1659,16 @@ module ADSL
     end
 
     class ASTIn < ASTNode
-      node_type :objset1, :objset2, :node_type => :formula
+      node_fields :objset1, :objset2
+      node_type :formula
 
       def typecheck_and_resolve(context)
         objset1 = @objset1.typecheck_and_resolve context
         objset2 = @objset2.typecheck_and_resolve context
         
-        return ADSL::DS::Boolean::TRUE if objset1.type_sig.nil_sig?
-        return ADSL::DS::DSEmpty.new :objset => objset1 if objset2.type_sig.nil_sig?
+        return ADSL::DS::Boolean::TRUE if objset1.type_sig.card_none?
+        return ADSL::DS::Boolean::FALSE if objset1.type_sig.cardinality.min > objset2.type_sig.cardinality.max
+        return ADSL::DS::DSEmpty.new :objset => objset1 if objset2.type_sig.card_none?
 
         unless objset1.type_sig <= objset2.type_sig
           raise ADSLError, "Object sets are not of compatible types: #{objset1.type_sig} and #{objset2.type_sig}"
@@ -1609,11 +1682,12 @@ module ADSL
     end
     
     class ASTIsEmpty < ASTNode
-      node_type :objset, :node_type => :formula
+      node_fields :objset
+      node_type :formula
 
       def typecheck_and_resolve(context)
         objset = @objset.typecheck_and_resolve context
-        return ADSL::DS::Boolean::TRUE if objset.type_sig.nil_sig?
+        return ADSL::DS::Boolean::TRUE if objset.type_sig.card_none?
         return ADSL::DS::DSIsEmpty.new :objset => objset
       end
 

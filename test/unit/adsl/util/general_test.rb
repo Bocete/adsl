@@ -218,16 +218,71 @@ class ADSL::Util::GeneralTest < Test::Unit::TestCase
     assert_equal Set[:a], foo.recursively_gather(:content)
   end
 
-  def test_process_race__1_process
-    stdout = process_race "echo 'blah'"
-    assert_equal 'blah', stdout.strip
+  def test_container_for__recursively_comparable__appears
+    eval <<-ruby
+      class Foo
+      end
+    ruby
+
+    assert_raise do
+      Foo.recursively_comparable
+    end
+    
+    eval <<-ruby
+      class Foo
+        container_for :field, :array
+      end
+    ruby
+
+    Foo.recursively_comparable
   end
-  
-  def test_process_race__2_processes
-    time = Time.now
-    stdout = process_race "echo 'blah'", "sleep 20; echo 'blah2'"
-    assert (Time.now - time) < 1
-    assert_equal 'blah', stdout.strip
+
+  def test_container_for__recursively_comparable__basic_types
+    eval <<-ruby
+      class Foo
+        container_for :field1, :field2
+        recursively_comparable
+      end
+    ruby
+
+    assert_equal     Foo.new(:field1 => 1, :field2 => 2), Foo.new(:field1 => 1, :field2 => 2)
+    assert_not_equal Foo.new(:field1 => 1, :field2 => 2), Foo.new()
+    assert_not_equal Foo.new(:field1 => 1, :field2 => 2), Foo.new(:field1 => 1, :field2 => 3)
+  end
+
+  def test_container_for__recursively_comparable__arrays
+    eval <<-ruby
+      class Foo
+        container_for :field, :array
+        recursively_comparable
+      end
+    ruby
+
+    assert_equal     Foo.new(:array => []), Foo.new(:array => [])
+    assert_equal     Foo.new(:array => [:a, :b, :c]), Foo.new(:array => [:a, :b, :c])
+    assert_not_equal Foo.new(:array => [:a, :b, :c]), Foo.new(:array => [:a, :b, :c, :d])
+    assert_not_equal Foo.new(:array => [:a, :b, :c]), Foo.new()
+    assert_not_equal Foo.new(:array => [:a, :b, :c]), Foo.new(:array => [:a, :b, :c], :field => :p)
+  end
+
+  def test_container_for__recursively_compare__dup
+    eval <<-ruby
+      class Foo
+        container_for :field, :array
+        recursively_comparable
+      end
+    ruby
+    foo = Foo.new :field => :p, :array => [1, 2, 3]
+
+    foo2 = foo.dup
+    assert_equal foo, foo2
+    foo2.field = :d
+    assert_not_equal foo, foo2
+
+    foo2 = foo.dup
+    assert_equal foo, foo2
+    foo2.array << 4
+    assert_not_equal foo, foo2
   end
   
   def test_string__increment_suffix
@@ -320,5 +375,56 @@ class ADSL::Util::GeneralTest < Test::Unit::TestCase
   def test_range__inject_on_intersection
     assert_equal (2..3), [1..6, 2..12, 0..3].inject(:intersect)
     assert [1..6, 2..3, 0...0].inject(:intersect).empty?
+  end
+
+  def test_array__each_index
+    assert [].respond_to? :each_index
+    assert [].respond_to? :each_index_with_elem
+    assert [].respond_to? :each_index_without_elem
+
+    list = [1, 2, 3].each_index
+    [1, 2, 3].each do |e|
+      assert_equal e, list.next + 1
+    end
+
+    a = 1
+    [1, 2, 3].each_index do |i|
+      assert_equal a, i + 1
+      a += 1
+    end
+
+    [3, 4, 5].each_index do |elem, i|
+      assert_equal elem, i + 3
+    end
+  end
+
+  def test_array__try_map
+    a = [13, 35, [], "kme", nil]
+    assert_equal [13, 35, 0, 3, nil], a.try_map(:length)
+    assert_equal [13, 35, [], "kme", nil], a
+  end
+
+  def test_array__try_map!
+    a = [13, 35, [], "kme", nil]
+    assert_equal [13, 35, 0, 3, nil], a.try_map!(:length)
+    assert_equal [13, 35, 0, 3, nil], a
+  end
+  
+  def test_string__resolve_params_distinct_identifiers
+    a = "asd(${1}, ${2})"
+    assert_equal "asd(a, b)", a.resolve_params(:a, :b)
+    assert_raise ArgumentError do
+      a.resolve_params(:s)
+    end
+    assert_equal "asd(s, k)", a.resolve_params(:s, :k, :r)
+  end
+  
+  def test_string__resolve_params_repeating_identifiers
+    a = "asd(${1}, ${2}): ${1}"
+    assert_equal "asd(a, b): a", a.resolve_params(:a, :b)
+    assert_raise ArgumentError do
+      a.resolve_params(:s)
+    end
+    assert_equal "asd(s, k): s", a.resolve_params(:s, :k, :r)
   end
 end

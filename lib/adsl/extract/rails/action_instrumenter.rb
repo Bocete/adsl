@@ -15,7 +15,7 @@ module Kernel
       end
     else
       stmt = ::ADSL::Extract::Rails::ActionInstrumenter.extract_stmt_from_expr expr
-      if stmt.is_a? ::ADSL::Parser::ASTNode and stmt.class.is_statement?
+      if stmt.is_a?(::ADSL::Parser::ASTNode) && stmt.class.is_statement?
         ::ADSL::Extract::Instrumenter.get_instance.abb.append_stmt stmt, options
       end
     end
@@ -43,9 +43,9 @@ module Kernel
       end
       
       if value.respond_to?(:adsl_ast) && value.adsl_ast.class.is_objset?
-        assignment = ::ADSL::Parser::ASTObjsetStmt.new(:objset => ::ADSL::Parser::ASTAssignment.new(
+        assignment = ::ADSL::Parser::ASTExprStmt.new(:expr => ::ADSL::Parser::ASTAssignment.new(
           :var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name),
-          :objset => value.adsl_ast
+          :expr => value.adsl_ast
         ))
         if operator == '||='
           old_value = outer_binding.eval name rescue nil
@@ -127,7 +127,7 @@ module Kernel
     if frame1_stmts.length <= 1 && frame2_stmts.length <= 1 &&
         frame1_ret_value.respond_to?(:adsl_ast) && frame1_ret_value.adsl_ast.class.is_objset? &&
         frame2_ret_value.respond_to?(:adsl_ast) && frame2_ret_value.adsl_ast.class.is_objset? &&
-        !frame1_ret_value.adsl_ast.objset_has_side_effects? && !frame2_ret_value.adsl_ast.objset_has_side_effects?
+        !frame1_ret_value.adsl_ast.expr_has_side_effects? && !frame2_ret_value.adsl_ast.expr_has_side_effects?
 
       return nil if frame1_ret_value.nil? && frame2_ret_value.nil?
       
@@ -151,7 +151,7 @@ module Kernel
         return ::ADSL::Parser::ASTEither.new :blocks => [block1, block2]
       end
 
-      result_type.new(:adsl_ast => ::ADSL::Parser::ASTOneOfObjset.new(
+      result_type.new(:adsl_ast => ::ADSL::Parser::ASTPickOneObjset.new(
         :objsets => [frame1_ret_value.adsl_ast, frame2_ret_value.adsl_ast]
       ))
     else
@@ -172,7 +172,7 @@ module ADSL
           adsl_ast = expr.adsl_ast if adsl_ast.respond_to? :adsl_ast
           return nil unless adsl_ast.is_a? ::ADSL::Parser::ASTNode
           return adsl_ast if adsl_ast.class.is_statement?
-          return ::ADSL::Parser::ASTObjsetStmt.new :objset => adsl_ast if adsl_ast.class.is_objset?
+          return ::ADSL::Parser::ASTExprStmt.new :expr => adsl_ast if adsl_ast.class.is_objset?
           nil
         end
 

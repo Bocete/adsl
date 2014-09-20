@@ -25,7 +25,7 @@ module ADSL::Parser
       assert_equal 3, spec.classes.length
       assert_equal ["Kme", "Zsd", "Asd"], spec.classes.map{ |a| a.name }
       spec.classes.each do |klass|
-        assert_equal 0, klass.relations.count
+        assert_equal 0, klass.members.count
         assert klass.parents.empty?
       end
       assert_equal 0, spec.actions.count
@@ -92,11 +92,11 @@ module ADSL::Parser
 
       klass = spec.classes.select{ |a| a.name == "Classname" }.first
       assert klass
-      assert_equal 3, klass.relations.count
-      assert_equal 'other', klass.relations[0].name
-      assert_equal 'something_else', klass.relations[1].name
-      assert_equal 'third', klass.relations[2].name
-      klass.relations.each do |rel|
+      assert_equal 3, klass.members.count
+      assert_equal 'other', klass.members[0].name
+      assert_equal 'something_else', klass.members[1].name
+      assert_equal 'third', klass.members[2].name
+      klass.members.each do |rel|
         assert rel.inverse_of.nil?
       end
     end
@@ -112,11 +112,11 @@ module ADSL::Parser
 
       klass = spec.classes.select{ |a| a.name == "Classname" }.first
       assert klass
-      assert_equal 2, klass.relations.count
-      assert_equal 1, klass.relations.select{ |a| a.inverse_of.nil? }.length
-      assert_equal 1, klass.relations.select{ |a| not a.inverse_of.nil? }.length
-      other = klass.relations.select{ |a| a.name == 'other'}.first
-      something_else = klass.relations.select{ |a| a.name == 'something_else'}.first
+      assert_equal 2, klass.members.count
+      assert_equal 1, klass.members.select{ |a| a.inverse_of.nil? }.length
+      assert_equal 1, klass.members.select{ |a| not a.inverse_of.nil? }.length
+      other = klass.members.select{ |a| a.name == 'other'}.first
+      something_else = klass.members.select{ |a| a.name == 'something_else'}.first
       assert_equal other, something_else.inverse_of
       
       assert_nothing_raised ADSLError do
@@ -154,11 +154,11 @@ module ADSL::Parser
 
       klass = spec.classes.select{ |a| a.name == "Classname" }.first
       assert klass
-      assert_equal [1, 1], klass.relations[0].cardinality
-      assert_equal [1, 1], klass.relations[1].cardinality
-      assert_equal [0, 1], klass.relations[2].cardinality
-      assert_equal [0, 1.0/0.0], klass.relations[3].cardinality
-      assert_equal [1, 1.0/0.0], klass.relations[4].cardinality
+      assert_equal [1, 1], klass.members[0].cardinality
+      assert_equal [1, 1], klass.members[1].cardinality
+      assert_equal [0, 1], klass.members[2].cardinality
+      assert_equal [0, 1.0/0.0], klass.members[3].cardinality
+      assert_equal [1, 1.0/0.0], klass.members[4].cardinality
     end
 
     def test_typecheck__relation_cardinality_invalid

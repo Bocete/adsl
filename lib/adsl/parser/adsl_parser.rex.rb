@@ -116,8 +116,8 @@ class ADSL::Parser::ADSLParser < Racc::Parser
       when (text = @ss.scan(/oneof\b/))
          action { [:oneof, lineno] }
 
-      when (text = @ss.scan(/forceoneof\b/))
-         action { [:forceoneof, lineno] }
+      when (text = @ss.scan(/tryoneof\b/))
+         action { [:tryoneof, lineno] }
 
       when (text = @ss.scan(/allof\b/))
          action { [:allof, lineno] }
@@ -202,6 +202,12 @@ class ADSL::Parser::ADSLParser < Racc::Parser
 
       when (text = @ss.scan(/[01]/))
          action { [text, lineno] }
+
+      when (text = @ss.scan(/Int|String|Real|Decimal|Bool/))
+         action { [:BASIC_TYPE, [text, lineno]] }
+
+      when (text = @ss.scan(/`(?:[^\\]*(?:\\[^`])?)*`/))
+         action { [:JS, {:js => text, :lineno => lineno}] }
 
       when (text = @ss.scan(/\w+/))
          action { [:IDENT, ADSL::Parser::ASTIdent.new(:lineno => lineno, :text => text)] }

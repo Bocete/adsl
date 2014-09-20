@@ -1,4 +1,5 @@
 require 'adsl/parser/adsl_parser.tab.rb'
+require 'adsl/ds/type_sig'
 require 'test/unit'
 require 'pp'
 
@@ -11,9 +12,9 @@ module ADSL::Parser
       context = ASTTypecheckResolveContext.new
       context.classes['class1'] = [:class1, :class1]
       context.actions['action1'] = [:action1, :action1]
-      context.relations['class1'] = {"relation1" => [:relation1, :relation1]}
+      context.members['class1'] = {"relation1" => [:relation1, :relation1]}
       context.push_frame
-      var = DSVariable.new :name => "varname", :type_sig => ADSL::DS::DSTypeSig::EMPTY
+      var = DSVariable.new :name => "varname", :type_sig => ADSL::DS::TypeSig::UNKNOWN
       context.define_var var, :node
 
       counter = 0
@@ -47,7 +48,7 @@ module ADSL::Parser
       context = ASTTypecheckResolveContext.new
       context.classes['class1'] = [:class1, :class1]
       context.actions['action1'] = [:action1, :action1]
-      context.relations['class1'] = {"relation1" => [:relation1, :relation1]}
+      context.members['class1'] = {"relation1" => [:relation1, :relation1]}
       context.push_frame
 
       counter = 0
@@ -57,7 +58,7 @@ module ADSL::Parser
         counter += 1
       end
       
-      var = DSVariable.new :name => "varname", :type_sig => ADSL::DS::DSTypeSig::EMPTY
+      var = DSVariable.new :name => "varname", :type_sig => ADSL::DS::TypeSig::UNKNOWN
       context.define_var var, :node
       
       assert_equal 1, counter
@@ -82,9 +83,9 @@ module ADSL::Parser
       context = ASTTypecheckResolveContext.new
       context.classes['class1'] = [:class1, :class1]
       context.actions['action1'] = [:action1, :action1]
-      context.relations['class1'] = {"relation1" => [:relation1, :relation1]}
+      context.members['class1'] = {"relation1" => [:relation1, :relation1]}
       context.push_frame
-      var = DSVariable.new :name => "varname", :type_sig => ADSL::DS::DSTypeSig::EMPTY
+      var = DSVariable.new :name => "varname", :type_sig => ADSL::DS::TypeSig::UNKNOWN
       context.define_var var, :node
 
       context2 = context.clone
@@ -98,7 +99,7 @@ module ADSL::Parser
       end
       assert context.var_stack.last.var_write_listeners.empty?
 
-      context.define_var DSVariable.new(:name => 'other', :type_sig => ADSL::DS::DSTypeSig::EMPTY), :node2
+      context.define_var DSVariable.new(:name => 'other', :type_sig => ADSL::DS::TypeSig::UNKNOWN), :node2
 
       assert_equal 1, context2.var_stack.count
       assert_equal 1, context.var_stack.count

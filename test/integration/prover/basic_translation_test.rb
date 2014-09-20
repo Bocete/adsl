@@ -333,6 +333,53 @@ class BasicTranslationTest < Test::Unit::TestCase
     ADSL
   end
 
+  def test_assignment__reassign
+    adsl_assert :correct, <<-ADSL
+      class Class1 {
+        0..1 Class2 rel
+      }
+      class Class2 {
+        0..1 Class1 rel inverseof rel
+      }
+      action blah() {
+        o = oneof(allof(Class1))
+        o.rel = create(Class2)
+        o.rel = create(Class2)
+        o.rel = create(Class2)
+      }
+      invariant exists(Class1 o: not isempty(o.rel))
+    ADSL
+    adsl_assert :incorrect, <<-ADSL, :conjecture => 'false'
+      class Class1 {
+        0..1 Class2 rel
+      }
+      class Class2 {
+        0..1 Class1 rel inverseof rel
+      }
+      action blah() {
+        o = oneof(allof(Class1))
+        o.rel = create(Class2)
+        o.rel = create(Class2)
+        o.rel = create(Class2)
+      }
+      invariant exists(Class1 o: not isempty(o.rel))
+    ADSL
+    adsl_assert :incorrect, <<-ADSL, :conjecture => 'false'
+      class Class1 {
+        1 Class2 rel
+      }
+      class Class2 {
+        0..1 Class1 rel inverseof rel
+      }
+      action blah() {
+        o = oneof(allof(Class1))
+        o.rel = create(Class2)
+        o.rel = create(Class2)
+        o.rel = create(Class2)
+      }
+    ADSL
+  end
+
   def test_assignment__as_objset
     adsl_assert :correct, <<-ADSL
       class Class {
@@ -368,7 +415,7 @@ class BasicTranslationTest < Test::Unit::TestCase
       }
       class Class2 {}
       action blah() {
-        other = forceoneof(allof(Class2))
+        other = oneof(allof(Class2))
         obj = create(Class)
         obj.rel += other
       }
@@ -558,7 +605,10 @@ class BasicTranslationTest < Test::Unit::TestCase
 
   def test_ref_cardinality__at_least_one
     conjecture = <<-SPASS
-      forall( [o], implies(of_Class_type(o), exists([r], left_link_Class_rel(r, o))))
+      forall( [o], implies(
+        and(of_Class_type(o), init_state(o)),
+        exists([r], and(init_state(r), left_link_Class_rel(r, o)))
+      ))
     SPASS
     adsl_assert :correct, <<-ADSL, :conjecture => conjecture
       class Class { 1+ Class rel }
@@ -571,8 +621,12 @@ class BasicTranslationTest < Test::Unit::TestCase
   end
 
   def test_ref_cardinality__at_most_one
+    # two different tuples exist for the same object
     conjecture = <<-SPASS
-      exists( [o, r1, r2], and(of_Class_type(o), left_link_Class_rel(r1, o), left_link_Class_rel(r2, o), not(equal(r1, r2))))
+      exists( [o, r1, r2], and(
+        init_state(o), init_state(r1), init_state(r2),
+        of_Class_type(o), left_link_Class_rel(r1, o), left_link_Class_rel(r2, o), not(equal(r1, r2))
+      ))
     SPASS
     adsl_assert :correct, <<-ADSL, :conjecture => "not(#{conjecture})"
       class Class { 0..1 Class rel }

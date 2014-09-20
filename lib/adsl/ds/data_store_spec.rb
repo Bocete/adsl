@@ -1,3 +1,4 @@
+require 'adsl/ds/type_sig'
 require 'adsl/util/general'
 require 'adsl/util/partial_ordered'
 
@@ -52,13 +53,22 @@ module ADSL
     class DSClass < DSNode
       include ADSL::Util::PartialOrdered
 
-      container_for :name, :parents, :relations do
-        @relations = [] if @relations.nil?
-        @parents   = [] if @parents.nil?
+      container_for :name, :sort, :parents, :children, :members do
+        @members  ||= []
+        @parents  ||= []
+        @children ||= []
       end
 
       def to_s
         @name
+      end
+      
+      def all_children(include_self = false)
+        c = Set[*@children]
+        c << self if include_self
+        until_no_change c do |iter|
+          iter + Set[*iter.map(&:children).flatten].flatten
+        end
       end
 
       def all_parents(include_self = false)
@@ -82,86 +92,34 @@ module ADSL
       end
 
       def to_sig
-        DSTypeSig.new self
-      end
-    end
-
-    class DSTypeSig
-      attr_reader :classes
-      
-      include ADSL::Util::PartialOrdered
-
-      def initialize(*classes)
-        @classes = Set[*classes.flatten].flatten
-        canonize!
-      end
-      
-      def canonize!
-        @classes.dup.each do |klass|
-          @classes -= klass.all_parents(false)
-        end
+        ADSL::DS::TypeSig::ObjsetType.new self
       end
 
-      def compare(other)
-        return nil unless other.is_a? DSTypeSig
-        my_full_tree    = self.classes.map{ |k| k.all_parents true }.inject(&:+)
-        other_full_tree = other.classes.map{ |k| k.all_parents true }.inject(&:+)
-        return 0  if my_full_tree == other_full_tree
-        return -1 if my_full_tree.superset? other_full_tree
-        return 1  if my_full_tree.subset?   other_full_tree
-        return nil
+      def relations
+        @members.select{ |m| m.is_a? DSRelation }
       end
 
-      def join(other)
-        DSTypeSig.join self, other
+      def fields
+        @members.select{ |m| m.is_a? DSField }
       end
-
-      def all_parents(include_self = false)
-        @classes.map{ |c| c.all_parents include_self }.inject(&:+)
-      end
-
-      def nil_sig?
-        @classes.empty?
-      end
-
-      def to_s
-        @classes.map(&:to_s).join ', '
-      end
-
-      def ==(other)
-        return false unless other.is_a?(DSTypeSig)
-        other_seed = other.send(:instance_variable_get, :@random_seed)
-        if @random_seed || other_seed
-          return false if @random_seed != other_seed
-        end
-        @classes == other.classes
-      end
-      alias_method :eql?, :==
-
-      def hash
-        [@classes, @random_seed].hash
-      end
-
-      def self.join(*type_sigs)
-        type_sigs.flatten.reject(&:nil_sig?).inject do |memo, sig|
-          new_sig = DSTypeSig.new (memo.all_parents(true) & sig.all_parents(true))
-          raise "Incompatible type signatures joined: #{type_sigs.map(&:to_s).join}" if new_sig.nil_sig?
-          new_sig
-        end
-      end
-
-      def self.random
-        sig = DSTypeSig.new
-        @@random_seed ||= 0
-        sig.send :instance_variable_set, :@random_seed, (@@random_seed += 1)
-        sig
-      end
-      
-      EMPTY = DSTypeSig.new
     end
 
     class DSRelation < DSNode
       container_for :cardinality, :from_class, :to_class, :name, :inverse_of
+
+      def type_sig
+        @to_class.to_sig
+      end
+
+      def to_s
+        "#{from_class.name}.#{name}"
+      end
+    end
+
+    class DSField < DSNode
+      container_for :from_class, :name, :type
+
+      alias_method :type_sig, :type
 
       def to_s
         "#{from_class.name}.#{name}"
@@ -181,7 +139,7 @@ module ADSL
     end
 
     class DSAssignment < DSNode
-      container_for :var, :objset
+      container_for :var, :expr
     end
 
     class DSCreateObj < DSNode
@@ -208,12 +166,16 @@ module ADSL
       container_for :objset1, :relation, :objset2
     end
 
+    class DSFieldSet < DSNode
+      container_for :objset, :field, :expr
+    end
+
     class DSEither < DSNode
       container_for :blocks, :lambdas
     end
     
-    class DSEitherLambdaObjset < DSNode
-      container_for :either, :objsets
+    class DSEitherLambdaExpr < DSNode
+      container_for :either, :exprs
 
       def type_sig
         DSTypeSig.join @objsets.map(&:type_sig)
@@ -224,11 +186,11 @@ module ADSL
       container_for :condition, :then_block, :else_block
     end
 
-    class DSIfLambdaObjset < DSNode
-      container_for :if, :then_objset, :else_objset
+    class DSIfLambdaExpr < DSNode
+      container_for :if, :then_expr, :else_expr
 
       def type_sig
-        DSTypeSig.join @then_objset.type_sig, @else_objset.type_sig
+        ADSL::DS::TypeSig.join @then_expr.type_sig, @else_expr.type_sig
       end
     end
 
@@ -254,7 +216,7 @@ module ADSL
       end
     end
 
-    class DSForEachPreLambdaObjset < DSNode
+    class DSForEachPreLambdaExpr < DSNode
       container_for :for_each, :before_var, :inside_var
 
       def type_sig
@@ -262,7 +224,7 @@ module ADSL
       end
     end
     
-    class DSForEachPostLambdaObjset < DSNode
+    class DSForEachPostLambdaExpr < DSNode
       container_for :for_each, :before_var, :inside_var
 
       def type_sig
@@ -272,6 +234,10 @@ module ADSL
 
     class DSVariable < DSNode
       container_for :name, :type_sig
+    end
+
+    class DSAnythingExpr < DSNode
+      container_for
     end
 
     class DSAllOf < DSNode
@@ -298,7 +264,7 @@ module ADSL
       end
     end
 
-    class DSOneOfObjset < DSNode
+    class DSPickOneObjset < DSNode
       container_for :objsets
 
       def type_sig
@@ -314,7 +280,7 @@ module ADSL
       end
     end
     
-    class DSForceOneOf < DSNode
+    class DSTryOneOf < DSNode
       container_for :objset
 
       def type_sig
@@ -329,12 +295,22 @@ module ADSL
         @relation.to_class.to_sig
       end
     end
+    
+    class DSFieldRead < DSNode
+      container_for :objset, :field
+
+      def type_sig
+        @relation.to_class.to_sig
+      end
+    end
 
     class DSEmptyObjset < DSNode
       container_for
 
+      SIG = ADSL::DS::TypeSig::UnknownType.new(ADSL::DS::TypeSig::ObjsetCardinality::ZERO)
+
       def type_sig
-        DSTypeSig::EMPTY
+        SIG
       end
     end
 
@@ -391,7 +367,7 @@ module ADSL
     end
     
     class DSEqual < DSNode
-      container_for :objsets
+      container_for :exprs
     end
   end
 end

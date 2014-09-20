@@ -22,7 +22,8 @@ module ADSL
         end
 
         def invariant(name = nil, builder)
-          @invariants << Invariant.new(:description => name, :formula => builder.adsl_ast)
+          formula = builder.respond_to?(:adsl_ast) ? builder.adsl_ast : builder
+          @invariants << Invariant.new(:description => name, :formula => formula)
         end
 
         def load_in_context(path)

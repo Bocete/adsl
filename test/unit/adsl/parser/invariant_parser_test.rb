@@ -255,7 +255,7 @@ module ADSL::Parser
       ADSL
       f = spec.invariants.first.formula.subformula
       assert_equal DSEqual, f.class
-      assert_equal ['o1', 'o2'], f.objsets.map { |v| v.name }
+      assert_equal ['o1', 'o2'], f.exprs.map { |v| v.name }
 
       spec = parser.parse <<-ADSL
         class Class {}
@@ -263,7 +263,7 @@ module ADSL::Parser
       ADSL
       f = spec.invariants.first.formula.subformula
       assert_equal DSEqual, f.class
-      assert_equal ['o1', 'o2'], f.objsets.map { |v| v.name }
+      assert_equal ['o1', 'o2'], f.exprs.map { |v| v.name }
 
       spec = parser.parse <<-ADSL
         class Class {}
@@ -271,7 +271,7 @@ module ADSL::Parser
       ADSL
       f = spec.invariants.first.formula.subformula
       assert_equal DSEqual, f.class
-      assert_equal ['o1', 'o2', 'o1', 'o1'], f.objsets.map { |v| v.name }
+      assert_equal ['o1', 'o2', 'o1', 'o1'], f.exprs.map { |v| v.name }
 
       assert_nothing_raised ADSLError do
         parser.parse <<-ADSL
@@ -306,7 +306,7 @@ module ADSL::Parser
       f = spec.invariants.first.formula.subformula
       assert_equal DSNot, f.class
       assert_equal DSEqual, f.subformula.class
-      assert_equal ['o1', 'o2'], f.subformula.objsets.map { |v| v.name }
+      assert_equal ['o1', 'o2'], f.subformula.exprs.map { |v| v.name }
     end
     
     def test_invariant__equiv
@@ -413,15 +413,13 @@ module ADSL::Parser
 
     def test_invariant__variable_scope
       parser = ADSLParser.new
-      assert_nothing_raised do
-        parser.parse <<-ADSL
-          class Class {}
-          invariant exists(Class o)
-          invariant exists(Class o)
-          invariant exists(Class o)
-          invariant exists(Class o)
-        ADSL
-      end
+      parser.parse <<-ADSL
+        class Class {}
+        invariant exists(Class o)
+        invariant exists(Class o)
+        invariant exists(Class o)
+        invariant exists(Class o)
+      ADSL
     end
 
     def test_invariant__no_side_effects

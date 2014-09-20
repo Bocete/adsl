@@ -92,7 +92,7 @@ module ADSL
             stmts = pairs[index][1]
             pairs[index][1] = (stmts.length == 1 ? stmts.first : ASTBlock.new(:statements => stmts.reverse))
           end
-          
+
           pairs
         end
 

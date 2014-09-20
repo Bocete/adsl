@@ -8,40 +8,49 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
 
   def test__statements_are_statements
     all_nodes = ADSL::Parser.constants.map{ |c| ADSL::Parser.const_get c }.select{ |c| c < ADSL::Parser::ASTNode }
-    statements = [:dummy_stmt, :create_tup, :delete_tup, :set_tup, :delete_obj, :block, :for_each, :either, :if, :objset_stmt, :declare_var]
+    statements = [:dummy_stmt, :create_tup, :delete_tup, :member_set, :delete_obj, :block, :for_each, :either, :if, :expr_stmt, :declare_var]
     statements = statements.map{ |c| ADSL::Parser.const_get "AST#{c.to_s.camelize}" }
-    assert_set_equal all_nodes.select{ |c| c.is_statement? }, statements
+  end
+
+  def test__all_nodes_are_something
+    all_nodes = Set[*ADSL::Parser.constants.map{ |c| ADSL::Parser.const_get c }.select{ |c| c < ADSL::Parser::ASTNode }]
+    exceptions = Set[*[:spec, :class, :relation, :field, :action, :invariant, :ident].map do |c|
+      ADSL::Parser.const_get "AST#{c.to_s.camelize}"
+    end]
+    (all_nodes - exceptions).each do |node|
+      assert(node.is_statement? || node.is_objset? || node.is_base_type? || node.is_formula?, "Type undefined for #{node}")
+    end
   end
 
   def test__create_objset_has_transitive_sideeffects
-    assert ASTCreateObjset.new.objset_has_side_effects?
+    assert ASTCreateObjset.new.expr_has_side_effects?
 
-    assert_false ASTSubset.new.objset_has_side_effects?
-    assert ASTSubset.new(:objset => ASTCreateObjset.new).objset_has_side_effects?
+    assert_false ASTSubset.new.expr_has_side_effects?
+    assert ASTSubset.new(:objset => ASTCreateObjset.new).expr_has_side_effects?
 
-    assert_false ASTUnion.new.objset_has_side_effects?
+    assert_false ASTUnion.new.expr_has_side_effects?
     assert_false ASTUnion.new(:objsets => [
       ASTSubset.new, ASTSubset.new
-    ]).objset_has_side_effects?
+    ]).expr_has_side_effects?
     assert ASTUnion.new(:objsets => [
       ASTSubset.new, ASTSubset.new, ASTCreateObjset.new
-    ]).objset_has_side_effects?
+    ]).expr_has_side_effects?
   end
 
   def test__block_optimize__merges_nested_blocks
     block = ASTBlock.new(:statements => [
       ASTBlock.new(:statements => [
-        ASTObjsetStmt.new(:objset => ASTAssignment.new(:objset => 1)),
-        ASTObjsetStmt.new(:objset => ASTAssignment.new(:objset => 2))
+        ASTExprStmt.new(:expr => ASTAssignment.new(:expr => 1)),
+        ASTExprStmt.new(:expr => ASTAssignment.new(:expr => 2))
       ]),
-      ASTObjsetStmt.new(:objset => ASTAssignment.new(:objset => 3)),
+      ASTExprStmt.new(:expr => ASTAssignment.new(:expr => 3)),
       ASTBlock.new(:statements => [
-        ASTObjsetStmt.new(:objset => ASTAssignment.new(:objset => 4)),
+        ASTExprStmt.new(:expr => ASTAssignment.new(:expr => 4)),
         ASTBlock.new(:statements => [
-          ASTObjsetStmt.new(:objset => ASTAssignment.new(:objset => 5)),
-          ASTObjsetStmt.new(:objset => ASTAssignment.new(:objset => 6))
+          ASTExprStmt.new(:expr => ASTAssignment.new(:expr => 5)),
+          ASTExprStmt.new(:expr => ASTAssignment.new(:expr => 6))
         ]),
-        ASTObjsetStmt.new(:objset => ASTAssignment.new(:objset => 7))
+        ASTExprStmt.new(:expr => ASTAssignment.new(:expr => 7))
       ])
     ])
     
@@ -49,17 +58,17 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
 
     assert_equal 7, block.statements.length
     7.times do |i|
-      assert_equal i+1, block.statements[i].objset.objset
+      assert_equal i+1, block.statements[i].expr.expr
     end
   end
 
   def test__block_optimize__remove_noop_objset_stmts
     block = ASTBlock.new(:statements => [
-      ASTObjsetStmt.new(:objset => ASTAssignment.new(:objset => 1)),
-      ASTObjsetStmt.new(:objset => ASTEmptyObjset.new),
-      ASTObjsetStmt.new(:objset => ASTAssignment.new(:objset => 2)),
-      ASTObjsetStmt.new(:objset => ASTAssignment.new(:objset => 3)),
-      ASTObjsetStmt.new(:objset => ASTEmptyObjset.new)
+      ASTExprStmt.new(:expr => ASTAssignment.new(:expr => 1)),
+      ASTExprStmt.new(:expr => ASTEmptyObjset.new),
+      ASTExprStmt.new(:expr => ASTAssignment.new(:expr => 2)),
+      ASTExprStmt.new(:expr => ASTAssignment.new(:expr => 3)),
+      ASTExprStmt.new(:expr => ASTEmptyObjset.new)
     ])
 
     block = block.optimize
@@ -67,17 +76,17 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
     assert_equal 3, block.statements.length
     3.times do |i|
       stmt = block.statements[i]
-      assert_equal ASTObjsetStmt, stmt.class
-      assert_equal ASTAssignment, stmt.objset.class
-      assert_equal i+1,           stmt.objset.objset
+      assert_equal ASTExprStmt, stmt.class
+      assert_equal ASTAssignment, stmt.expr.class
+      assert_equal i+1,           stmt.expr.expr
     end
   end
 
   def test__block_optimize__removes_dummy_stmts
     block = ASTBlock.new(:statements => [
-      ASTObjsetStmt.new(:objset => ASTAssignment.new(:objset => 1)),
+      ASTExprStmt.new(:expr => ASTAssignment.new(:expr => 1)),
       ASTDummyStmt.new(),
-      ASTObjsetStmt.new(:objset => ASTAssignment.new(:objset => 2)),
+      ASTExprStmt.new(:expr => ASTAssignment.new(:expr => 2)),
       ASTDummyStmt.new()
     ])
 
@@ -86,9 +95,9 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
     assert_equal 2, block.statements.length
     2.times do |i|
       stmt = block.statements[i]
-      assert_equal ASTObjsetStmt, stmt.class
-      assert_equal ASTAssignment, stmt.objset.class
-      assert_equal i+1,           stmt.objset.objset
+      assert_equal ASTExprStmt, stmt.class
+      assert_equal ASTAssignment, stmt.expr.class
+      assert_equal i+1,           stmt.expr.expr
     end
   end
 
@@ -96,33 +105,33 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
     either = ASTEither.new(:blocks => [
       ASTBlock.new(:statements => [ASTEither.new(:blocks => [
         ASTBlock.new(:statements => [
-          ASTObjsetStmt.new(:objset => ASTAssignment.new(:objset => 1)),
-          ASTObjsetStmt.new(:objset => ASTAssignment.new(:objset => 2))
+          ASTExprStmt.new(:expr => ASTAssignment.new(:var_name => ASTIdent.new(:text => 'a'), :expr => 1)),
+          ASTExprStmt.new(:expr => ASTAssignment.new(:var_name => ASTIdent.new(:text => 'b'), :expr => 2))
         ]),
         ASTBlock.new(:statements => [
-          ASTObjsetStmt.new(:objset => ASTAssignment.new(:objset => 3)),
-          ASTObjsetStmt.new(:objset => ASTAssignment.new(:objset => 4))
+          ASTExprStmt.new(:expr => ASTAssignment.new(:var_name => ASTIdent.new(:text => 'c'), :expr => 3)),
+          ASTExprStmt.new(:expr => ASTAssignment.new(:var_name => ASTIdent.new(:text => 'd'), :expr => 4))
         ]),
         ASTBlock.new(:statements => [
           ASTEither.new(:blocks => [
             ASTBlock.new(:statements => [
-              ASTObjsetStmt.new(:objset => ASTAssignment.new(:objset => 5))
+              ASTExprStmt.new(:expr => ASTAssignment.new(:var_name => ASTIdent.new(:text => 'e'), :expr => 5))
             ])
           ])
         ])
       ])]),
       ASTBlock.new(:statements => [
-        ASTObjsetStmt.new(:objset => ASTAssignment.new(:objset => 6))
+        ASTExprStmt.new(:expr => ASTAssignment.new(:var_name => ASTIdent.new(:text => 'f'), :expr => 6))
       ]),
     ])
-    
+   
     either = either.optimize
 
     assert_equal 4,      either.blocks.length
-    assert_equal [1, 2], either.blocks[0].statements.map(&:objset).map(&:objset)
-    assert_equal [3, 4], either.blocks[1].statements.map(&:objset).map(&:objset)
-    assert_equal [5],    either.blocks[2].statements.map(&:objset).map(&:objset)
-    assert_equal [6],    either.blocks[3].statements.map(&:objset).map(&:objset)
+    assert_equal [1, 2], either.blocks[0].statements.map(&:expr).map(&:expr)
+    assert_equal [3, 4], either.blocks[1].statements.map(&:expr).map(&:expr)
+    assert_equal [5],    either.blocks[2].statements.map(&:expr).map(&:expr)
+    assert_equal [6],    either.blocks[3].statements.map(&:expr).map(&:expr)
   end
 
   def test__action_optimize__removes_root_either_empty_options
@@ -214,13 +223,13 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
         ASTBlock.new(:statements => [
           ASTBlock.new(:statements => [
             ASTBlock.new(:statements => [
-              ASTObjsetStmt.new(
-                :objset => ASTAssignment.new(:objset => ASTVariable.new(:var_name => ASTIdent.new(:text => 'kme')))
+              ASTExprStmt.new(
+                :expr => ASTAssignment.new(:expr => ASTVariable.new(:var_name => ASTIdent.new(:text => 'kme')))
               )
             ]),
             ASTBlock.new(:statements => [
-              ASTObjsetStmt.new(
-                :objset => ASTAssignment.new(:objset => ASTVariable.new(:var_name => ASTIdent.new(:text => 'at__blahblah')))
+              ASTExprStmt.new(
+                :expr => ASTAssignment.new(:expr => ASTVariable.new(:var_name => ASTIdent.new(:text => 'at__blahblah')))
               )
             ]),
             ASTBlock.new(:statements => [])
@@ -235,22 +244,22 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
     action.prepend_global_variables_by_signatures /^at__.*$/, /^atat__.*$/
     assert_equal 3, action.block.statements.length
 
-    assert_equal ASTObjsetStmt,  action.block.statements[0].class
-    assert_equal ASTAssignment,  action.block.statements[0].objset.class
-    assert_equal 'at__blahblah', action.block.statements[0].objset.var_name.text
-    assert_equal ASTEmptyObjset, action.block.statements[0].objset.objset.class
+    assert_equal ASTExprStmt,  action.block.statements[0].class
+    assert_equal ASTAssignment,  action.block.statements[0].expr.class
+    assert_equal 'at__blahblah', action.block.statements[0].expr.var_name.text
+    assert_equal ASTEmptyObjset, action.block.statements[0].expr.expr.class
    
     assert_equal ASTEither,     action.block.statements[1].class
     blocks = action.block.statements[1].blocks
 
     assert_equal 0,              blocks.first.statements.length
     assert_equal 2,              blocks.second.statements.length
-    assert_equal ASTObjsetStmt,  blocks.second.statements[0].class
-    assert_equal ASTAssignment,  blocks.second.statements[0].objset.class
-    assert_equal 'kme',          blocks.second.statements[0].objset.objset.var_name.text
-    assert_equal ASTObjsetStmt,  blocks.second.statements[1].class
-    assert_equal ASTAssignment,  blocks.second.statements[1].objset.class
-    assert_equal 'at__blahblah', blocks.second.statements[1].objset.objset.var_name.text
+    assert_equal ASTExprStmt,  blocks.second.statements[0].class
+    assert_equal ASTAssignment,  blocks.second.statements[0].expr.class
+    assert_equal 'kme',          blocks.second.statements[0].expr.expr.var_name.text
+    assert_equal ASTExprStmt,  blocks.second.statements[1].class
+    assert_equal ASTAssignment,  blocks.second.statements[1].expr.class
+    assert_equal 'at__blahblah', blocks.second.statements[1].expr.expr.var_name.text
     
     assert_equal ASTDeleteObj,   action.block.statements[2].class
   end
@@ -276,30 +285,30 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
 
   def test__block_optimize__removes_last_stmts_without_sideeffects
     action = ASTAction.new(:block => ASTBlock.new(:statements => [
-      ASTObjsetStmt.new(
-        :objset => ASTAssignment.new(:var_name => ASTIdent.new(:text => 'at_asdf'), :objset => ASTEmptyObjset.new)
+      ASTExprStmt.new(
+        :expr => ASTAssignment.new(:var_name => ASTIdent.new(:text => 'at_asdf'), :expr => ASTEmptyObjset.new)
       ),
       ASTEither.new(:blocks => [
         ASTBlock.new(:statements => []),
         ASTBlock.new(:statements => [
           ASTEither.new(:blocks => [
             ASTBlock.new(:statements => [
-              ASTObjsetStmt.new(
-                :objset => ASTAssignment.new(:var_name => ASTIdent.new(:text => 'at_asdf'), :objset => ASTDummyObjset.new)
+              ASTExprStmt.new(
+                :expr => ASTAssignment.new(:var_name => ASTIdent.new(:text => 'at_asdf'), :expr => ASTDummyObjset.new)
               )
             ]),
             ASTBlock.new(:statements => [
-              ASTObjsetStmt.new(
-                :objset => ASTAssignment.new(:var_name => ASTIdent.new(:text => 'at_asdf'), :objset => ASTDummyObjset.new)
+              ASTExprStmt.new(
+                :expr => ASTAssignment.new(:var_name => ASTIdent.new(:text => 'at_asdf'), :expr => ASTDummyObjset.new)
               )
             ])
           ])
         ]),
-        ASTBlock.new(:statements => [ASTObjsetStmt.new(
-          :objset => ASTAssignment.new(:var_name => ASTIdent.new(:text => 'at_asdf'), :objset => ASTDummyObjset.new)
+        ASTBlock.new(:statements => [ASTExprStmt.new(
+          :expr => ASTAssignment.new(:var_name => ASTIdent.new(:text => 'at_asdf'), :expr => ASTDummyObjset.new)
         )]),
-        ASTBlock.new(:statements => [ASTObjsetStmt.new(
-          :objset => ASTAssignment.new(:var_name => ASTIdent.new(:text => 'at_asdf'), :objset => ASTCreateObjset.new)
+        ASTBlock.new(:statements => [ASTExprStmt.new(
+          :expr => ASTAssignment.new(:var_name => ASTIdent.new(:text => 'at_asdf'), :expr => ASTCreateObjset.new)
         )])
       ])
     ]))
@@ -308,14 +317,14 @@ class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
 
     stmts = action.block.statements
     assert_equal 1,               stmts.length
-    assert_equal ASTObjsetStmt,   stmts.first.class
-    assert_equal ASTCreateObjset, stmts.first.objset.class
+    assert_equal ASTExprStmt,   stmts.first.class
+    assert_equal ASTCreateObjset, stmts.first.expr.class
   end
 
   def test__adsl_ast_size
     ast = ASTBlock.new(:statements => [
-      ASTObjsetStmt.new(
-        :objset => ASTAssignment.new(:var_name => ASTIdent.new(:text => 'asd'), :objset => ASTEmptyObjset.new)
+      ASTExprStmt.new(
+        :expr => ASTAssignment.new(:var_name => ASTIdent.new(:text => 'asd'), :expr => ASTEmptyObjset.new)
       ),
       ASTDummyStmt.new(:label => :blah)
     ])

@@ -22,7 +22,7 @@ rule
   or\b            { [:or, lineno] }
   subset\b        { [:subset, lineno] }
   oneof\b         { [:oneof, lineno] }
-  forceoneof\b    { [:forceoneof, lineno] }
+  tryoneof\b      { [:tryoneof, lineno] }
   allof\b         { [:allof, lineno] }
   forall\b        { [:forall, lineno] }
   exists\b        { [:exists, lineno] }
@@ -51,6 +51,8 @@ rule
   \+              { [text, lineno] }
   \*              { [text, lineno] }
   [01]            { [text, lineno] }
+  Int|String|Real|Decimal|Bool { [:BASIC_TYPE, [text, lineno]] }
+  `(?:[^\\]*(?:\\[^`])?)*`  { [:JS, {:js => text, :lineno => lineno}] }
   \w+             { [:IDENT, ADSL::Parser::ASTIdent.new(:lineno => lineno, :text => text)] }
   \s               # blank, no action
   .               { [:unknown_symbol, [text, lineno]] }

@@ -2,6 +2,7 @@ require 'set'
 require 'open3'
 require 'thread'
 require 'active_support'
+require 'active_support/core_ext/module'
 require 'tempfile'
 
 class String
@@ -24,6 +25,19 @@ class String
     indented = "  " + gsub("\n", "\n  ")
     (/  $/ =~ indented) ? indented[0..-3] : indented
   end
+  
+  def resolve_params(*args)
+    args = args.flatten
+    max_arg_index = self.scan(/\$\{(\d+)\}/).map{ |a| a.first.to_i }.max || 0
+    if args.length < max_arg_index
+      raise ArgumentError, "Invalid argument number: #{args.length} instead of #{max_arg_index}"
+    end
+    result = self
+    args.length.times do |i|
+      result = result.gsub "${#{i + 1}}", args[i].to_s
+    end
+    result
+  end
 end
 
 class Time
@@ -35,6 +49,15 @@ class Time
 end
 
 class Array
+  def each_index_with_elem(&block)
+    return each_index_without_elem(&block) if block.nil? or block.arity < 2
+    count.times.each do |index|
+      block[self[index], index]
+    end
+    self
+  end
+  alias_method_chain :each_index, :elem
+  
   def worklist_each
     changed = true
     until empty? or not changed
@@ -50,6 +73,22 @@ class Array
 
   def adsl_indent
     join("").adsl_indent
+  end
+
+  def try_map(*args)
+    raise "At least method name required for try_map" if args.empty?
+    raise "First argument to try_map needs to be a symbol or string" unless args.first.is_a?(String) or args.first.is_a?(Symbol)
+    map do |e|
+      e.respond_to?(args.first) ? e.send(*args) : e
+    end
+  end
+
+  def try_map!(*args)
+    raise "At least method name required for try_map!" if args.empty?
+    raise "First argument to try_map! needs to be a symbol or string" unless args.first.is_a?(String) or args.first.is_a?(Symbol)
+    map! do |e|
+      e.respond_to?(args.first) ? e.send(*args) : e
+    end
   end
 
   def select_reject
@@ -160,6 +199,36 @@ class Module
       all_fields.merge prev_fields
     end
     singleton_class.send :define_method, :container_for_fields, lambda{ all_fields }
+    singleton_class.send :define_method, :recursively_comparable do
+      send :define_method, :eql? do |other|
+        return false if other.class != self.class
+        self.class.container_for_fields.each do |field|
+          f1 = self.send field
+          f2 = other.send field
+          if f1.respond_to?(:each) && f2.respond_to?(:each)
+            return false if f1.count != f2.count
+            f1.zip(f2).each do |e1, e2|
+              return false unless f1.eql? f2
+            end
+          else
+            return false unless f1.eql? f2
+          end
+        end
+        return true
+      end
+      alias_method :==, :eql?
+      send :define_method, :hash do
+        [*self.class.container_for_fields.map{ |f| self.send f }].hash
+      end
+      send :define_method, :dup do
+        new_values = {}
+        self.class.container_for_fields.each do |field_name|
+          value = send field_name
+          new_values[field_name] = value.respond_to?(:dup) ? value.dup : value
+        end
+        self.class.new new_values
+      end
+    end
 
     attr_accessor *fields
 
@@ -204,43 +273,6 @@ class Module
 end
 
 module Kernel
-  # returns stdout of the process that terminates first
-  # not completely thread safe; cannot be with 1.8.7
-  def process_race(*commands)
-    parent_thread = Thread.current
-    mutex = Mutex.new
-    children_threads = []
-    spawned_pids = []
-    result = nil
-    mutex.synchronize do
-      commands.each do |command|
-        children_threads << Thread.new do
-          begin
-            sleep 0.1
-            pipe = IO.popen command, 'r'
-            spawned_pids << pipe.pid
-            output = pipe.read
-            mutex.synchronize do
-              result = output if result.nil?
-              parent_thread.run
-            end
-          rescue => e
-            parent_thread.raise e unless e.message == 'die!'
-          end
-        end
-      end
-    end
-    Thread.stop
-    return result
-  ensure
-    children_threads.each do |child|
-      child.raise 'die!'
-    end
-    spawned_pids.each do |pid|
-      Process.kill 'HUP', pid
-    end
-  end
-
   def until_no_change(object)
     loop do
       old_object = object

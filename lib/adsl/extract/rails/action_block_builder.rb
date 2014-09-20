@@ -30,9 +30,9 @@ module ADSL
         def included_already?(where, what)
           return where.map{ |e| e.equal? what }.include?(true) ||
             (
-              where.last.is_a?(ADSL::Parser::ASTObjsetStmt) &&
-              what.is_a?(ADSL::Parser::ASTObjsetStmt) &&
-              where.last.objset == what.objset
+              where.last.is_a?(ADSL::Parser::ASTExprStmt) &&
+              what.is_a?(ADSL::Parser::ASTExprStmt) &&
+              where.last.expr == what.expr
             )
         end
 
@@ -84,9 +84,9 @@ module ADSL
            
               do_return return_value unless @has_returned_or_raised
             rescue Exception => e
-              #puts "Exception: #{e}"
-              #puts e.backtrace.first 20
-              #do_raise unless @has_returned_or_raised
+             # puts "Exception: #{e}"
+             # puts e.backtrace.first 20
+             # do_raise unless @has_returned_or_raised
             ensure
               return common_return_value unless has_more_executions?
             end
@@ -99,12 +99,12 @@ module ADSL
             return false if value.is_a?(MetaUnknown) || !value.respond_to?(:adsl_ast)
           end
           adsl_asts = values.reject{ |v| v.nil? }.map(&:adsl_ast)
-          adsl_asts = adsl_asts.map{ |v| v.is_a?(ADSL::Parser::ASTObjsetStmt) ? v.objset : v }
+          adsl_asts = adsl_asts.map{ |v| v.is_a?(ADSL::Parser::ASTExprStmt) ? v.objset : v }
           adsl_asts.each do |adsl_ast|
             return false unless adsl_ast.class.is_objset?
             # side effects should trigger only if the selection is chosen;
             # but the translation does not do this
-            return false if adsl_ast.objset_has_side_effects?
+            return false if adsl_ast.expr_has_side_effects?
           end
 
           common_supertype = nil
@@ -152,14 +152,14 @@ module ADSL
           if uniq.length == 1
             uniq.first
           elsif ct = common_supertype_of_objsets(uniq)
-            objsets = uniq.map(&:adsl_ast).map{ |r| r.is_a?(ADSL::Parser::ASTObjsetStmt) ? r.objset : r }
-            ct.new(:adsl_ast => ADSL::Parser::ASTOneOfObjset.new(:objsets => objsets))
+            objsets = uniq.map(&:adsl_ast).map{ |r| r.is_a?(ADSL::Parser::ASTExprStmt) ? r.expr : r }
+            ct.new(:adsl_ast => ADSL::Parser::ASTPickOneObjset.new(:objsets => objsets))
           elsif ct = common_supertype_of_objset_arrays(uniq)
             highest_length = uniq.map(&:length).max
             combined_objsets = []
             highest_length.times do |index|
-              objsets = uniq.map{|u| u[index]}.map(&:adsl_ast).map{ |r| r.is_a?(ADSL::Parser::ASTObjsetStmt) ? r.objset : r }
-              combined_objsets << ct[index].new(:objset => ADSL::Parser::ASTOneOfObjset.new(:objsets => objsets))
+              objsets = uniq.map{|u| u[index]}.map(&:adsl_ast).map{ |r| r.is_a?(ADSL::Parser::ASTExprStmt) ? r.expr : r }
+              combined_objsets << ct[index].new(:objset => ADSL::Parser::ASTPickOneObjset.new(:objsets => objsets))
             end
             combined_objsets
           else

@@ -63,12 +63,12 @@ module ADSL::Extract::Rails
 
       inv = ie.invariants.first.formula
 
-      assert_equal ASTIsEmpty, inv.class
-      assert_equal ASTDereference, inv.objset.class
-      assert_equal 'kme12', inv.objset.rel_name.text
-      assert_equal ASTDereference, inv.objset.objset.class
-      assert_equal 'blahs', inv.objset.objset.rel_name.text
-      assert_equal ASTAllOf, inv.objset.objset.objset.class
+      assert_equal ASTIsEmpty,      inv.class
+      assert_equal ASTMemberAccess, inv.objset.class
+      assert_equal 'kme12',         inv.objset.member_name.text
+      assert_equal ASTMemberAccess, inv.objset.objset.class
+      assert_equal 'blahs',         inv.objset.objset.member_name.text
+      assert_equal ASTAllOf,        inv.objset.objset.objset.class
     end
 
     def test_load_in_context__instrumented_boolean_operators

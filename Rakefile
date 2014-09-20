@@ -15,6 +15,7 @@ namespace :test do
   namespace :units do
     desc "Test Lexer & Parser"
     task :parser => ["build:parser"]
+    
     Rake::TestTask.new(name=:parser) do |t|
       t.libs += ["lib"]
       t.test_files = FileList['test/unit/adsl/parser/**/*_test.rb']
@@ -35,10 +36,10 @@ namespace :test do
       t.verbose = true
     end
     
-    desc "Test Spass Translator"
-    Rake::TestTask.new(name=:spass) do |t|
+    desc "Test The Prover Engine"
+    Rake::TestTask.new(name=:prover) do |t|
       t.libs += ["lib"]
-      t.test_files = FileList['test/unit/adsl/spass/**/*_test.rb']
+      t.test_files = FileList['test/unit/adsl/prover/**/*_test.rb']
       t.verbose = true
     end
     
@@ -62,6 +63,13 @@ namespace :test do
       t.test_files = FileList['test/unit/adsl/verification/**/*_test.rb']
       t.verbose = true
     end
+    
+    desc "Test Translation"
+    Rake::TestTask.new(name=:translation) do |t|
+      t.libs += ["lib"]
+      t.test_files = FileList['test/unit/adsl/translation/**/*_test.rb']
+      t.verbose = true
+    end
   end
 
   desc "Test All Units"
@@ -70,18 +78,17 @@ namespace :test do
     t.test_files = FileList['test/unit/adsl/**/*_test.rb']
     t.verbose = true
   end
-
   
   namespace :integrations do
-    Rake::TestTask.new(name=:spass) do |t|
+    Rake::TestTask.new(name=:prover) do |t|
       t.libs += ["lib"]
-      t.test_files = FileList['test/integration/spass/**/*_test.rb']
+      t.test_files = FileList['test/integration/prover/**/*_test.rb']
       t.verbose = true
     end
     
-    Rake::TestTask.new(name=:rails) do |t|
+    Rake::TestTask.new(name=:extract) do |t|
       t.libs += ["lib"]
-      t.test_files = FileList['test/integration/rails/**/*_test.rb']
+      t.test_files = FileList['test/integration/extract/**/*_test.rb']
       t.verbose = true
     end
   end

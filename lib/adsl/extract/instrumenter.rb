@@ -183,7 +183,7 @@ module ADSL
               new_code = Ruby2Ruby.new.process instrumented_sexp
 
               object.replace_method method_name, new_code
-              
+
               new_code
             else
               source
