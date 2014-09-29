@@ -9,7 +9,7 @@ module ADSL
 
       def initialize(translator, name, *context_sorts)
         @translator = translator
-        @name = @translator._reserve_names(name.to_s).first
+        @name = @translator.register_name name
         @context_sorts = context_sorts
         @pred_map = {}
         Hash.new do |hash, sort|

@@ -16,7 +16,7 @@ module ADSL
 
         @provers.each do |prover|
           require "adsl/prover/#{prover}/engine_extensions"
-          Engine.include ADSL::Prover.const_get("#{prover.camelize}::EngineExtensions")
+          Engine.send :include, ADSL::Prover.const_get("#{prover.camelize}::EngineExtensions")
         end
       end
 

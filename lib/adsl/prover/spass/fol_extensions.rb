@@ -46,8 +46,9 @@ module ADSL
 
       def replace_nullary_argument_preds(formula_string)
         return formula_string unless formula_string.include? "()"
-        not_existing_string = "nullary_argument"
-        not_existing_string.increment_suffix while formula_string.include? not_existing_string
+        not_existing_string = "n"
+	symbols_in_formula = formula_string.scan /\w+/
+        not_existing_string = not_existing_string.increment_suffix while symbols_in_formula.include? not_existing_string
         "forall( [#{not_existing_string}], #{formula_string.gsub(/(\w+)\(\)/){ "#{ $1 }(#{ not_existing_string })" }})"
       end
 
@@ -59,19 +60,36 @@ module ADSL
         predicates = @predicates.map do |p|
           "(#{p.name}, #{ [p.arity, 1].max })"
         end.join ', '
-        axioms = @axioms.map{ |f| "formula(#{ replace_nullary_argument_preds f.to_spass_string })." }
-        axioms += @predicates.select{ |p| p.arity == 0 }.map do |p|
-          "formula(forall( [o1, o2], equiv(#{p.name}(o1), #{p.name}(o2))))."
-        end
-        axioms += @functions.select{ |p| p.arity == 0 }.map do |p|
-          "formula(forall( [o1, o2], equal(#{p.name}(o1), #{p.name}(o2))))."
-        end
-        if @sorts.size > 1
-          axioms.unshift "formula(forall( [o], #{FOL::OneOf.new(@sorts.map{ |s| s[:o] }).to_spass_string}))."
-        end
-        conjecture = "formula(#{@conjecture.to_spass_string})."
         
-        <<-SPASS
+	axioms = []
+        
+	if @sorts.size > 1
+          axioms << "formula(forall( [o], #{ FOL::OneOf.new(@sorts.map{ |s| s[:o] }).optimize.to_spass_string } ))."
+        end
+	axioms += @predicates.map do |p|
+	  if p.arity == 0
+            "formula(forall( [o1, o2], equiv(#{p.name}(o1), #{p.name}(o2)) ))."
+	  else
+	    args = p.arity.times.map{ |i| "o#{i}" }
+	    "formula(forall( [#{args.join ', '}], implies(#{p.name}(#{args.join ', '}), #{And.new(
+	      p.arity.times.map{ |i| p.sorts[i][args[i]] }
+	    ).optimize.to_spass_string }) ))."
+	  end
+	end
+        axioms += @functions.select{ |f| f.arity == 0 }.map do |f|
+          "formula(forall( [o1, o2], equal(#{f.name}(o1), #{f.name}(o2)) ))."
+        end
+	axioms += @functions.map do |f|
+	  args = f.arity.times.map{ |i| "o#{i}" }
+	  args = [:o] if args.empty?
+	  "formula(forall( [#{args.join ', '}], #{f.ret_sort.name}(#{f.name}(#{args.join ', '})) ))."
+	end
+	
+	axioms += @axioms.map{ |f| "formula(#{ replace_nullary_argument_preds f.optimize.to_spass_string })." }
+
+        conjecture = "formula(#{@conjecture.optimize.to_spass_string})."
+        
+        spass = <<-SPASS
         begin_problem(Blahblah).
         list_of_descriptions.
           name({* *}).
@@ -92,6 +110,7 @@ module ADSL
         )}
         end_problem.
         SPASS
+	spass
       end
     end
 
@@ -166,7 +185,7 @@ module ADSL
           sort[name]
         end
 
-        f = @formula
+        f = @formula || true
         f = And.new(*extra_conditions, f).optimize if extra_conditions.any?
         "exists( [#{args.map(&:to_spass_string).join(', ')}], #{f.to_spass_string})" 
       end

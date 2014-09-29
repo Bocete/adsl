@@ -27,7 +27,8 @@ class Test::Unit::TestCase
       if result == :inconclusive || result == :timeout
         puts "inconclusive result on testcase #{self.class.name}.#{method_name}"
       else
-        assert_equal expected_result, result 
+        puts fol.to_spass_string if expected_result != result
+	assert_equal expected_result, result
       end
     end
   end

@@ -23,12 +23,14 @@ module ADSL
                   pid = io.pid
                   io.read
                 end
-                status = $?.exitstatus
-                spawned_pids << pid
-                mutex.synchronize do
-                  result = [output, index, status] if result.nil?
-                  parent_thread.run
-                end
+                unless $?.nil?
+		  status = $?.exitstatus
+                  spawned_pids << pid
+                  mutex.synchronize do
+                    result = [output, index, status] if result.nil?
+                    parent_thread.run
+                  end
+		end
               rescue => e
                 parent_thread.raise e unless e.message == 'die!'
               end

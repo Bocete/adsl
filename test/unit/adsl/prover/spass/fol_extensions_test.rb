@@ -37,7 +37,7 @@ class ADSL::Prover::SpassFolExtensionsTest < Test::Unit::TestCase
     assert_include_nospace string, "formula(forall( [o1, o2], equiv(predname1(o1), predname1(o2)) ))."
     assert_include_nospace string, "formula(forall( [o1, o2], equiv(predname2(o1), predname2(o2)) ))."
     assert_include_nospace string, <<-SPASS
-      formula(forall( [nullary_argument], and(predname1(nullary_argument), predname2(nullary_argument)) )).
+      formula(forall( [n], and(predname1(n), predname2(n)) )).
     SPASS
   end
 
@@ -53,7 +53,7 @@ class ADSL::Prover::SpassFolExtensionsTest < Test::Unit::TestCase
     assert_include_nospace string, "formula(forall( [o1, o2], equal(predname1(o1), predname1(o2)) ))."
     assert_include_nospace string, "formula(forall( [o1, o2], equal(predname2(o1), predname2(o2)) ))."
     assert_include_nospace string, <<-SPASS
-      formula(forall( [nullary_argument], and(predname1(nullary_argument), predname2(nullary_argument)) )).
+      formula(forall( [n], and(predname1(n), predname2(n)) )).
     SPASS
   end
 

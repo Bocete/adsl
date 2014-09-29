@@ -178,7 +178,7 @@ module ADSL
       container_for :either, :exprs
 
       def type_sig
-        DSTypeSig.join @objsets.map(&:type_sig)
+        ADSL::DS::TypeSig.join @objsets.map(&:type_sig)
       end
     end
 

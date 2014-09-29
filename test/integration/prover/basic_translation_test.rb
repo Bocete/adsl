@@ -57,22 +57,20 @@ class BasicTranslationTest < Test::Unit::TestCase
     ADSL
   end
 
-  def test_classtypes
-    conjecture = ForAll.new(:o, Not.new(And.new('of_Class1_type(o)', 'of_Class2_type(o)')))
-    adsl_assert :correct, <<-ADSL, :conjecture => conjecture
-      class Class1 {}
-      class Class2 {}
-      action blah() {}
-    ADSL
-  end
-
   def test_classtypes_polymorphism__no_contradictions
+    sort = Sort.new :ParentSort
+    sort2 = Sort.new :Parent2Sort
+    
+    preds = {}
+    [:Child1, :Child2, :Parent, :SubChild].each{ |s| preds[s] = Predicate.new s, sort }
+    preds[:Parent2] = Predicate.new 'Parent2', sort2
+    
     conjecture = Or.new(
-      Not.new(Exists.new(:o, 'of_Parent_type(o)')),
-      Not.new(Exists.new(:o, 'of_Child1_type(o)')),
-      Not.new(Exists.new(:o, 'of_Child2_type(o)')),
-      Not.new(Exists.new(:o, 'of_SubChild_type(o)')),
-      Not.new(Exists.new(:o, 'of_Parent2_type(o)'))
+      Not.new(Exists.new(sort, :o, preds[:Parent][:o])),
+      Not.new(Exists.new(sort, :o, preds[:Child1][:o])),
+      Not.new(Exists.new(sort, :o, preds[:Child2][:o])),
+      Not.new(Exists.new(sort, :o, preds[:SubChild][:o])),
+      Not.new(Exists.new(sort2, :o, preds[:Parent2][:o]))
     )
     adsl_assert :incorrect, <<-ADSL, :conjecture => conjecture
       class Parent {}
@@ -94,22 +92,24 @@ class BasicTranslationTest < Test::Unit::TestCase
       action blah() {}
     ADSL
 
-    conjecture = ForAll.new(:o, Implies.new('of_Child1_type(o)', 'of_Parent_type(o)'))
+    sort = Sort.new :ParentSort
+    sort2 = Sort.new :Parent2Sort
+    preds = {}
+    [:Child1, :Child2, :Parent, :SubChild].each{ |s| preds[s] = Predicate.new s, sort }
+    preds[:Parent2] = Predicate.new 'Parent2', sort2
+    conjecture = ForAll.new(sort, :o, Implies.new(preds[:Child1][:o], preds[:Parent][:o]))
     adsl_assert :correct, type_spec, :conjecture => conjecture
 
-    conjecture = ForAll.new(:o, Implies.new(Not.new('of_Child1_type(o)'), 'of_Parent_type(o)'))
+    conjecture = ForAll.new(sort, :o, Implies.new(Not.new(preds[:Child1][:o]), preds[:Parent][:o]))
     adsl_assert :incorrect, type_spec, :conjecture => conjecture
     
-    conjecture = ForAll.new(:o, Implies.new(Not.new('of_Parent_type(o)'), And.new(
-      Not.new('of_Child1_type(o)'),
-      Not.new('of_Child2_type(o)')
+    conjecture = ForAll.new(sort, :o, Implies.new(Not.new(preds[:Parent][:o]), And.new(
+      Not.new(preds[:Child1][:o]),
+      Not.new(preds[:Child2][:o])
     )))
     adsl_assert :correct, type_spec, :conjecture => conjecture
 
-    conjecture = ForAll.new(:o, Not.new(And.new('of_Child1_type(o)', 'of_Parent2_type(o)')))
-    adsl_assert :correct, type_spec, :conjecture => conjecture
-    
-    conjecture = ForAll.new(:o, Implies.new('of_SubChild_type(o)', 'of_Child1_type(o)'))
+    conjecture = ForAll.new(sort, :o, Implies.new(preds[:SubChild][:o], preds[:Child1][:o]))
     adsl_assert :correct, type_spec, :conjecture => conjecture
   end
 
@@ -331,6 +331,19 @@ class BasicTranslationTest < Test::Unit::TestCase
       }
       invariant not exists(Class c)
     ADSL
+    adsl_assert :correct, <<-ADSL
+      class Class1 {
+        0..1 Class2 rel
+      }
+      class Class2 {
+        0..1 Class1 rel inverseof rel
+      }
+      action blah() {
+        o = oneof(allof(Class1))
+        o.rel = create(Class2)
+      }
+      invariant exists(Class1 o: not isempty(o.rel))
+    ADSL
   end
 
   def test_assignment__reassign
@@ -364,20 +377,6 @@ class BasicTranslationTest < Test::Unit::TestCase
       }
       invariant exists(Class1 o: not isempty(o.rel))
     ADSL
-    adsl_assert :incorrect, <<-ADSL, :conjecture => 'false'
-      class Class1 {
-        1 Class2 rel
-      }
-      class Class2 {
-        0..1 Class1 rel inverseof rel
-      }
-      action blah() {
-        o = oneof(allof(Class1))
-        o.rel = create(Class2)
-        o.rel = create(Class2)
-        o.rel = create(Class2)
-      }
-    ADSL
   end
 
   def test_assignment__as_objset
@@ -409,17 +408,25 @@ class BasicTranslationTest < Test::Unit::TestCase
   end
 
   def test_forced_one_of__is_forced
+    # the following action should be contradictory
+    adsl_assert :correct, <<-ADSL, :conjecture => false
+      class Class {}
+      action blah() {
+        delete allof(Class)
+	a = oneof(allof(Class))
+      }
+    ADSL
     adsl_assert :correct, <<-ADSL
       class Class {
         0+ Class2 rel
       }
       class Class2 {}
       action blah() {
-        other = oneof(allof(Class2))
-        obj = create(Class)
-        obj.rel += other
+        o1 = oneof(allof(Class))
+        o2 = oneof(allof(Class2))
+        o1.rel += o2
       }
-      invariant forall(Class o: not isempty(o.rel))
+      invariant exists(Class o)
     ADSL
   end
   
@@ -510,35 +517,33 @@ class BasicTranslationTest < Test::Unit::TestCase
       }
       invariant forall(Class o: isempty(o.rel))
     ADSL
+    adsl_assert :correct, <<-ADSL
+      class Class1 {
+        0+ Class2 rel
+      }
+      class Class2 {}
+      action blah() {
+        o1 = create(Class1)
+        o2 = create(Class2)
+        o1.rel += o2
+      }
+      invariant forall(Class1 o: not isempty(o.rel))
+    ADSL
   end
 
   def test__create_ref_clique
-    adsl_assert :correct, <<-adsl
+    adsl_assert :correct, <<-ADSL
       class Class{ 0+ Class rel }
       action blah() {
         allof(Class).rel += allof(Class)
       }
       invariant forall(Class v: v.rel == allof(Class))
-    adsl
-
-    conjecture = <<-SPASS
-      forall( [o1, o2], implies(
-        and(exists_finally(o1), exists_finally(o2), is_object(o1), is_object(o2)),
-        exists( [r], and(left_link_Class_rel(r, o1), right_link_Class_rel(r, o2)))
-      ))
-    SPASS
-    adsl_assert(:correct, <<-adsl, :conjecture => conjecture)
-      class Class{ 0+ Class rel }
-      action blah() {
-        allof(Class).rel += allof(Class)
-      }
-      invariant forall(Class v: v.rel == allof(Class))
-    adsl
+    ADSL
     
-    adsl_assert :incorrect, <<-ADSL
+    adsl_assert :correct, <<-ADSL
       class Class{ 0+ Class rel }
       action blah() {
-        allof(Class).rel += allof(Class)
+        allof(Class).rel -= allof(Class)
       }
       invariant !forall(Class v: v.rel == allof(Class))
     ADSL
@@ -604,37 +609,22 @@ class BasicTranslationTest < Test::Unit::TestCase
   end
 
   def test_ref_cardinality__at_least_one
-    conjecture = <<-SPASS
-      forall( [o], implies(
-        and(of_Class_type(o), init_state(o)),
-        exists([r], and(init_state(r), left_link_Class_rel(r, o)))
-      ))
-    SPASS
-    adsl_assert :correct, <<-ADSL, :conjecture => conjecture
+    adsl_assert :correct, <<-ADSL, :conjecture => false
       class Class { 1+ Class rel }
-      action blah() {}
-    ADSL
-    adsl_assert :incorrect, <<-ADSL, :conjecture => "not(#{conjecture})"
-      class Class { 1+ Class rel }
-      action blah() {}
+      action blah() {
+        create(Class)
+      }
     ADSL
   end
 
   def test_ref_cardinality__at_most_one
-    # two different tuples exist for the same object
-    conjecture = <<-SPASS
-      exists( [o, r1, r2], and(
-        init_state(o), init_state(r1), init_state(r2),
-        of_Class_type(o), left_link_Class_rel(r1, o), left_link_Class_rel(r2, o), not(equal(r1, r2))
-      ))
-    SPASS
-    adsl_assert :correct, <<-ADSL, :conjecture => "not(#{conjecture})"
+    adsl_assert :correct, <<-ADSL, :conjecture => false
       class Class { 0..1 Class rel }
-      action blah() {}
-    ADSL
-    adsl_assert :incorrect, <<-ADSL, :conjecture => conjecture
-      class Class { 0..1 Class rel }
-      action blah() {}
+      action blah() {
+        o = oneof(allof(Class))
+	o.rel += create(Class)
+	o.rel += create(Class)
+      }
     ADSL
   end
 

@@ -41,31 +41,48 @@ class ADSL::Translation::DSTranslatorTest < Test::Unit::TestCase
     end
   end
 
-  def test_translation__reserve_names
+  def test_translation__reserve
     t = ADSL::Translation::DSTranslator.new
-    t.reserve_names :o do |o|
-      assert_equal :o, o
+    sort1 = t.create_sort :sort1
+    sort2 = t.create_sort :sort2
+    t.reserve sort1, :o do |o|
+      assert_equal "o", o.to_s
+      assert_equal sort1, o.to_sort
     end
-    t.reserve_names do |*a|
+    t.reserve do |*a|
       assert_equal 0, a.length
     end
-    t.reserve_names [:a, :b, :c] do |*a|
+    t.reserve [sort1, :a, sort2, :b, sort1, :c] do |*a|
       assert_equal 1, a.length
       assert_equal 3, a[0].length
+      assert_equal "a", a[0][0].to_s
+      assert_equal "b", a[0][1].to_s
+      assert_equal "c", a[0][2].to_s
+      assert_equal sort1, a[0][0].to_sort
+      assert_equal sort2, a[0][1].to_sort
+      assert_equal sort1, a[0][2].to_sort
     end
-    t.reserve_names :o do |o1|
-      t.reserve_names :o, :a do |o2, a|
-        assert_equal :o, o1
-        assert_equal :o_2, o2
-        assert_equal :a, a
+    t.reserve sort1, :o do |o1|
+      t.reserve sort2, :o, sort1, :a do |o2, a|
+        assert_equal "o", o1.to_s
+        assert_equal "o_2", o2.to_s
+        assert_equal "a", a.to_s
+	assert_equal sort1, o1.to_sort
+	assert_equal sort2, o2.to_sort
+	assert_equal sort1, a.to_sort
       end
-      t.reserve_names [:o, :o], :o do |os, o4|
+      t.reserve [sort1, :o, sort2, :o], sort2, :o do |os, o4|
+        assert_equal 2, os.length
         o2 = os[0]
         o3 = os[1]
-        assert_equal :o, o1
-        assert_equal :o_2, o2
-        assert_equal :o_3, o3
-        assert_equal :o_4, o4
+        assert_equal "o", o1.to_s
+	assert_equal "o_2", o2.to_s
+	assert_equal "o_3", o3.to_s
+	assert_equal "o_4", o4.to_s
+	assert_equal sort1, o1.to_sort
+	assert_equal sort1, o2.to_sort
+	assert_equal sort2, o3.to_sort
+	assert_equal sort2, o4.to_sort
       end
     end
   end

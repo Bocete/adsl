@@ -10,13 +10,16 @@ module ADSL
       attr_accessor :context
       attr_accessor :initial_state, :state, :final_state
       attr_reader :root_context
-      attr_reader :create_obj_stmts, :delete_obj_stmts, :all_contexts, :classes
+      attr_reader :create_obj_stmts, :all_contexts, :classes
       attr_reader :conjectures
 
       include FOL
 
       def initialize
         @classes = []
+        # the pool of symbol names that are used
+        @registered_names = []
+        # the pool of variable names that are used
         @temp_vars = []
         @functions = []
         @predicates = []
@@ -29,15 +32,13 @@ module ADSL
         @context = @root_context
         
         @initial_state = create_state :init_state
-        @either_resolution = create_sort :EitherResolution
-        # {class => [[before_stmt, context], [after_stmt, context]]}
+        # klass => Set[ [stmt] ]
         @create_obj_stmts = Hash.new{ |hash, klass| hash[klass] = [] }
-        @delete_obj_stmts = Hash.new{ |hash, klass| hash[klass] = [] }
         @state = @initial_state
       end
 
       def create_sort name
-        sort = Sort.new *_reserve_names(name)
+        sort = Sort.new *register_names(name)
         @sorts << sort
         sort
       end
@@ -102,10 +103,8 @@ module ADSL
           if name.is_a? Array
             result << _create_vars(sorts, name)
           elsif name.is_a?(String) || name.is_a?(Symbol) || name.is_a?(TypedString)
-            name = name.to_s if name.is_a? TypedString
-            while @temp_vars.include? name
-              name = name.to_s.increment_suffix.to_sym
-            end
+            name = name.to_s
+            name = name.increment_suffix while @registered_names.include?(name) or @temp_vars.include?(name)
             @temp_vars.push name
             var = TypedString.new sorts.shift, name 
             result << var
@@ -129,7 +128,7 @@ module ADSL
       end
 
       def create_sort(name)
-        sort = Sort.new get_pred_name(name)
+        sort = Sort.new register_name(name)
         @sorts << sort
         sort
       end
@@ -139,65 +138,50 @@ module ADSL
       end
 
       def create_function(ret_sort, name, *sorts)
-        function = Function.new ret_sort, get_pred_name(name.to_s), *sorts
+        function = Function.new ret_sort, register_name(name), *sorts
         @functions << function
         function
       end
 
       def create_predicate(name, *sorts)
-        pred = Predicate.new get_pred_name(name.to_s), sorts
+        pred = Predicate.new register_name(name), sorts
         @predicates << pred
         pred
       end
-      
-      def get_pred_name common_name
-        registered_names = (@functions + @predicates + @sorts).map &:name
-        prefix = common_name
-        prefix = common_name.scan(/^(.+)_\d+$/).first.first if prefix =~ /^.+_\d+$/
-        regexp = /^#{ Regexp.escape prefix }(?:_(\d+))?$/
 
-        already_registered = registered_names.select{ |a| a =~ regexp }
-        return common_name if already_registered.empty?
-        
-        rhs_numbers = already_registered.map{ |a| [a, a.scan(regexp).first.first] }
-        
-        rhs_numbers.each do |a|
-          a[1] = a[1].nil? ? -1 : a[1].to_i
-        end
-
-        max_name = rhs_numbers.max_by{ |a| a[1] }
-        return max_name[0].increment_suffix
+      def register_name(name)
+        name = name.to_s
+        name = name.increment_suffix while @registered_names.include? name
+        @registered_names << name
+        name
       end
+      
+      def to_fol
+        additional_axioms = []
 
-      def _reserve_names(*names)
-        result = []
-        names.each do |name|
-          if name.is_a? Array
-            result << _reserve_names(*name)
-          else
-            while @temp_vars.include? name
-              name = name.to_s.increment_suffix.to_sym
-            end
-            @temp_vars.push name
-            result << name
+        @create_obj_stmts.each do |klass, stmts|
+          reserve stmts.map{ |s| s.context.make_ps } do |pss|
+            statement_ps_pairs = stmts.zip pss
+            additional_axioms << ADSL::FOL::ForAll.new(pss, ADSL::FOL::And.new(
+              statement_ps_pairs.map{ |stmt, ps| ADSL::FOL::Not.new @initial_state[stmt.context_creation_link[ps]] },
+	      statement_ps_pairs.each_index.map do |i|
+	        others = statement_ps_pairs[i+1..-1]
+		others.map{ |other, other_ps|
+		  ADSL::FOL::Not.new(ADSL::FOL::Equal.new(
+		    statement_ps_pairs[i][0].context_creation_link[statement_ps_pairs[i][1]],
+		    other.context_creation_link[other_ps]
+		  ))
+		}
+	      end
+	    ))
           end
         end
-        result
-      end
 
-      def reserve_names(*names)
-        result = _reserve_names(*names)
-        yield *result
-      ensure
-        @temp_vars.pop names.flatten.length
-      end
-    
-      def to_fol
         return ADSL::FOL::Theorem.new(
           :sorts => @sorts,
           :predicates => @predicates,
           :functions => @functions,
-          :axioms => @formulae.flatten,
+          :axioms => @formulae.flatten + additional_axioms,
           :conjecture => And[@conjectures].optimize
         )
       end
