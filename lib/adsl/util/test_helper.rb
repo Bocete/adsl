@@ -24,7 +24,7 @@ class Test::Unit::TestCase
       engine = ADSL::Prover::Engine.new prover, fol, :timeout => options[:timeout]
       
       result = engine.run[:result]
-      if result == :inconclusive || result == :timeout
+      if result == :unknown || result == :timeout
         puts "inconclusive result on testcase #{self.class.name}.#{method_name}"
       else
         puts fol.to_spass_string if expected_result != result

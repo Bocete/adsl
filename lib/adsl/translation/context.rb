@@ -34,8 +34,9 @@ module ADSL
           # ps includes the context object of this context
           translation.reserve make_ps do |ps|
             translation.create_formula FOL::ForAll.new(ps, FOL::Implies.new(
-              @type_pred[ps], @parent.type_pred(ps[0..-2])
-            )).optimize
+              @type_pred[ps],
+              @parent.type_pred(ps[0..-2])
+            ))
           end
           translation.create_formula ADSL::Translation::Util.gen_formula_for_unique_arg(@type_pred, 0..@level-2)
         end

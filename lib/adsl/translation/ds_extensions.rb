@@ -216,7 +216,7 @@ module ADSL
         if @inverse_of.nil?
           name = "Assoc#{@from_class.name}#{@name.camelize}"
           @sort = translation.create_sort "#{name}Sort"
-	  @type_pred = translation.create_predicate name, @sort
+      @type_pred = translation.create_predicate name, @sort
           @left_link = translation.create_function @from_class.to_sort, "#{name}_left", @sort
           @right_link = translation.create_function  @to_class.to_sort, "#{name}_right", @sort
           translation.create_formula ForAll[@sort, :t, And[
@@ -268,12 +268,12 @@ module ADSL
         prev_state = translation.state
         translation.reserve @context.make_ps do |ps|
           
-	  translation.reserve @klass.to_sort, :o do |o|
+      translation.reserve @klass.to_sort, :o do |o|
             translation.create_formula ForAll.new(ps, Implies.new(
               @context.type_pred(ps),
               And[
                 Not.new(prev_state[ps, @context_creation_link[ps]]),
-		@klass.precise_type_pred[@context_creation_link[ps]],
+        @klass.precise_type_pred[@context_creation_link[ps]],
                 ForAll[o, Equiv.new(Or.new(prev_state[ps, o], Equal[o, @context_creation_link[ps]]), post_state[ps, o])]
               ]
             ))
@@ -287,30 +287,30 @@ module ADSL
             And.new(
               relevant_from_relations.map do |rel|
                 translation.reserve rel, :r do |r|
-		  ForAll.new(r, Equiv.new(
-		    post_state[ps, r],
+          ForAll.new(r, Equiv.new(
+            post_state[ps, r],
                     And.new(
-		      prev_state[ps, r],
-		      Not.new(Equal.new(
-		        rel.left_link[r],
-			@context_creation_link[ps]
-		      ))
-		    )
-		  ))
+              prev_state[ps, r],
+              Not.new(Equal.new(
+                rel.left_link[r],
+            @context_creation_link[ps]
+              ))
+            )
+          ))
                 end
               end,
               relevant_to_relations.map do |rel|
                 translation.reserve rel, :r do |r|
-		  ForAll.new(r, Equiv.new(
-		    post_state[ps, r],
+          ForAll.new(r, Equiv.new(
+            post_state[ps, r],
                     And.new(
-		      prev_state[ps, r],
-		      Not.new(Equal.new(
-		        rel.right_link[r],
-			@context_creation_link[ps]
-		      ))
-		    )
-		  ))
+              prev_state[ps, r],
+              Not.new(Equal.new(
+                rel.right_link[r],
+            @context_creation_link[ps]
+              ))
+            )
+          ))
                 end
               end,
             )
@@ -337,28 +337,30 @@ module ADSL
       attr_accessor :context_deletion_link
 
       def prepare(translation)
+        return if @objset.type_sig.unknown_sig?
+
         @objset.prepare_expr translation
       end
 
       def migrate_state(translation)
         return if @objset.type_sig.unknown_sig?
-        state = translation.create_state "post_delete_#{@objset.type_sig.underscore}"
+
+        pre_state = translation.state
+        post_state = translation.create_state "post_delete_#{@objset.type_sig.underscore}"
         sort = @objset.type_sig.to_sort
-        prev_state = translation.state
         context = translation.context
         
         translation.reserve context.make_ps, sort, :o do |ps, o|
           translation.create_formula ForAll.new(ps, o,
-            IfThenElseEq.new(
-	      And.new(@objset.resolve_expr(translation, ps, o), prev_state[ps, o]),
-              And.new(prev_state[ps, o], Not.new(state[ps, o])),
-              Equiv.new(prev_state[ps, o], state[ps, o])
+            Equiv.new(
+              post_state[ps, o],
+              And.new(pre_state[ps, o], Not.new(@objset.resolve_expr(translation, ps, o)))
             )
           )
         end
 
-        state.link_to_previous_state prev_state
-        translation.state = state
+        post_state.link_to_previous_state pre_state
+        translation.state = post_state
       end
     end
 
@@ -378,27 +380,27 @@ module ADSL
         context = translation.context
 
         translation.reserve context.make_ps, @relation.to_sort, :r, @objset1.type_sig, :o1, @objset2.type_sig, :o2 do |ps, r, o1, o2|
-	  links_match = And.new(
+      links_match = And.new(
             @objset1.resolve_expr(translation, ps, @relation.left_link[r]),
             @objset2.resolve_expr(translation, ps, @relation.right_link[r])
-	  )
+      )
           translation.create_formula FOL::ForAll.new(ps, r, FOL::Equiv.new(
-	    state[ps, r],
-	    Or.new(
-	      prev_state[ps, r],
-	      links_match
-	    )
+        state[ps, r],
+        Or.new(
+          prev_state[ps, r],
+          links_match
+        )
           ))
-	  translation.create_formula FOL::ForAll.new(ps, o1, o2, FOL::Implies.new(
-	    And.new(
-	      prev_state[ps, o1], 
-	      prev_state[ps, o2]
-	    ),
-	    FOL::Exists.new(r, And.new(
-	      state[ps, r],
-	      links_match
-	    ))
-	  ))
+      translation.create_formula FOL::ForAll.new(ps, o1, o2, FOL::Implies.new(
+        And.new(
+          prev_state[ps, o1], 
+          prev_state[ps, o2]
+        ),
+        FOL::Exists.new(r, And.new(
+          state[ps, r],
+          links_match
+        ))
+      ))
         end
         state.link_to_previous_state prev_state
         translation.state = state
@@ -458,12 +460,12 @@ module ADSL
         prev_state = translation.state
         context = translation.context
         
-	translation.reserve context.make_ps do |ps|
+    translation.reserve context.make_ps do |ps|
           translation.create_formula FOL::ForAll.new(ps, FOL::Implies.new(
-	    context.type_pred(ps),
+        context.type_pred(ps),
             FOL::OneOf.new(@is_trues.map{ |pred| pred[ps] })
           ))
-	end
+    end
 
         pre_states = []
         post_states = []
@@ -501,8 +503,8 @@ module ADSL
       def prepare_expr(translation); end
 
       def resolve_expr(translation, ps, o)
-        Or.new(@either.blocks.each_index.map do |i|
-          And.new(
+        FOL::Or.new(@either.blocks.each_index.map do |i|
+          FOL::And.new(
             @either.is_trues[i][ps],
             @exprs[i].resolve_expr(translation, ps, o)
           )
@@ -557,7 +559,7 @@ module ADSL
                 translation.reserve sort, :o do |o|
                   [
                     FOL::ForAll.new(o, FOL::Equiv.new(prev_state[ps, o], pre_states[1][ps, o])),
-                    FOL::ForAll.new(o, FOL::Equiv.new(post_state[ps, o], post_states[0][ps, o]))
+                    FOL::ForAll.new(o, FOL::Equiv.new(post_state[ps, o], post_states[1][ps, o]))
                   ]
                 end
               end
@@ -593,6 +595,8 @@ module ADSL
       attr_reader :context, :pre_iteration_state, :post_iteration_state, :pre_state, :post_state
 
       def prepare_with_context(translation, flat_context)
+        return if @objset.type_sig.card_none?
+
         @context = translation.create_context "for_each_context", flat_context, translation.context, @objset.type_sig.to_sort
         @objset.prepare_expr translation
         translation.context = @context
@@ -606,7 +610,7 @@ module ADSL
         @pre_state = translation.state
         @post_state = translation.create_state :post_for_each
         
-        translation.reserve @context.parent.make_ps, @objset.type_sig.to_sort, :o do |ps, o|
+        translation.reserve @context.parent.make_ps, @objset.type_sig, :o do |ps, o|
           translation.create_formula ForAll.new(ps, o, Equiv.new(
             And.new(@objset.resolve_expr(translation, ps, o), @pre_state[ps, o]),
             @context.type_pred(ps, o)
@@ -623,6 +627,8 @@ module ADSL
         create_iteration_formulae translation
 
         translation.context = @context.parent
+
+        post_state.link_to_previous_state @pre_state
         translation.state = post_state
       end
     end
@@ -662,7 +668,7 @@ module ADSL
 
       def create_iteration_formulae(translation)
         context = translation.context
-        affected_sorts = @post_state.sort_difference @pre_state
+        affected_sorts = @post_iteration_state.sort_difference @pre_iteration_state
         translation.reserve context.make_ps, context.sort_array.last, :prev do |ps, prev|
           ps_without_last = ps[0..-2]
           translation.create_formula ForAll.new(ps_without_last,
@@ -694,7 +700,7 @@ module ADSL
                   ),
                   Implies.new(
                     And.new(@context.type_pred(ps), Not[Exists[prev, context.just_before[ps_without_last, ps.last, prev]]]),
-		    translation.states_equivalent_formula(affected_sorts, ps, @post_iteration_state, ps_without_last, @post_state)
+            translation.states_equivalent_formula(affected_sorts, ps, @post_iteration_state, ps_without_last, @post_state)
                   )
                 ))
               )
@@ -711,20 +717,20 @@ module ADSL
 
       def create_iteration_formulae(translation)
         context = translation.context
-        affected_sorts = @post_state.sort_difference @pre_state
+        affected_sorts = @post_iteration_state.sort_difference @pre_iteration_state
         translation.reserve context.make_ps do |ps|
           ps_without_last = ps[0..-2]
           translation.create_formula ForAll.new(ps, Implies.new(
             @context.type_pred(ps),
-	    translation.states_equivalent_formula(affected_sorts, ps_without_last, @pre_state, ps, @pre_iteration_state)
+            translation.states_equivalent_formula(affected_sorts, ps_without_last, @pre_state, ps, @pre_iteration_state)
           ))
           translation.create_formula ForAll.new(ps_without_last, IfThenElse.new(
             Not.new(Exists.new(ps.last, @context.type_pred(ps))),
             translation.states_equivalent_formula(affected_sorts, ps_without_last, @pre_state, ps_without_last, @post_state),
             Implies.new(
               @context.parent.type_pred(ps_without_last),
-	      And.new(affected_sorts.map do |sort|
-	        translation.reserve sort, :o do |o|
+              And.new(affected_sorts.map do |sort|
+                translation.reserve sort, :o do |o|
                   ForAll.new(o, Equiv.new(
                     @post_state[ps_without_last, o],
                     Or.new(
@@ -737,12 +743,15 @@ module ADSL
                       ),
                       And.new(
                         Not.new(@pre_state[ps_without_last, o]),
-                        Exists.new(ps.last, @post_iteration_state[ps, o])
+                        Exists.new(ps.last, And.new(
+                          @context.type_pred(ps),
+                          @post_iteration_state[ps, o]
+                        ))
                       )
                     )
                   ))
-		end
-	      end)
+                end
+              end)
             )
           ))
         end
@@ -776,6 +785,7 @@ module ADSL
             translation.create_formula FOL::ForAll.new(ps, o, FOL::Equiv.new(
               var.resolve_expr(translation, ps, o),
               FOL::And.new(
+                context.type_pred(ps),
                 translation.state[ps, o],
                 @expr.resolve_expr(translation, ps, o)
               )
@@ -1104,9 +1114,9 @@ module ADSL
         translation.reserve @objset1.type_sig, :o do |o|
           return FOL::ForAll.new(o, FOL::Implies.new(
             FOL::And.new(
-	      translation.state[ps, o],
-	      @objset1.type_sig[:o]
-	    ),
+              translation.state[ps, o],
+              @objset1.type_sig[:o]
+            ),
             FOL::Implies.new(
               @objset1.resolve_expr(translation, ps, o),
               @objset2.resolve_expr(translation, ps, o)
@@ -1126,9 +1136,9 @@ module ADSL
         translation.reserve @objset.type_sig, :o do |o|
           return FOL::ForAll.new(o, FOL::Implies.new(
             FOL::And.new(
-	      translation.state[ps, o],
-	      @objset.type_sig[o]
-	    ),
+              translation.state[ps, o],
+              @objset.type_sig[o]
+            ),
             FOL::Not.new(@objset.resolve_expr(translation, ps, o))
           ))
         end

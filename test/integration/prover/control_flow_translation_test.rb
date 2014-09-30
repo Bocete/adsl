@@ -397,10 +397,9 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
 
   def test_for_each__no_iterations
     adsl_assert :correct, <<-ADSL
-      class Class1{}
-      class Class2{}
+      class Class1 {}
+      class Class2 {}
       action blah() {
-        create(Class1)
         delete allof(Class2)
         foreach i: allof(Class2) {
           delete allof(Class1)
