@@ -7,84 +7,40 @@ module ADSL
   module DS
     module TypeSig
 
-      def self.join(*args) # *type_sigs, raise_on_incorrect = true)
-        args = args.flatten
-        raise_on_incorrect = args.last.is_a?(TrueClass) || args.last.is_a?(FalseClass) ? args.pop : true
-        injected = args.inject do |memo, sig|
-          memo.nil? ? nil : memo.join(sig, raise_on_incorrect)
-        end
-        injected
-      end
-
-      class IncompatibleTypesException < StandardError
-        def initialize(*type_sigs)
-          super(type_sigs.last.is_a?(String) ?
-            type_sigs.pop :
-            "Incompatible types: #{type_sigs.map(&:to_s).join(', ')}"
-          )
-        end
-      end
-      
-      module HasCardinality
-        def cardinality
-          @cardinality
-        end
-
-        def card_none?
-          @cardinality == ObjsetCardinality::ZERO
-        end
-        
-        def card_one?
-          @cardinality == ObjsetCardinality::ZERO
-        end
-      end
-
       class Common
         include ADSL::Util::PartialOrdered
 
-        def initialize
-          raise "This serves to wrap a module, not to be initialized"
-        end
-
-        def unknown_sig?
-          false
+        self.singleton_class.send :define_method, :set_typesig_flags do |*types|
+          [:unknown, :objset, :ambiguous_objset, :basic, :bool, :invalid].each do |m|
+            self.send :define_method, "is_#{m}_type?" do
+              types.include? m
+            end
+          end
         end
       end
 
       class UnknownType < Common
-        include HasCardinality
-
-        def initialize(card = nil)
-          @cardinality = card
-        end
+        set_typesig_flags :unknown
   
-        def join(other, raise_on_incorrect=true)
+        def &(other)
           other
         end
       
-        def unknown_sig?
-          true
-        end
-  
         def to_s
           "UnknownType"
         end
   
         def compare(other)
-          other.unknown_sig? ? 0 : -1
+          other.class == UnknownType ? 0 : 1
         end
       end
       UNKNOWN = ADSL::DS::TypeSig::UnknownType.new
 
       class InvalidType < Common
-        def initialize; end
+        set_typesig_flags :invalid
 
-        def join(other, raise_on_incorrect=true)
+        def &(other)
           self
-        end
-
-        def invalid_sig?
-          true
         end
 
         def to_s
@@ -92,65 +48,35 @@ module ADSL
         end
 
         def compare(other)
-          other.invalid_sig? ? 0 : 1
+          other.is_invalid_type? ? 0 : -1
         end
       end
       INVALID = ADSL::DS::TypeSig::InvalidType.new
 
-      class RandomType < Common
-        attr_accessor :seed
-
-        def initialize
-          @@seed ||= 0
-          @seed = @@seed += 1
-        end
-
-        def ==(other)
-          return other.is_a?(RandomType) && other.seed == @seed
-        end
-        alias_method :eql?, :==
-
-        def hash
-          @seed.hash
-        end
-
-        def join(other, raise_on_incorrect=true)
-          return self if other.unknown_sig?
-          unless self == other
-            raise IncompatibleTypesException.new(self, other) if raise_on_incorrect
-            return nil
-          end
-          self
-        end
-
-        def to_s
-          "RandomType##{@seed}"
-        end
-      end
-
-      def self.random
-        RandomType.new
-      end
-  
       class BasicType < Common
-        attr_reader :type
+        attr_reader :type, :subtypes
+        set_typesig_flags :basic
   
-        def initialize(type)
-          raise "Unknown basic type: #{type}" unless [:int, :string, :real, :decimal, :bool].include? type
+        def initialize(type, *subtypes)
           @type = type
+          @subtypes = subtypes
         end
   
         def to_s
           @type.to_s.camelize
         end
   
-        def join(other, raise_on_incorrect=true)
-          return self if other.unknown_sig?
-          unless self == other
-            raise IncompatibleTypesException.new(self, other) if raise_on_incorrect
-            return nil
-          end
-          self
+        def &(other)
+          return self if other.is_unknown_type?
+          return TypeSig::INVALID unless other.is_basic_type?
+          return self if self == other
+          return self if self > other
+          return other if other > self
+          return TypeSig::INVALID
+        end
+
+        def is_bool_type?
+          @type == :bool
         end
         
         def ==(other)
@@ -163,8 +89,23 @@ module ADSL
         end
 
         def compare(other)
-          return 1 if other.unknown_sig?
-          self == other ? 0 : nil
+          return 1 if other.is_unknown_type?
+          return nil unless other.is_basic_type?
+          return 0 if self == other
+          return 1 if self.subtypes.include? other
+          return -1 if other.subtypes.include? self
+          return nil
+        end
+
+        BOOL = BasicType.new :bool
+        STRING = BasicType.new :string
+        INT = BasicType.new :int
+        DECIMAL = BasicType.new :decimal, BasicType::INT
+        REAL = BasicType.new :real, BasicType::INT, BasicType::DECIMAL
+
+        def self.for_sym(sym)
+          return nil unless [:bool, :string, :int, :decimal, :real].include? sym
+          BasicType.const_get sym.to_s.upcase
         end
       end
 
@@ -190,6 +131,10 @@ module ADSL
           ObjsetCardinality.new([@min + other.min, 2].min, [@max + other.max, 2].min)
         end
 
+        def *(other)
+          ObjsetCardinality.new([@min * other.min, 2].min, [@max * other.max, 2].min)
+        end
+
         def validate
           raise "Invalid cardinality: #{self}" unless @min <= @max
         end
@@ -210,33 +155,98 @@ module ADSL
         end
 
         def self.numberize(value)
-          return 2 if value == :many
+          return 2 if value == :many || value == Float::INFINITY
           value
+        end
+
+        def empty?
+          @min == 0 and @max == 0
+        end
+
+        def singleton?
+          @min == 1 and @max == 1
+        end
+
+        def to_many?
+          @max == 2
+        end
+
+        def to_one?
+          @max == 1
+        end
+
+        def at_least_one?
+          @min >= 1
         end
 
         ZERO      = ObjsetCardinality.new(0)
         ONE       = ObjsetCardinality.new(1)
+        ZERO_ONE  = ObjsetCardinality.new(0, 1)
         ZERO_MANY = ObjsetCardinality.new(0, :many)
         ONE_MANY  = ObjsetCardinality.new(1, :many)
       end
 
+      class AmbiguousObjsetType < Common
+        attr_reader :cardinality
+        set_typesig_flags :objset, :ambiguous_objset
+
+        def initialize(cardinality = ObjsetCardinality::ZERO_MANY)
+          @cardinality = cardinality
+        end
+
+        def compare(other)
+          return -1 if other.is_unknown_type?
+          return 0 if other.is_ambiguous_objset_type?
+          return 1 if other.is_objset_type?
+          return nil
+        end
+
+        def |(other)
+          return other if other.is_unknown_type?
+          return TypeSig::INVALID unless other.is_objset_type?
+          return self
+        end
+
+        def &(other)
+          return self if other.is_unknown_type?
+          return TypeSig::INVALID unless other.is_objset_type?
+          return other
+        end
+        
+        def eql?(other)
+          other.is_ambiguous_objset_type?
+        end
+        alias_method :==, :eql?
+
+        def to_s
+          "[AmbiguousObjset]"
+        end
+      end
+
       class ObjsetType < Common
-        attr_reader :classes
-        include HasCardinality
+        attr_reader :classes, :cardinality
+        set_typesig_flags :objset
   
         # optional cardinality first, followed by classes
         def initialize(*args)
           if args.first.is_a? ObjsetCardinality
             @cardinality = args.shift
-          elsif args.first.is_a? Fixnum or args.first.is_a? Symbol
+          elsif args.first.is_a? Numeric or args.first.is_a? Symbol
             min = args.shift
-            max = (args.first.is_a?(Fixnum) || args.first.is_a?(Symbol)) ? args.shift : :same
-            @cardinality = ObjsetCardinality.new min, max
+            if args.first.is_a? Numeric or args.first.is_a? Symbol
+              @cardinality = ObjsetCardinality.new min, args.shift
+            else
+              @cardinality = ObjsetCardinality.new min
+            end
           else
             @cardinality = ObjsetCardinality::ZERO_MANY
           end
           @classes = Set[*args.flatten].flatten
           canonize!
+        end
+
+        def with_cardinality(*args)
+          ObjsetType.new *args, *(@classes.dup)
         end
         
         def canonize!
@@ -247,74 +257,77 @@ module ADSL
         end
   
         def compare(other)
-          return 1 if other.unknown_sig?
-          return nil unless other.is_a? ObjsetType
+          return -1 if other.is_unknown_type? || other.is_ambiguous_objset_type?
+          return nil unless other.is_objset_type?
 
           my_full_tree    = self.classes.map{ |k| k.all_parents true }.inject(&:+)
           other_full_tree = other.classes.map{ |k| k.all_parents true }.inject(&:+)
           return 0  if my_full_tree == other_full_tree
           return -1 if my_full_tree.superset? other_full_tree
           return 1  if my_full_tree.subset?   other_full_tree
-          return nil
+          nil
         end
 
-        def union(other)
-          return self
+        def |(other)
+          return self if other.is_unknown_type?
+          return TypeSig::INVALID unless other.is_objset_type?
+          return other if other.is_ambiguous_objset_type?
           
-          unless other.is_a? ObjsetType
-            raise IncompatibleTypesException(self, other)
-          end
-          
-          new_sig = ObjsetType.new(self.cardinality | other.cardinality, self.all_parents(true) | other.all_parents(true))
-          if new_sig.invalid_sig?
-            raise IncompatibleTypesException(self, other) if raise_on_incorrect
-          end
-
-          new_sig
+          ObjsetType.new(self.cardinality | other.cardinality, self.all_parents(true) | other.all_parents(true))
         end
   
-        def join(other, raise_on_incorrect=true)
-          return self if other.unknown_sig?
-          
-          unless other.is_a? ObjsetType
-            raise IncompatibleTypesException(self, other) if raise_on_incorrect
-            return nil
-          end
-          
-          new_sig = ObjsetType.new(self.cardinality & other.cardinality, self.all_parents(true) & other.all_parents(true))
-          if new_sig.invalid_sig?
-            raise IncompatibleTypesException(self, other) if raise_on_incorrect
-            return nil
-          end
+        def &(other)
+          return self if other.is_unknown_type?
+          return TypeSig::INVALID unless other.is_objset_type?
+          return self if other.is_ambiguous_objset_type?
 
-          new_sig
+          a = ObjsetType.new(self.cardinality | other.cardinality, self.all_parents(true) & other.all_parents(true))
+          return TypeSig::INVALID if a.classes.empty?
+          a
         end
   
         def all_parents(include_self = false)
-          @classes.map{ |c| c.all_parents include_self }.inject(&:+)
+          @classes.map{ |c| c.all_parents include_self }.inject(&:+) || Set[]
         end
         
         def all_children(include_self = false)
-          @classes.map{ |c| c.all_children include_self }.inject(&:+)
-        end
-  
-        def invalid_sig?
-          @classes.empty?
+          @classes.map{ |c| c.all_children include_self }.inject(&:+) || Set[]
         end
 
         def underscore
           @classes.map(&:to_s).join '_'
         end
 
+        def eql?(other)
+          return false unless other.is_a?(ObjsetType)
+          @classes == other.classes
+        end
+        alias_method :==, :eql?
+
         def to_s
-          @classes.map(&:to_s).join ', '
+          "[#{ @classes.map(&:to_s).join ', ' }]"
         end
-  
-        def ==(other)
-          compare(other) == 0 && cardinality == other.cardinality
-        end
-        alias_method :eql?, :==
       end
+      
+      def self.join(*args) # *type_sigs, raise_on_incorrect = true)
+        args = args.flatten
+        raise_on_incorrect = (true == args.last || false == args.last) ? args.pop : true
+        injected = args.inject &:&
+        if injected.is_invalid_type? && raise_on_incorrect
+          raise OncompatibleTypesException.new *args
+        end
+        injected
+      end
+
+      class IncompatibleTypesException < StandardError
+        def initialize(*type_sigs)
+          super(type_sigs.last.is_a?(String) ?
+            type_sigs.pop :
+            "Incompatible types: #{type_sigs.map(&:to_s).join(', ')}"
+          )
+        end
+      end
+      
     end
   end
 end

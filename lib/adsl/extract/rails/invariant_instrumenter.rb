@@ -1,5 +1,5 @@
 require 'adsl/extract/instrumenter'
-require 'adsl/verification/formula_generators'
+require 'adsl/extract/formula_generators'
 require 'adsl/extract/rails/active_record_metaclass_generator'
 
 module ADSL

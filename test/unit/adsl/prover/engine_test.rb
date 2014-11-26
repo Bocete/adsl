@@ -1,9 +1,11 @@
 require 'adsl/prover/engine'
 require 'adsl/fol/first_order_logic'
 require 'adsl/util/test_helper'
-require 'test/unit'
+require 'minitest/unit'
 
-class ADSL::Prover::EngineTest < Test::Unit::TestCase
+require 'minitest/autorun'
+
+class ADSL::Prover::EngineTest < MiniTest::Unit::TestCase
   include ADSL::FOL
   include ADSL::Prover
 

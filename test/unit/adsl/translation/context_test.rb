@@ -3,10 +3,12 @@ require 'adsl/translation/typed_string'
 require 'adsl/translation/ds_extensions'
 require 'adsl/ds/data_store_spec'
 require 'adsl/fol/first_order_logic'
-require 'test/unit'
+require 'minitest/unit'
+
+require 'minitest/autorun'
 require 'pp'
 
-class ADSL::Translation::ContextTest < Test::Unit::TestCase
+class ADSL::Translation::ContextTest < MiniTest::Unit::TestCase
 
   include ADSL::FOL
 

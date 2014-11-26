@@ -1,4 +1,6 @@
-require 'test/unit'
+require 'minitest/unit'
+
+require 'minitest/autorun'
 require 'adsl/util/test_helper'
 require 'adsl/parser/ast_nodes'
 require 'adsl/extract/rails/rails_extractor'
@@ -27,13 +29,13 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert session.response.body.strip.empty?
 
     session = ActionDispatch::Integration::Session.new(Rails.application)
-    assert_raise ActionController::RoutingError do
+    assert_raises ActionController::RoutingError do
       session.get('thisdoesntexist')
     end
   end
 
   def test_setup__rails_crashes_actually_crash_tests
-    assert_raise do
+    assert_raises ActionController::RoutingError do
       session = ActionDispatch::Integration::Session.new(Rails.application)
       session.get('no_route')
     end
@@ -1244,9 +1246,9 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal ASTExprStmt,      statements[0].class
     assert_equal ASTAssignment,    statements[0].expr.class
     assert_equal 'a',              statements[0].expr.var_name.text
-    assert_equal ASTPickOneObjset, statements[0].expr.expr.class
-    assert_equal ASTAllOf,         statements[0].expr.expr.objsets[0].class
-    assert_equal ASTEmptyObjset,   statements[0].expr.expr.objsets[1].class
+    assert_equal ASTPickOneExpr,   statements[0].expr.expr.class
+    assert_equal ASTAllOf,         statements[0].expr.expr.exprs[0].class
+    assert_equal ASTEmptyObjset,   statements[0].expr.expr.exprs[1].class
 
     assert_equal ASTDeleteObj, statements[1].class
     assert_equal ASTVariable,  statements[1].objset.class
@@ -1270,9 +1272,9 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal ASTExprStmt,      statements[0].class
     assert_equal ASTAssignment,    statements[0].expr.class
     assert_equal 'a',              statements[0].expr.var_name.text
-    assert_equal ASTPickOneObjset, statements[0].expr.expr.class
-    assert_equal ASTAllOf,         statements[0].expr.expr.objsets[0].class
-    assert_equal ASTEmptyObjset,   statements[0].expr.expr.objsets[1].class
+    assert_equal ASTPickOneExpr,   statements[0].expr.expr.class
+    assert_equal ASTAllOf,         statements[0].expr.expr.exprs[0].class
+    assert_equal ASTEmptyObjset,   statements[0].expr.expr.exprs[1].class
 
     assert_equal ASTDeleteObj, statements[1].class
     assert_equal ASTVariable,  statements[1].objset.class
@@ -1296,9 +1298,9 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal ASTExprStmt,      statements[0].class
     assert_equal ASTAssignment,    statements[0].expr.class
     assert_equal 'a',              statements[0].expr.var_name.text
-    assert_equal ASTPickOneObjset, statements[0].expr.expr.class
-    assert_equal ASTEmptyObjset,   statements[0].expr.expr.objsets[0].class
-    assert_equal ASTAllOf,         statements[0].expr.expr.objsets[1].class
+    assert_equal ASTPickOneExpr,   statements[0].expr.expr.class
+    assert_equal ASTEmptyObjset,   statements[0].expr.expr.exprs[0].class
+    assert_equal ASTAllOf,         statements[0].expr.expr.exprs[1].class
 
     assert_equal ASTDeleteObj, statements[1].class
     assert_equal ASTVariable,  statements[1].objset.class

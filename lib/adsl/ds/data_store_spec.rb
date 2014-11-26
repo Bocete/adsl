@@ -53,10 +53,13 @@ module ADSL
     class DSClass < DSNode
       include ADSL::Util::PartialOrdered
 
-      container_for :name, :sort, :parents, :children, :members do
-        @members  ||= []
-        @parents  ||= []
-        @children ||= []
+      container_for :name, :sort, :parents, :children, :members
+
+      def initialize(args={})
+        args[:members]  ||= []
+        args[:parents]  ||= []
+        args[:children] ||= []
+        super args
       end
 
       def to_s
@@ -108,7 +111,7 @@ module ADSL
       container_for :cardinality, :from_class, :to_class, :name, :inverse_of
 
       def type_sig
-        @to_class.to_sig
+        @to_class.to_sig.with_cardinality(@cardinality)
       end
 
       def to_s
@@ -150,7 +153,7 @@ module ADSL
       container_for :createobj
 
       def type_sig
-        @createobj.klass.to_sig
+        @createobj.klass.to_sig.with_cardinality(1)
       end
     end
 
@@ -212,7 +215,7 @@ module ADSL
       end
 
       def type_sig
-        @for_each.objset.type_sig
+        @for_each.objset.type_sig.with_cardinality(1)
       end
     end
 
@@ -238,13 +241,17 @@ module ADSL
 
     class DSAnythingExpr < DSNode
       container_for
+
+      def type_sig
+        DSTypeSig::UNKNOWN
+      end
     end
 
     class DSAllOf < DSNode
       container_for :klass
-      
+
       def type_sig
-        @klass.to_sig
+        @klass.to_sig.with_cardinality TypeSig::ObjsetCardinality::ZERO_MANY
       end
     end
 
@@ -252,7 +259,8 @@ module ADSL
       container_for :objset
 
       def type_sig
-        @objset.type_sig
+        ts = @objset.type_sig
+        ts.with_cardinality(0, ts.cardinality.max)
       end
     end
 
@@ -268,7 +276,7 @@ module ADSL
       container_for :objsets
 
       def type_sig
-        DSTypeSig.join objsets.map(&:type_sig)
+        TypeSig.join objsets.map(&:type_sig)
       end
     end
 
@@ -276,7 +284,7 @@ module ADSL
       container_for :objset
 
       def type_sig
-        @objset.type_sig
+        @objset.type_sig.with_cardinality(1)
       end
     end
     
@@ -284,7 +292,7 @@ module ADSL
       container_for :objset
 
       def type_sig
-        @objset.type_sig
+        @objset.type_sig.with_cardinality(@objset.type_sig.cardinality.min, 1)
       end
     end
 
@@ -292,7 +300,7 @@ module ADSL
       container_for :objset, :relation
 
       def type_sig
-        @relation.to_class.to_sig
+        @relation.to_class.to_sig.with_cardinality(@relation.cardinality * @objset.type_sig.cardinality)
       end
     end
     
@@ -300,14 +308,14 @@ module ADSL
       container_for :objset, :field
 
       def type_sig
-        @relation.to_class.to_sig
+        @field.type_sig
       end
     end
 
     class DSEmptyObjset < DSNode
       container_for
 
-      SIG = ADSL::DS::TypeSig::UnknownType.new(ADSL::DS::TypeSig::ObjsetCardinality::ZERO)
+      SIG = ADSL::DS::TypeSig::AmbiguousObjsetType.new(ADSL::DS::TypeSig::ObjsetCardinality.new(0))
 
       def type_sig
         SIG
@@ -318,56 +326,93 @@ module ADSL
       container_for :name, :formula
     end
 
-    class DSBoolean < DSNode
-      container_for :bool_value
+    class DSConstant < DSNode
+      container_for :value, :type_sig
 
-      TRUE    = DSBoolean.new :bool_value => true
-      FALSE   = DSBoolean.new :bool_value => false
-      UNKNOWN = DSBoolean.new :bool_value => nil
+      TRUE      = DSConstant.new :value => true,  :type_sig => TypeSig::BasicType::BOOL
+      FALSE     = DSConstant.new :value => false, :type_sig => TypeSig::BasicType::BOOL
+      BOOL_STAR = DSConstant.new :value => nil,   :type_sig => TypeSig::BasicType::BOOL
     end
 
     class DSForAll < DSNode
       container_for :vars, :objsets, :subformula
+
+      def type_sig
+        TypeSig::BasicType::BOOL
+      end
     end
     
     class DSExists < DSNode
       container_for :vars, :objsets, :subformula
+
+      def type_sig
+        TypeSig::BasicType::BOOL
+      end
     end
 
     class DSQuantifiedVariable < DSNode
       container_for :name, :type_sig
+
+      def type_sig
+        @type_sig.with_cardinality 1
+      end
     end
 
     class DSIn < DSNode
       container_for :objset1, :objset2
+
+      def type_sig
+        TypeSig::BasicType::BOOL
+      end
     end
     
     class DSIsEmpty < DSNode
       container_for :objset
+
+      def type_sig
+        TypeSig::BasicType::BOOL
+      end
     end
 
     class DSNot < DSNode
       container_for :subformula
+
+      def type_sig
+        TypeSig::BasicType::BOOL
+      end
     end
     
     class DSAnd < DSNode
       container_for :subformulae
+
+      def type_sig
+        TypeSig::BasicType::BOOL
+      end
     end
     
     class DSOr < DSNode
       container_for :subformulae
+
+      def type_sig
+        TypeSig::BasicType::BOOL
+      end
     end
 
     class DSImplies < DSNode
       container_for :subformula1, :subformula2
-    end
-    
-    class DSEquiv < DSNode
-      container_for :subformulae
+
+      def type_sig
+        TypeSig::BasicType::BOOL
+      end
     end
     
     class DSEqual < DSNode
       container_for :exprs
+
+      def type_sig
+        TypeSig::BasicType::BOOL
+      end
     end
+
   end
 end

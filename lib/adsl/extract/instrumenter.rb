@@ -107,13 +107,18 @@ module ADSL
       end
 
       def should_instrument?(object, method_name)
-        return false if object.is_a?(Fixnum) or object.is_a?(Symbol)
+        return false if object.is_a?(Numeric) or object.is_a?(Symbol)
        
         method = object.singleton_class.instance_method method_name
-
         return false if method.source_location.nil?
+
+        source_full_path = method.source_location.first
+        unless source_full_path.start_with?("/")
+          source_full_path = File.join Dir.pwd, source_full_path
+        end
+
         return false if method.owner == Kernel
-        return false if @instrument_domain && !(method.source_location.first =~ /^#{@instrument_domain}.*$/)
+        return false if @instrument_domain && !(source_full_path =~ /^#{@instrument_domain}.*$/)
 
         (instrumentation_filters || []).each do |filter|
           return false unless filter.allow_instrumentation? object, method_name
@@ -166,7 +171,7 @@ module ADSL
       def instrument(object, method_name)
         if should_instrument? object, method_name
           begin
-            # this is complex because I want to avoid using .method on non-class objects
+            # this is overly complicated because I want to avoid using .method on non-class objects
             # because they might implement method themselves
             method = object.singleton_class.instance_method method_name
             

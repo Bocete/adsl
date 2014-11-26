@@ -33,6 +33,6 @@ Gem::Specification.new do |s|
   s.add_dependency 'backports'
   s.add_dependency 'activerecord', '~> 3.2' # used for code extraction only
   s.add_dependency 'activerecord-tableless'
-  s.add_dependency 'test-unit' # not a development dependency as there is an issue with test-unit vs minitest gem inclusion
+#  s.add_dependency 'test-unit' # not a development dependency as there is an issue with test-unit vs minitest gem inclusion
 end
 

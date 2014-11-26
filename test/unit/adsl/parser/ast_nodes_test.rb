@@ -1,26 +1,12 @@
-require 'test/unit'
+require 'minitest/unit'
+
+require 'minitest/autorun'
 require 'adsl/parser/ast_nodes'
 require 'adsl/util/test_helper'
 require 'set'
 
-class ADSL::Parser::AstNodesTest < Test::Unit::TestCase
+class ADSL::Parser::AstNodesTest < MiniTest::Unit::TestCase
   include ADSL::Parser
-
-  def test__statements_are_statements
-    all_nodes = ADSL::Parser.constants.map{ |c| ADSL::Parser.const_get c }.select{ |c| c < ADSL::Parser::ASTNode }
-    statements = [:dummy_stmt, :create_tup, :delete_tup, :member_set, :delete_obj, :block, :for_each, :either, :if, :expr_stmt, :declare_var]
-    statements = statements.map{ |c| ADSL::Parser.const_get "AST#{c.to_s.camelize}" }
-  end
-
-  def test__all_nodes_are_something
-    all_nodes = Set[*ADSL::Parser.constants.map{ |c| ADSL::Parser.const_get c }.select{ |c| c < ADSL::Parser::ASTNode }]
-    exceptions = Set[*[:spec, :class, :relation, :field, :action, :invariant, :ident].map do |c|
-      ADSL::Parser.const_get "AST#{c.to_s.camelize}"
-    end]
-    (all_nodes - exceptions).each do |node|
-      assert(node.is_statement? || node.is_objset? || node.is_base_type? || node.is_formula?, "Type undefined for #{node}")
-    end
-  end
 
   def test__create_objset_has_transitive_sideeffects
     assert ASTCreateObjset.new.expr_has_side_effects?

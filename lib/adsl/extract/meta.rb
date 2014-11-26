@@ -3,7 +3,9 @@ require 'backports'
 
 class Object
   def replace_method(method_name, source = nil, &block)
-    raise "Object #{self} of class #{self.class} does not respond to #{method_name}" unless self.respond_to? method_name, true
+    unless self.respond_to? method_name, true
+      raise ArgumentError, "Object #{self} of class #{self.class} does not respond to #{method_name}"
+    end
     
     im = self.singleton_class.instance_method(method_name)
     

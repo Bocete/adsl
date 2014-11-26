@@ -1,7 +1,9 @@
 require 'adsl/util/test_helper'
-require 'test/unit'
+require 'minitest/unit'
 
-class BasicTranslationTest < Test::Unit::TestCase
+require 'minitest/autorun'
+
+class BasicTranslationTest < MiniTest::Unit::TestCase
   include ADSL::FOL
   
   def test_blank_data_store

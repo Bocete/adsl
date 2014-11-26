@@ -1,10 +1,12 @@
 require 'adsl/translation/state'
 require 'adsl/translation/ds_translator'
 require 'adsl/translation/typed_string'
-require 'test/unit'
+require 'minitest/unit'
+
+require 'minitest/autorun'
 require 'adsl/util/test_helper'
 
-class ADSL::Translation::StateTest < Test::Unit::TestCase
+class ADSL::Translation::StateTest < MiniTest::Unit::TestCase
   def test_sort_difference__plain
     translator = ADSL::Translation::DSTranslator.new
 

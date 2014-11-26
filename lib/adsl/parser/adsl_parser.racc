@@ -1,14 +1,17 @@
 class ADSLParser
   prechigh
+    left '*'
+    left '+'
+    left '.'
+    left in
     left '==' '!='
     noassoc NOT
-    left '<=>'
-    left '<=' '=>'
     left and or
-    left '.'
+    left '<=' '=>'
+    left '<=>'
     right '='
   preclow
-  token class extends inverseof action foreach flatforeach unflatforeach either or create delete if else subset oneof tryoneof allof invariant forall exists in isempty empty true false not and equal equiv implies unknown IDENT BASIC_TYPE JS
+  token class extends inverseof action foreach flatforeach unflatforeach either or create derefcreate delete if else subset oneof tryoneof allof invariant forall exists in isempty empty true false not and equal implies unknown IDENT NUMBER STRING BASIC_TYPE JS
   start adslspec
 rule
   adslspec: root_elems { return ASTSpec.new :lineno => lineno, :classes => val[0][0], :actions => val[0][1], :invariants => val[0][2] }
@@ -31,14 +34,11 @@ rule
               |                          { return [] }
 
   member_decl: cardinality IDENT IDENT inverse_suffix { return ASTRelation.new :lineno => val[0][2], :cardinality => val[0].first(2), :to_class_name => val[1], :name => val[2], :inverse_of_name => val[3] }
-             | BASIC_TYPE IDENT { return ASTBasicTypeField.new :lineno => val[0][1], :type_name => val[0][0], :name => val[1] }
+             | BASIC_TYPE IDENT { return ASTField.new :lineno => val[0][1], :type_name => val[0][0], :name => val[1] }
 
-  cardinality: card_number                  { return [val[0][0], val[0][0], val[0][1]] }
-             | card_number '..' card_number { return [val[0][0], val[2][0], val[0][1]] }
-             | card_number '+'              { return [val[0][0], 1.0/0.0, val[0][1]] }
-
-  card_number: '0'    { return [0, lineno] }
-             | '1'    { return [1, lineno] }
+  cardinality: NUMBER             { return [val[0][:value], val[0][:value], val[0][:lineno]] }
+             | NUMBER '..' NUMBER { return [val[0][:value], val[2][:value], val[0][:lineno]] }
+             | NUMBER '+'         { return [val[0][:value], Numeric::INFINITY, val[0][:lineno]] }
 
   inverse_suffix: inverseof IDENT { return val[1] }
                 |                 { return nil }
@@ -69,7 +69,7 @@ rule
              }
            | foreach_stmt                   { return val[0] }
            | either block or eitherblocks   { val[3].unshift val[1]; return ASTEither.new :lineno => val[0], :blocks => val[3] }
-           | if formula block optelse       { return ASTIf.new :lineno => val[0], :condition => val[1], :then_block => val[2], :else_block => val[3] }
+           | if expr block optelse       { return ASTIf.new :lineno => val[0], :condition => val[1], :then_block => val[2], :else_block => val[3] }
 
   foreach_stmt: foreach IDENT ':' expr block {
                return ASTForEach.new :lineno => val[0], :var_name => val[1], :objset => val[3], :block => val[4]
@@ -101,64 +101,67 @@ rule
       | create '(' expr '.' IDENT ')' {
           return ASTDereferenceCreate.new :lineno => val[0], :objset => val[2], :rel_name => val[4]
         }
+      | derefcreate '(' expr '.' IDENT ')' {
+          return ASTDereferenceCreate.new :lineno => val[0], :objset => val[2], :rel_name => val[4]
+        }
       | expr '.' IDENT           { return ASTMemberAccess.new :lineno => val[0].lineno, :objset => val[0], :member_name => val[2] }
       | empty                    { return ASTEmptyObjset.new :lineno => val[0] }
       | '(' expr ')'             { return val[1] }
-      | JS                       { return ASTJsExpr.new :lineno => val[:lineno], :js => val[:js] }
+      | JS                       { return ASTJsExpr.new :lineno => val[0][:lineno], :js    => val[0][:js] }
+      | NUMBER                   { return ASTNumber.new :lineno => val[0][:lineno], :value => val[0][:value] }
+      | STRING   { return ASTString.new :lineno => val[0][:lineno], :value => val[0][:value].gsub(%q{\'}, %q{'}) }
+      # boolean
+      | forall '(' quantifier_parameters_with_commas ':' expr ')'
+         { return ASTForAll.new :lineno => val[0], :vars => val[2], :subformula => val[4] }
+      | exists '(' quantifier_parameters_with_commas optional_expr ')'
+         { return ASTExists.new :lineno => val[0], :vars => val[2], :subformula => val[3] }
+      | not expr
+        { return ASTNot.new :lineno => val[0], :subformula => val[1] } =NOT
+      | expr and expr { return ASTAnd.new :lineno => val[0].lineno, :subformulae => [val[0], val[2]] }
+      | expr or expr { return ASTOr.new :lineno => val[0].lineno, :subformulae => [val[0], val[2]] }
+      | expr '=>' expr
+        { return ASTImplies.new :lineno => val[0].lineno, :subformula1 => val[0], :subformula2 => val[2] }
+      | expr '<=' expr
+        { return ASTImplies.new :lineno => val[0].lineno, :subformula1 => val[2], :subformula2 => val[0] }
+      | implies '(' expr ',' expr ')'
+        { return ASTImplies.new :lineno => val[0], :subformula1 => val[2], :subformula2 => val[4] }
+      | expr '==' expr
+        { return ASTEqual.new :lineno => val[0].lineno, :exprs => [val[0], val[2]] }
+      | expr '<=>' expr
+        { return ASTEqual.new :lineno => val[0].lineno, :exprs => [val[0], val[2]] }
+      | expr '!=' expr {
+          return ASTNot.new(:lineno => val[0].lineno, :subformula => ASTEqual.new(:lineno => val[0].lineno, :exprs => [val[0], val[2]]))
+        }
+      | equal '(' comma_separated_exprs ')' { return ASTEqual.new :lineno => val[0], :exprs => val[2] }
+      | expr in expr          { return ASTIn.new :lineno => val[0].lineno, :objset1 => val[0], :objset2 => val[2] }
+      | true                  { return ASTBoolean.new :lineno => val[0], :bool_value => true  }
+      | false                 { return ASTBoolean.new :lineno => val[0], :bool_value => false }
+      | '*'                   { return ASTBoolean.new :lineno => val[0], :bool_value => nil   }
+      | isempty '(' expr ')'  { return ASTIsEmpty.new :lineno => val[0], :objset => val[2] }
 
-  invariant_decl: invariant formula           { return ASTInvariant.new :lineno => val[0], :name => nil, :formula => val[1] }
-                | invariant IDENT ':' formula { return ASTInvariant.new :lineno => val[0], :name => val[1], :formula => val[3] }
-
-  formula: forall '(' quantifier_parameters_with_commas ':' formula ')'
-           { return ASTForAll.new :lineno => val[0], :vars => val[2], :subformula => val[4] }
-         | exists '(' quantifier_parameters_with_commas optional_formula ')'
-           { return ASTExists.new :lineno => val[0], :vars => val[2], :subformula => val[3] }
-         | not formula
-           { return ASTNot.new :lineno => val[0], :subformula => val[1] } =NOT
-         | formula and formula
-           { return ASTAnd.new :lineno => val[0].lineno, :subformulae => [val[0], val[2]] }
-         | formula or formula
-           { return ASTOr.new :lineno => val[0].lineno, :subformulae => [val[0], val[2]] }
-         | formula '<=>' formula
-           { return ASTEquiv.new :lineno => val[0].lineno, :subformulae => [val[0], val[2]] }
-         | formula '=>' formula
-           { return ASTImplies.new :lineno => val[0].lineno, :subformula1 => val[0], :subformula2 => val[2] }
-         | formula '<=' formula
-           { return ASTImplies.new :lineno => val[0].lineno, :subformula1 => val[2], :subformula2 => val[0] }
-         | '(' formula ')' { return val[1] }
-         | equiv '(' formula ',' formula additional_formulae ')'
-           { return ASTEquiv.new :lineno => val[0], :subformulae => [val[2], val[4]] + val[5] }
-         | implies '(' formula ',' formula ')'
-           { return ASTImplies.new :lineno => val[0], :subformula1 => val[2], :subformula2 => val[4] }
-         | expr '==' expr
-           { return ASTEqual.new :lineno => val[0].lineno, :exprs => [val[0], val[2]] }
-         | expr '!=' expr
-           { return ASTNot.new(:lineno => val[0].lineno, :subformula => ASTEqual.new(:lineno => val[0].lineno, :exprs => [val[0], val[2]])) }
-         | equal '(' expr ',' expr additional_exprs ')'
-           { return ASTEqual.new :lineno => val[0], :exprs => [val[2], val[4]] + val[5] }
-         | expr in expr          { return ASTIn.new :lineno => val[0].lineno, :objset1 => val[0], :objset2 => val[2] }
-         | true                  { return ASTBoolean.new :lineno => val[0], :bool_value => true  }
-         | false                 { return ASTBoolean.new :lineno => val[0], :bool_value => false }
-         | '*'                   { return ASTBoolean.new :lineno => val[0], :bool_value => nil   }
-         | isempty '(' expr ')'  { return ASTIsEmpty.new :lineno => val[0], :objset => val[2] }
+  invariant_decl: invariant expr {
+          return ASTInvariant.new :lineno => val[0], :name => nil, :formula => val[1]
+        }
+      | invariant IDENT ':' expr { 
+          return ASTInvariant.new :lineno => val[0], :name => val[1], :formula => val[3]
+        }
 
   quantifier_parameters_with_commas: quantifier_parameters_with_commas ',' quantifier_parameter
-            { val[0] << val[2]; return val[0] }
+                                     { val[0] << val[2]; return val[0] }
                                    | quantifier_parameter { return [val[0]] }
 
   quantifier_parameter: IDENT IDENT {
                           return [val[1], ASTAllOf.new(:lineno => val[0].lineno, :class_name => val[0]), val[0].lineno]
                         }
                       | IDENT in expr { return [val[0], val[2], val[0].lineno] }
-
-  optional_formula: ':' formula { return val[1] }
-                  |             { return nil }
-
-  additional_formulae: additional_formulae ',' formula { val[0] << val[2]; return val[0] }
-                     |                                 { return [] }
+  
+  comma_separated_exprs: expr additional_exprs { val[1].unshift val[0]; return val[1] }
 
   additional_exprs: additional_exprs ',' expr { val[0] << val[2]; return val[0] }
                   |                           { return [] }
+
+  optional_expr: ':' expr { return val[1] }
+               |          { return nil }
 
 end
 
@@ -180,6 +183,8 @@ module ADSL
 
   def parse(str)
     generate_ast(str).typecheck_and_resolve
+  rescue ScanError, Racc::ParseError => e
+    raise ADSLError, e.message
   end
 
 ---- footer

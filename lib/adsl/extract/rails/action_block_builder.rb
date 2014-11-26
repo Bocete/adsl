@@ -101,7 +101,7 @@ module ADSL
           adsl_asts = values.reject{ |v| v.nil? }.map(&:adsl_ast)
           adsl_asts = adsl_asts.map{ |v| v.is_a?(ADSL::Parser::ASTExprStmt) ? v.objset : v }
           adsl_asts.each do |adsl_ast|
-            return false unless adsl_ast.class.is_objset?
+            return false unless adsl_ast.class.is_expr?
             # side effects should trigger only if the selection is chosen;
             # but the translation does not do this
             return false if adsl_ast.expr_has_side_effects?

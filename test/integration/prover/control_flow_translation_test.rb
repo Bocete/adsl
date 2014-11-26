@@ -1,7 +1,9 @@
 require 'adsl/util/test_helper'
-require 'test/unit'
+require 'minitest/unit'
 
-class ControlFlowTranslationTest < Test::Unit::TestCase
+require 'minitest/autorun'
+
+class ControlFlowTranslationTest < MiniTest::Unit::TestCase
   include ADSL::FOL
   
   def test_either__blank
@@ -462,7 +464,7 @@ class ControlFlowTranslationTest < Test::Unit::TestCase
           create(Class2)
         }
       }
-      invariant exists(Class2 a, Class2 b: not a == b)
+      invariant exists(Class2 a, Class2 b: a != b)
     ADSL
   end
 

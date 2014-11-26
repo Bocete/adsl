@@ -1,10 +1,11 @@
 require 'adsl/parser/adsl_parser.tab'
 require 'adsl/ds/data_store_spec'
-require 'test/unit'
+require 'minitest/unit'
+require 'minitest/autorun'
 require 'pp'
 
 module ADSL::Parser
-  class InvariantParserTest < Test::Unit::TestCase
+  class InvariantParserTest < MiniTest::Unit::TestCase
     include ADSL::Parser
     include ADSL::DS
     
@@ -19,7 +20,7 @@ module ADSL::Parser
         assert_equal([], spec.actions)
         assert_equal([], spec.classes)
         assert_equal 1, spec.invariants.length
-        assert_equal bool, spec.invariants.first.formula.bool_value
+        assert_equal bool, spec.invariants.first.formula.value
       end
     end
 
@@ -38,7 +39,7 @@ module ADSL::Parser
         ADSL
       end
       
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         spec = parser.parse <<-ADSL
           invariant some_name: true
           invariant some_name: true
@@ -76,7 +77,7 @@ module ADSL::Parser
         assert_equal 1, invariant.formula.vars.length
         assert_equal spec.classes.first.to_sig, invariant.formula.vars.first.type_sig
         assert_equal 'a', invariant.formula.vars.first.name
-        assert_equal true, invariant.formula.subformula.bool_value
+        assert_equal true, invariant.formula.subformula.value
       end 
     end
 
@@ -101,7 +102,7 @@ module ADSL::Parser
         assert_equal 2, invariant.formula.vars.length
         assert_equal [spec.classes.first.to_sig, spec.classes.first.to_sig], invariant.formula.vars.map(&:type_sig)
         assert_equal ['a', 'b'], invariant.formula.vars.map{ |v| v.name }
-        assert_equal true, invariant.formula.subformula.bool_value
+        assert_equal true, invariant.formula.subformula.value
       end 
     end
 
@@ -109,23 +110,23 @@ module ADSL::Parser
       parser = ADSLParser.new
       
       ['forall', 'exists'].each do |formula|
-        assert_raise do
+        assert_raises ADSLError do
           parser.parse <<-ADSL
             invariant #{formula}(true)
           ADSL
         end
-        assert_raise ADSLError do
+        assert_raises ADSLError do
           parser.parse <<-ADSL
             invariant #{formula}(Class a, Class b: true)
           ADSL
         end
-        assert_raise ADSLError do
+        assert_raises ADSLError do
           parser.parse <<-ADSL
             class Class {}
             invariant #{formula}(Class a, Class a: true)
           ADSL
         end  
-        assert_raise ADSLError do
+        assert_raises ADSLError do
           parser.parse <<-ADSL
             class Class {}
             invariant #{formula}(Class a: #{formula}(Class a: true))
@@ -168,7 +169,7 @@ module ADSL::Parser
           invariant exists(Class a)
         ADSL
       end
-      assert_raise do
+      assert_raises ADSLError do
         spec = parser.parse <<-ADSL
           class Class {}
           invariant forall(Class a)
@@ -182,7 +183,7 @@ module ADSL::Parser
         invariant (true)
       ADSL
       invariant = spec.invariants.first
-      assert_equal true, invariant.formula.bool_value
+      assert_equal true, invariant.formula.value
     end
 
     def test_invariant__not
@@ -193,7 +194,7 @@ module ADSL::Parser
         ADSL
         invariant = spec.invariants.first
         assert_equal DSNot, invariant.formula.class
-        assert_equal false, invariant.formula.subformula.bool_value
+        assert_equal false, invariant.formula.subformula.value
       end
     end
 
@@ -209,7 +210,7 @@ module ADSL::Parser
         ADSL
         invariant = spec.invariants.first
         assert_equal type, invariant.formula.class
-        assert_equal [nil, nil], invariant.formula.subformulae.map{ |a| a.bool_value}
+        assert_equal [nil, nil], invariant.formula.subformulae.map{ |a| a.value}
       end
     end
 
@@ -226,7 +227,7 @@ module ADSL::Parser
         invariant = spec.invariants.first
         assert_equal type, invariant.formula.class
         assert_equal DSNot, invariant.formula.subformulae.first.class
-        assert_equal false, invariant.formula.subformulae.second.bool_value
+        assert_equal false, invariant.formula.subformulae.second.value
       end
       operators.each do |word, type|
         spec = parser.parse <<-ADSL
@@ -241,9 +242,9 @@ module ADSL::Parser
       ADSL
       invariant = spec.invariants.first
       assert_equal DSOr, invariant.formula.class
-      assert_equal true, invariant.formula.subformulae.second.bool_value
+      assert_equal true, invariant.formula.subformulae.second.value
       assert_equal DSAnd, invariant.formula.subformulae.first.class
-      assert_equal true, invariant.formula.subformulae.first.subformulae.first.bool_value
+      assert_equal true, invariant.formula.subformulae.first.subformulae.first.value
       assert_equal DSNot, invariant.formula.subformulae.first.subformulae.second.class
     end
 
@@ -280,14 +281,14 @@ module ADSL::Parser
           invariant allof(Class) == allof(Child)
         ADSL
       end
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-ADSL
           class Class1 {}
           class Class2 {}
           invariant allof(Class1) == allof(Child2)
         ADSL
       end
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-ADSL
           class Parent {}
           class Class1 extends Parent {}
@@ -316,24 +317,24 @@ module ADSL::Parser
         invariant true <=> false
       ADSL
       invariant = spec.invariants.first
-      assert_equal DSEquiv, invariant.formula.class
-      assert_equal [true, false], invariant.formula.subformulae.map{ |f| f.bool_value }
+      assert_equal DSEqual, invariant.formula.class
+      assert_equal [true, false], invariant.formula.exprs.map{ |f| f.value }
       
       spec = parser.parse <<-ADSL
         class Class {}
-        invariant equiv(true, false)
+        invariant equal(true, false)
       ADSL
       invariant = spec.invariants.first
-      assert_equal DSEquiv, invariant.formula.class
-      assert_equal [true, false], invariant.formula.subformulae.map{ |f| f.bool_value }
+      assert_equal DSEqual, invariant.formula.class
+      assert_equal [true, false], invariant.formula.exprs.map{ |f| f.value }
       
       spec = parser.parse <<-ADSL
         class Class {}
-        invariant equiv(true, false, true, true)
+        invariant equal(true, false, true, true)
       ADSL
       invariant = spec.invariants.first
-      assert_equal DSEquiv, invariant.formula.class
-      assert_equal [true, false, true, true], invariant.formula.subformulae.map{ |f| f.bool_value }
+      assert_equal DSEqual, invariant.formula.class
+      assert_equal [true, false, true, true], invariant.formula.exprs.map{ |f| f.value }
     end
 
     def test_invariant__implies
@@ -344,8 +345,8 @@ module ADSL::Parser
       ADSL
       invariant = spec.invariants.first
       assert_equal DSImplies, invariant.formula.class
-      assert_equal true,  invariant.formula.subformula1.bool_value
-      assert_equal false, invariant.formula.subformula2.bool_value
+      assert_equal true,  invariant.formula.subformula1.value
+      assert_equal false, invariant.formula.subformula2.value
       
       spec = parser.parse <<-ADSL
         class Class {}
@@ -353,8 +354,8 @@ module ADSL::Parser
       ADSL
       invariant = spec.invariants.first
       assert_equal DSImplies, invariant.formula.class
-      assert_equal true,  invariant.formula.subformula1.bool_value
-      assert_equal false, invariant.formula.subformula2.bool_value
+      assert_equal true,  invariant.formula.subformula1.value
+      assert_equal false, invariant.formula.subformula2.value
       
       spec = parser.parse <<-ADSL
         class Class {}
@@ -362,8 +363,8 @@ module ADSL::Parser
       ADSL
       invariant = spec.invariants.first
       assert_equal DSImplies, invariant.formula.class
-      assert_equal true,  invariant.formula.subformula1.bool_value
-      assert_equal false, invariant.formula.subformula2.bool_value
+      assert_equal true,  invariant.formula.subformula1.value
+      assert_equal false, invariant.formula.subformula2.value
     end
     
     def test_invariant__empty
@@ -388,14 +389,14 @@ module ADSL::Parser
       assert_equal DSAllOf, invariant.formula.objset1.class
       assert_equal DSAllOf, invariant.formula.objset2.class
 
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-ADSL
           class Class1 {}
           class Class2 {}
           invariant allof(Class1) in allof(Class2)
         ADSL
       end
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-ADSL
           class Super {}
           class Sub extends Super {}
@@ -430,13 +431,13 @@ module ADSL::Parser
           invariant exists(o in allof(Class))
         ADSL
       end
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-ADSL
           class Class {}
           invariant exists(o in create(Class))
         ADSL
       end
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-ADSL
           class Class {}
           invariant exists(o in a = allof(Class))

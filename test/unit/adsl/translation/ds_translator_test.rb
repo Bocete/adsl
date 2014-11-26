@@ -3,10 +3,12 @@ require 'adsl/translation/typed_string'
 require 'adsl/translation/ds_extensions'
 require 'adsl/ds/data_store_spec'
 require 'adsl/fol/first_order_logic'
-require 'test/unit'
+require 'minitest/unit'
+
+require 'minitest/autorun'
 require 'pp'
 
-class ADSL::Translation::DSTranslatorTest < Test::Unit::TestCase
+class ADSL::Translation::DSTranslatorTest < MiniTest::Unit::TestCase
 
   include ADSL::FOL
 
@@ -97,13 +99,13 @@ class ADSL::Translation::DSTranslatorTest < Test::Unit::TestCase
     predboth = ADSL::FOL::Predicate.new 'both', sort1, sort2
 
     [:for_all, :exists].each do |q|
-      assert_raise ArgumentError do
+      assert_raises ArgumentError do
         t.send q, :a, :b do |a, b|
           true
         end
       end
       
-      assert_raise ArgumentError do
+      assert_raises ArgumentError do
         t.send q, sort1, :a, :b do |a, b|
           true
         end
@@ -189,8 +191,8 @@ class ADSL::Translation::DSTranslatorTest < Test::Unit::TestCase
 
   def test_translation__prepare_sorts
     translation = ADSL::Translation::DSTranslator.new
-    klass1 = ADSL::DS::DSClass.new :name => 'name', :parent => nil, :members => []
-    klass2 = ADSL::DS::DSClass.new :name => 'name', :parent => nil, :members => []
+    klass1 = ADSL::DS::DSClass.new :name => 'name', :parents => [], :members => []
+    klass2 = ADSL::DS::DSClass.new :name => 'name', :parents => [], :members => []
 
     klass1.translate translation
     klass2.translate translation
@@ -201,9 +203,9 @@ class ADSL::Translation::DSTranslatorTest < Test::Unit::TestCase
 
   def test_translation__pre_post_create_objs
     translation = ADSL::Translation::DSTranslator.new
-    a_klass = ADSL::DS::DSClass.new(:name => "a", :parent => nil, :relations => [])
+    a_klass = ADSL::DS::DSClass.new(:name => "a", :parents => [], :members => [])
     a_stmt = ADSL::DS::DSCreateObj.new(:klass => a_klass)
-    b_klass = ADSL::DS::DSClass.new(:name => "b", :parent => nil, :relations => [])
+    b_klass = ADSL::DS::DSClass.new(:name => "b", :parents => [], :members => [])
     b_stmt = ADSL::DS::DSCreateObj.new(:klass => b_klass)
     block = ADSL::DS::DSBlock.new(:statements => [a_stmt, b_stmt])
    

@@ -1,9 +1,10 @@
-require 'adsl/verification/utils'
 require 'adsl/parser/ast_nodes'
 require 'adsl/util/general'
+require 'adsl/extract/utils'
+require 'adsl/extract/extraction_error'
 
 module ADSL
-  module Verification
+  module Extract
 
     # forward declaration
     class FormulaBuilder; end
@@ -14,10 +15,10 @@ module ADSL
 
       def in_formula_builder
         formula_builder = nil
-        if self.is_a? ::ADSL::Verification::FormulaBuilder
+        if self.is_a? ::ADSL::Extract::FormulaBuilder
           formula_builder = self
         else
-          formula_builder = ::ADSL::Verification::FormulaBuilder.new
+          formula_builder = ::ADSL::Extract::FormulaBuilder.new
           formula_builder.adsl_stack << self.adsl_ast if self.respond_to? :adsl_ast
         end
         yield formula_builder
@@ -25,8 +26,8 @@ module ADSL
       end
 
       def handle_quantifier(quantifier, adsl_ast_node_klass, arg_types, block)
-        raise "A block needs to be passed to quantifiers" if block.nil?
-        raise "At least some variables need to be given to the block" if block.parameters.empty?
+        raise ExtractionError, "A block needs to be passed to quantifiers" if block.nil?
+        raise ExtractionError, "At least some variables need to be given to the block" if block.parameters.empty?
         in_formula_builder do |fb|
           
           param_types = {}
@@ -38,13 +39,13 @@ module ADSL
           arg_types.each do |explicit_name, explicit_type|
             classname = classname_for_classname explicit_type
             klass = Object.lookup_const classname
-            raise "Unknown class #{explicit_type} for parameter #{explicit_name}" if klass.nil?
+            raise ExtractionError, "Unknown class #{explicit_type} for parameter #{explicit_name}" if klass.nil?
             param_types[explicit_name.to_sym] = klass
           end
 
           param_types.each do |name, klass|
-            raise "Unknown klass for variable `#{name}' in #{quantifier} quantifier" if klass.nil?
-            raise "Class #{klass.name} is not instrumented" unless klass.respond_to? :adsl_ast
+            raise ExtractionError, "Unknown klass for variable `#{name}' in #{quantifier} quantifier" if klass.nil?
+            raise ExtractionError, "Class #{klass.name} is not instrumented" unless klass.respond_to? :adsl_ast
           end
 
           vars_and_objsets = block.parameters.map{ |param|
@@ -58,8 +59,8 @@ module ADSL
           end)
           subformula = subformula.adsl_ast if subformula.respond_to? :adsl_ast
           subformula = ASTBoolean.new(:bool_value => true) if subformula.nil?
-          unless subformula.is_a?(ASTNode) && subformula.class.is_formula? 
-            raise "Invalid formula #{subformula} returned by block in `#{quantifier}'"
+          unless subformula.is_a?(ASTNode) && subformula.class.is_expr? 
+            raise ExtractionError, "Invalid formula #{subformula} returned by block in `#{quantifier}'"
           end
           fb.adsl_stack << adsl_ast_node_klass.new(:vars => vars_and_objsets, :subformula => subformula)
         end
@@ -103,27 +104,27 @@ module ADSL
         end
       end
 
-      def binary_op_with_any_number_of_params(op, klass, params)
+      def binary_op_with_any_number_of_params(op, children_key, klass, params)
         in_formula_builder do |fb|
           if params.empty?
             fb.adsl_stack << op
           else
             params.each do |param|
-              raise "Invalid formula `#{param}' in `#{op}' parameter list" unless param.respond_to? :adsl_ast
+              raise ExtractionError, "Invalid formula `#{param}' in `#{op}' parameter list" unless param.respond_to? :adsl_ast
             end
-            fb.adsl_stack << klass.new(:subformulae => params.map(&:adsl_ast))
+            fb.adsl_stack << klass.new(children_key => params.map(&:adsl_ast))
           end
         end
       end
 
       def binary_op(op, klass, params)
-        raise "`#{op}' takes two parameters or none at all" unless params.empty? or params.length == 2
+        raise ExtractionError, "`#{op}' takes two parameters or none at all" unless params.empty? or params.length == 2
         in_formula_builder do |fb|
           if params.empty?
             fb.adsl_stack << op
           else
             params.each do |param|
-              raise "Invalid formula `#{param}' in `#{op}' parameter list" unless param.respond_to? :adsl_ast
+              raise ExtractionError, "Invalid formula `#{param}' in `#{op}' parameter list" unless param.respond_to? :adsl_ast
             end
             fb.adsl_stack << klass.new(:subformula1 => params.first.adsl_ast, :subformula2 => params.last.adsl_ast)
           end
@@ -131,15 +132,15 @@ module ADSL
       end
 
       def and(*params)
-        binary_op_with_any_number_of_params :and, ASTAnd, params
+        binary_op_with_any_number_of_params :and, :subformulae, ASTAnd, params
       end
       
       def or(*params)
-        binary_op_with_any_number_of_params :or, ASTOr, params
+        binary_op_with_any_number_of_params :or, :subformulae, ASTOr, params
       end
 
-      def equiv(*params)
-        binary_op_with_any_number_of_params :equiv, ASTEquiv, params
+      def equal(*params)
+        binary_op_with_any_number_of_params :equal, :exprs, ASTEqual, params
       end
       
       def implies(*params)
@@ -159,9 +160,9 @@ module ADSL
 
       def handle_unary_operator(elements, operator)
         until (index = elements.find_index(operator)).nil?
-          raise "Unary operator `#{operator}' not prefix-called" if index == elements.length-1
+          raise ExtractionError, "Unary operator `#{operator}' not prefix-called" if index == elements.length-1
           arg = elements[index+1]
-          raise "`#{arg}', used by operator `#{operator}', is not a formula" unless arg.is_a? ASTNode
+          raise ExtractionError, "`#{arg}', used by operator `#{operator}', is not a formula" unless arg.is_a? ASTNode
           result = yield arg
           elements.delete_at index
           elements[index] = result
@@ -170,10 +171,10 @@ module ADSL
       
       def handle_binary_operator(elements, operator)
         until (index = elements.find_index(operator)).nil?
-          raise "Binary operator `#{operator}' not infix-called" if index == 0 or index == elements.length-1
+          raise ExtractionError, "Binary operator `#{operator}' not infix-called" if index == 0 or index == elements.length-1
           args = [elements[index-1], elements[index+1]]
           args.each do |arg|
-            raise "`#{arg}', used by operator `#{operator}', is not a formula" unless arg.is_a? ASTNode
+            raise ExtractionError, "`#{arg}', used by operator `#{operator}', is not a formula" unless arg.is_a? ASTNode
           end
           result = yield *args
           elements.delete_at index - 1
@@ -196,8 +197,8 @@ module ADSL
         handle_binary_operator elements, :implies do |formula1, formula2|
           ASTImplies.new(:subformula1 => formula1, :subformula2 => formula2)
         end
-        handle_binary_operator elements, :equiv do |formula1, formula2|
-          ASTEquiv.new(:subformula1 => formula1, :subformula2 => formula2)
+        handle_binary_operator elements, :equal do |formula1, formula2|
+          ASTEqual.new(:exprs => [formula1, formula2])
         end
         elements 
       end
@@ -205,7 +206,7 @@ module ADSL
       def adsl_ast
         elements = gather_adsl_asts
         if elements.length != 1
-          raise "Invalid formula/operator stack state [#{ elements.map{ |e| e.respond_to?(:to_adsl) ? e.to_adsl : e }.join(', ') }]"
+          raise ExtractionError, "Invalid formula/operator stack state [#{ elements.map{ |e| e.respond_to?(:to_adsl) ? e.to_adsl : e }.join(', ') }]"
         end
         elements.first
       end
@@ -214,7 +215,7 @@ module ADSL
 end
 
 class TrueClass
-  include ADSL::Verification::FormulaGenerators
+  include ADSL::Extract::FormulaGenerators
 
   def adsl_ast
     ASTBoolean.new(:bool_value => self)
@@ -222,7 +223,7 @@ class TrueClass
 end
 
 class FalseClass
-  include ADSL::Verification::FormulaGenerators
+  include ADSL::Extract::FormulaGenerators
   
   def adsl_ast
     ASTBoolean.new(:bool_value => self)
@@ -230,5 +231,5 @@ class FalseClass
 end
 
 class ADSL::Parser::ASTNode
-  include ADSL::Verification::FormulaGenerators
+  include ADSL::Extract::FormulaGenerators
 end

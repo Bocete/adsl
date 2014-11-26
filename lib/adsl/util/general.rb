@@ -141,7 +141,7 @@ class NilClass
   def dup; self; end
 end
 
-class Fixnum
+class Numeric
   def dup; self; end
 end
 
@@ -191,85 +191,6 @@ class Module
     container.const_set name.to_s.split('::').last, new_class
     new_class
   end
-  
-  def container_for(*fields, &block)
-    all_fields = Set.new(fields)
-    if respond_to? :container_for_fields
-      prev_fields = send :container_for_fields
-      all_fields.merge prev_fields
-    end
-    singleton_class.send :define_method, :container_for_fields, lambda{ all_fields }
-    singleton_class.send :define_method, :recursively_comparable do
-      send :define_method, :eql? do |other|
-        return false if other.class != self.class
-        self.class.container_for_fields.each do |field|
-          f1 = self.send field
-          f2 = other.send field
-          if f1.respond_to?(:each) && f2.respond_to?(:each)
-            return false if f1.count != f2.count
-            f1.zip(f2).each do |e1, e2|
-              return false unless f1.eql? f2
-            end
-          else
-            return false unless f1.eql? f2
-          end
-        end
-        return true
-      end
-      alias_method :==, :eql?
-      send :define_method, :hash do
-        [*self.class.container_for_fields.map{ |f| self.send f }].hash
-      end
-      send :define_method, :dup do
-        new_values = {}
-        self.class.container_for_fields.each do |field_name|
-          value = send field_name
-          new_values[field_name] = value.respond_to?(:dup) ? value.dup : value
-        end
-        self.class.new new_values
-      end
-    end
-
-    attr_accessor *fields
-
-    send :define_method, :initialize do |*options|
-      options = options.empty? ? {} : options[0]
-      options ||= {}
-      options_trimmed = Hash[options]
-
-      all_fields.each do |field|
-        instance_variable_set "@#{field}".to_sym, options_trimmed.delete(field.to_sym)
-      end
-      if block
-        instance_eval &block
-      elsif not options_trimmed.empty?
-        raise ArgumentError, "Undefined fields mentioned in initializer of #{self.class}: #{options_trimmed.keys.map{ |key| ":#{key.to_s}"}.join(", ")}" + "\n[#{all_fields.to_a.join ' ' }]"
-      end
-    end
-
-    send :define_method, :recursively_gather do |method|
-      to_inspect = [self]
-      inspected = Set[]
-      while not to_inspect.empty?
-        elem = to_inspect.pop
-        inspected << elem
-        if elem.class.respond_to? :container_for_fields
-          elem.class.container_for_fields.each do |field|
-            field_val = elem.send(field)
-            next if field_val.nil?
-            [field_val].flatten.each do |subval|
-              to_inspect << subval unless inspected.include?(subval)
-            end
-          end
-        end
-      end
-      result = Set[]
-      inspected.each do |val|
-        result = result + [val.send(method)].flatten if val.class.method_defined?(method)
-      end
-      result.delete_if{ |a| a.nil? }.flatten
-    end
-  end
 end
 
 module Kernel
@@ -279,5 +200,15 @@ module Kernel
       object = yield object
       return object if old_object == object
     end
+  end
+end
+
+module Enumerable
+  def find_one(&block)
+    raise ArgumentError, "find_one expects a block" unless block_given?
+    elems = select &block
+    raise ArgumentError, "Element not found" if elems.empty?
+    raise ArgumentError, "Multiple elements found" if elems.count > 1
+    elems.first
   end
 end

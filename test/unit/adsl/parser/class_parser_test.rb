@@ -1,11 +1,13 @@
 require 'adsl/parser/adsl_parser.tab'
 require 'adsl/parser/ast_nodes'
-require 'test/unit'
+require 'minitest/unit'
+
+require 'minitest/autorun'
 require 'pp'
 require 'set'
 
 module ADSL::Parser
-  class ClassParserTest < Test::Unit::TestCase
+  class ClassParserTest < MiniTest::Unit::TestCase
     include ADSL::Parser
 
     def test_class__empty
@@ -33,7 +35,7 @@ module ADSL::Parser
 
     def test_class__superclass
       parser = ADSLParser.new
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-adsl
           class Class extends Unknown {}
         adsl
@@ -65,18 +67,55 @@ module ADSL::Parser
       assert spec.classes[1].parents.empty?
       assert_equal [spec.classes[0], spec.classes[1]], spec.classes[2].parents
       
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-adsl
           class Class extends Class {}
         adsl
       end
       
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-adsl
           class First extends Class1 {}
           class Class2 extends Class1 {}
           class Class1 extends Class2 {}
         adsl
+      end
+    end
+
+    def test_class__basic_type_fields
+      parser = ADSLParser.new
+      assert_nothing_raised ADSLError do
+        spec = parser.parse <<-ADSL
+          class Class {
+            int blah
+            string text
+          }
+        ADSL
+
+        members = spec.classes[0].members
+
+        assert_equal ['blah', 'text'], members.map(&:name)
+        assert_equal [ADSL::DS::TypeSig::BasicType::INT, ADSL::DS::TypeSig::BasicType::STRING], members.map(&:type)
+      end
+
+      assert_raises ADSLError do
+        parser.parse <<-ADSL
+          class Class {
+            int blah
+            1+ Class blah
+          }
+        ADSL
+      end
+
+      assert_raises ADSLError do
+        parser.parse <<-ADSL
+          class Super {
+            int blah
+          }
+          class Class extends Super {
+            1+ Class blah
+          }
+        ADSL
       end
     end
 
@@ -154,30 +193,30 @@ module ADSL::Parser
 
       klass = spec.classes.select{ |a| a.name == "Classname" }.first
       assert klass
-      assert_equal [1, 1], klass.members[0].cardinality
-      assert_equal [1, 1], klass.members[1].cardinality
-      assert_equal [0, 1], klass.members[2].cardinality
-      assert_equal [0, 1.0/0.0], klass.members[3].cardinality
-      assert_equal [1, 1.0/0.0], klass.members[4].cardinality
+      assert_equal ADSL::DS::TypeSig::ObjsetCardinality::ONE,       klass.members[0].cardinality
+      assert_equal ADSL::DS::TypeSig::ObjsetCardinality::ONE,       klass.members[1].cardinality
+      assert_equal ADSL::DS::TypeSig::ObjsetCardinality::ZERO_ONE,  klass.members[2].cardinality
+      assert_equal ADSL::DS::TypeSig::ObjsetCardinality::ZERO_MANY, klass.members[3].cardinality
+      assert_equal ADSL::DS::TypeSig::ObjsetCardinality::ONE_MANY,  klass.members[4].cardinality
     end
 
     def test_typecheck__relation_cardinality_invalid
       parser = ADSLParser.new
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-adsl
           class Classname {
             0 Classname other
           }
         adsl
       end
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-adsl
           class Classname {
             0..0 Classname other
           }
         adsl
       end
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-adsl
           class Classname {
             1..0 Classname other
@@ -188,7 +227,7 @@ module ADSL::Parser
 
     def test_typecheck__repeating_classname
       parser = ADSLParser.new
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-adsl
           class Classname {}
           class Classname {}
@@ -198,7 +237,7 @@ module ADSL::Parser
 
     def test_typecheck__unknown_rel_type
       parser = ADSLParser.new
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-adsl
           class Classname {
             1 UnknownClass other
@@ -209,7 +248,7 @@ module ADSL::Parser
     
     def test_typecheck__mulitple_rels_under_the_same_name
       parser = ADSLParser.new
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-adsl
           class Classname {
             1 Classname other
@@ -245,7 +284,7 @@ module ADSL::Parser
           }
         adsl
       end
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-adsl
           class Parent {
             1 Parent other
@@ -259,7 +298,7 @@ module ADSL::Parser
 
     def test_typecheck__inverse_rel_of_unexisting
       parser = ADSLParser.new
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-adsl
           class Classname {
             1 Classname other
@@ -271,14 +310,14 @@ module ADSL::Parser
     
     def test_typecheck__inverse_rel_of_an_inverse
       parser = ADSLParser.new
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-adsl
           class Classname {
             1 Classname other inverseof other
           }
         adsl
       end 
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-adsl
           class Classname {
             0+ Classname rel1 inverseof rel2

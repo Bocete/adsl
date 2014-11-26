@@ -13,6 +13,7 @@ module ADSL
         children_threads = []
         spawned_pids = []
         result = nil
+        puts commands
         mutex.synchronize do
           commands.each_index do |command, index|
             children_threads << Thread.new do
@@ -24,13 +25,13 @@ module ADSL
                   io.read
                 end
                 unless $?.nil?
-		  status = $?.exitstatus
+                  status = $?.exitstatus
                   spawned_pids << pid
                   mutex.synchronize do
                     result = [output, index, status] if result.nil?
                     parent_thread.run
                   end
-		end
+                end
               rescue => e
                 parent_thread.raise e unless e.message == 'die!'
               end
@@ -38,10 +39,11 @@ module ADSL
           end
         end
         Thread.stop
-        if result[2] != 0
-          puts result[0]
-          raise ProcessRaceExitCodeException, "Return status of command #{commands[result[1]]} was #{result[2]}"
-        end
+        puts 'terminated!'
+        #if result[2] != 0
+        #  puts result[0]
+        #  raise ProcessRaceExitCodeException, "Return status of command #{commands[result[1]]} was #{result[2]}"
+        #end
         return result.first 2
       ensure
         children_threads.each do |child|

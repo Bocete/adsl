@@ -1,10 +1,12 @@
-require 'test/unit'
+require 'minitest/unit'
+
+require 'minitest/autorun'
 require 'adsl/util/test_helper'
 require 'adsl/parser/ast_nodes'
 require 'adsl/extract/rails/callback_chain_simulator'
 
 module ADSL::Extract::Rails
-  class CallbackChainSimulatorTest < Test::Unit::TestCase
+  class CallbackChainSimulatorTest < MiniTest::Unit::TestCase
     include ADSL::Parser
     include ADSL::Extract::Rails::CallbackChainSimulator
 

@@ -1,9 +1,11 @@
-require 'test/unit'
+require 'minitest/unit'
+
+require 'minitest/autorun'
 require 'pp'
 require 'adsl/extract/instrumenter'
 require 'adsl/util/test_helper'
 
-class ADSL::Extract::InstrumenterTest < Test::Unit::TestCase
+class ADSL::Extract::InstrumenterTest < MiniTest::Unit::TestCase
   class Foo
   end
 

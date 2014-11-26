@@ -1,15 +1,17 @@
 require 'adsl/translation/typed_string'
 require 'adsl/fol/first_order_logic'
-require 'test/unit'
+require 'minitest/unit'
 
-class ADSL::Translation::TypedStringTest < Test::Unit::TestCase
+require 'minitest/autorun'
+
+class ADSL::Translation::TypedStringTest < MiniTest::Unit::TestCase
 
   def test_arg_order
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       ADSL::Translation::TypedString.new :sort, :name
     end
     sort = ADSL::FOL::Sort.new :sort
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       ADSL::Translation::TypedString.new :name, sort
     end
   end

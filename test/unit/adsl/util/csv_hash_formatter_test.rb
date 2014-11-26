@@ -1,7 +1,9 @@
 require 'adsl/util/csv_hash_formatter'
-require 'test/unit'
+require 'minitest/unit'
 
-class ADSL::Util::CSVHashFormatterTest < Test::Unit::TestCase
+require 'minitest/autorun'
+
+class ADSL::Util::CSVHashFormatterTest < MiniTest::Unit::TestCase
   include ADSL::Util
 
   def wrap(col_count, *content)
@@ -27,16 +29,17 @@ class ADSL::Util::CSVHashFormatterTest < Test::Unit::TestCase
   def test_no_duplicate_columns
     formatter = CSVHashFormatter.new
     formatter.add_column 'a'
-    assert_raise do
+
+    assert_raises ArgumentError do
       formatter.add_column 'a'
     end
     
     formatter = CSVHashFormatter.new 'a'
-    assert_raise do
+    assert_raises ArgumentError do
       formatter.add_column 'a'
     end
     
-    assert_raise do
+    assert_raises ArgumentError do
       formatter = CSVHashFormatter.new 'a', 'a'
     end
   end

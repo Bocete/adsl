@@ -37,7 +37,7 @@ module ADSL
       end
 
       def add_column(col)
-        raise "Duplicate column name #{col}" if @columns.include? col.to_sym
+        raise ArgumentError, "Duplicate column name #{col}" if @columns.include? col.to_sym
         @columns << col.to_sym
       end
 

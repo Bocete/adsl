@@ -82,16 +82,16 @@ module ADSL
         end
 
         @invariants.each do |inv|
-          inv.formula.prepare_formula translation
+          inv.formula.prepare_expr translation
         end
 
         if action_name
           translation.state = translation.initial_state
-          pre_invariants = @invariants.map{ |invariant| invariant.formula.resolve_formula(translation, []) }
+          pre_invariants = @invariants.map{ |invariant| invariant.formula.resolve_expr(translation, []) }
         
           listed_invariants = @invariants if listed_invariants.empty?
           translation.state = translation.final_state
-          post_invariants = listed_invariants.map{ |invariant| invariant.formula.resolve_formula(translation, []) }
+          post_invariants = listed_invariants.map{ |invariant| invariant.formula.resolve_expr(translation, []) }
           
           translation.create_conjecture FOL::Implies.new(
             FOL::And.new(pre_invariants),
@@ -104,7 +104,7 @@ module ADSL
             dummy_state = translation.create_predicate 'always_true', 1
             translation.create_formula FOL::ForAll.new(:o, dummy_state[:o])
             translation.state = dummy_state
-            formula.resolve_formula(translation, [])
+            formula.resolve_expr(translation, [])
           end
           translation.create_conjecture FOL::Not.new(FOL::And.new(invariants_formulae))
         end
@@ -232,12 +232,12 @@ module ADSL
 
       def enforce_cardinality(translation)
         translation.reserve @from_class, :o, to_sort, :t1, to_sort, :t2 do |o, t1, t2|
-          if @cardinality[0] > 0
+          if @cardinality.min > 0
             translation.create_formula ForAll[o, Implies[
               translation.state[o], Exists[t1, And[translation.state[t1], Equal[o, left_link[t1]]]]
             ]]
           end
-          if @cardinality[1] == 1
+          if @cardinality.max == 1
             translation.create_formula ForAll[o, t1, t2, Implies[
               And[
                 translation.state[o], translation.state[t1], translation.state[t2],
@@ -337,13 +337,13 @@ module ADSL
       attr_accessor :context_deletion_link
 
       def prepare(translation)
-        return if @objset.type_sig.unknown_sig?
+        return if @objset.type_sig.cardinality.empty?
 
         @objset.prepare_expr translation
       end
 
       def migrate_state(translation)
-        return if @objset.type_sig.unknown_sig?
+        return if @objset.type_sig.cardinality.empty?
 
         pre_state = translation.state
         post_state = translation.create_state "post_delete_#{@objset.type_sig.underscore}"
@@ -373,34 +373,34 @@ module ADSL
       end
 
       def migrate_state(translation)
-        return if @objset1.type_sig.card_none? or @objset2.type_sig.card_none?
+        return if @objset1.type_sig.cardinality.empty? or @objset2.type_sig.cardinality.empty?
 
         state = translation.create_state "post_createref_#{@relation.from_class.name}_#{@relation.name}"
         prev_state = translation.state
         context = translation.context
 
         translation.reserve context.make_ps, @relation.to_sort, :r, @objset1.type_sig, :o1, @objset2.type_sig, :o2 do |ps, r, o1, o2|
-      links_match = And.new(
+          links_match = And.new(
             @objset1.resolve_expr(translation, ps, @relation.left_link[r]),
             @objset2.resolve_expr(translation, ps, @relation.right_link[r])
-      )
+          )
           translation.create_formula FOL::ForAll.new(ps, r, FOL::Equiv.new(
-        state[ps, r],
-        Or.new(
-          prev_state[ps, r],
-          links_match
-        )
+            state[ps, r],
+            Or.new(
+              prev_state[ps, r],
+              links_match
+            )
           ))
-      translation.create_formula FOL::ForAll.new(ps, o1, o2, FOL::Implies.new(
-        And.new(
-          prev_state[ps, o1], 
-          prev_state[ps, o2]
-        ),
-        FOL::Exists.new(r, And.new(
-          state[ps, r],
-          links_match
+          translation.create_formula FOL::ForAll.new(ps, o1, o2, FOL::Implies.new(
+          And.new(
+            prev_state[ps, o1], 
+            prev_state[ps, o2]
+          ),
+          FOL::Exists.new(r, And.new(
+            state[ps, r],
+            links_match
+          ))
         ))
-      ))
         end
         state.link_to_previous_state prev_state
         translation.state = state
@@ -416,7 +416,7 @@ module ADSL
       end
 
       def migrate_state(translation)
-        return if @objset1.type_sig.card_none? or @objset2.type_sig.card_none?
+        return if @objset1.type_sig.cardinality.empty? or @objset2.type_sig.cardinality.empty?
 
         state = translation.create_state "post_deleteref_#{@relation.from_class.name}_#{@relation.name}"
         prev_state = translation.state
@@ -460,12 +460,12 @@ module ADSL
         prev_state = translation.state
         context = translation.context
         
-    translation.reserve context.make_ps do |ps|
+        translation.reserve context.make_ps do |ps|
           translation.create_formula FOL::ForAll.new(ps, FOL::Implies.new(
-        context.type_pred(ps),
+            context.type_pred(ps),
             FOL::OneOf.new(@is_trues.map{ |pred| pred[ps] })
           ))
-    end
+        end
 
         pre_states = []
         post_states = []
@@ -502,7 +502,7 @@ module ADSL
     class DSEitherLambdaExpr < DSNode
       def prepare_expr(translation); end
 
-      def resolve_expr(translation, ps, o)
+      def resolve_expr(translation, ps, o = nil)
         FOL::Or.new(@either.blocks.each_index.map do |i|
           FOL::And.new(
             @either.is_trues[i][ps],
@@ -517,7 +517,7 @@ module ADSL
       attr_reader :condition_state
       
       def prepare(translation)
-        @condition.prepare_formula(translation)
+        @condition.prepare_expr(translation)
         @then_block.prepare(translation)
         @else_block.prepare(translation)
       end
@@ -543,7 +543,7 @@ module ADSL
         translation.state = @condition_state
         translation.reserve context.make_ps do |ps|
           translation.create_formula FOL::ForAll.new(ps, FOL::IfThenElse.new(
-            @condition.resolve_formula(translation, ps),
+            @condition.resolve_expr(translation, ps),
             FOL::And.new(
               affected_sorts.map do |sort|
                 translation.reserve sort, :o do |o|
@@ -575,11 +575,11 @@ module ADSL
     class DSIfLambdaExpr < DSNode
       def prepare_expr(translation); end
 
-      def resolve_expr(translation, ps, o)
+      def resolve_expr(translation, ps, o = nil)
         actual_state = translation.state
         translation.state = @if.condition_state
         FOL::IfThenElse.new(
-          @if.condition.resolve_formula(translation, ps),
+          @if.condition.resolve_expr(translation, ps),
           @then_expr.resolve_expr(translation, ps, o),
           @else_expr.resolve_expr(translation, ps, o)
         )
@@ -595,7 +595,7 @@ module ADSL
       attr_reader :context, :pre_iteration_state, :post_iteration_state, :pre_state, :post_state
 
       def prepare_with_context(translation, flat_context)
-        return if @objset.type_sig.card_none?
+        return if @objset.type_sig.cardinality.empty?
 
         @context = translation.create_context "for_each_context", flat_context, translation.context, @objset.type_sig.to_sort
         @objset.prepare_expr translation
@@ -605,7 +605,7 @@ module ADSL
       end
 
       def migrate_state(translation)
-        return if @objset.type_sig.card_none?
+        return if @objset.type_sig.cardinality.empty?
 
         @pre_state = translation.state
         @post_state = translation.create_state :post_for_each
@@ -636,7 +636,7 @@ module ADSL
     class DSForEachIteratorObjset < DSNode
       def prepare_expr(translation); end
 
-      def resolve_expr(translation, ps, o)
+      def resolve_expr(translation, ps, o = nil)
         return FOL::Equal.new(o, ps[@for_each.context.level-1])
       end
     end
@@ -644,7 +644,7 @@ module ADSL
     class DSForEachPreLambdaExpr < DSNode
       def prepare_expr(translation); end
 
-      def resolve_expr(translation, ps, o)
+      def resolve_expr(translation, ps, o = nil)
         raise "Not implemented for flexible arities"
         translation.reserve_names :parent, :prev_context do |parent, prev_context|
           return ForAll.new(parent, Implies.new(@context.parent_of_pred[parent, :c],
@@ -774,23 +774,25 @@ module ADSL
 
     class DSAssignment < DSNode
       def prepare(translation)
+        return if @expr.type_sig.is_objset_type? && @expr.type_sig.cardinality.empty?
+
         @expr.prepare_expr translation
         @var.define_predicate translation, @expr.type_sig
       end
 
       def migrate_state(translation)
+        return if @expr.type_sig.is_objset_type? && @expr.type_sig.cardinality.empty?
+
         context = translation.context
-        unless @expr.type_sig.unknown_sig?
-          translation.reserve context.make_ps, @expr.type_sig, :o do |ps, o|
-            translation.create_formula FOL::ForAll.new(ps, o, FOL::Equiv.new(
-              var.resolve_expr(translation, ps, o),
-              FOL::And.new(
-                context.type_pred(ps),
-                translation.state[ps, o],
-                @expr.resolve_expr(translation, ps, o)
-              )
-            ))
-          end
+        translation.reserve context.make_ps, @expr.type_sig, :o do |ps, o|
+          translation.create_formula FOL::ForAll.new(ps, o, FOL::Equiv.new(
+            var.resolve_expr(translation, ps, o),
+            FOL::And.new(
+              context.type_pred(ps),
+              translation.state[ps, o],
+              @expr.resolve_expr(translation, ps, o)
+            )
+          ))
         end
       end
     end
@@ -808,15 +810,25 @@ module ADSL
       def define_predicate(translation, type_sig)
         @context = translation.context
         @type_sig = type_sig
-        @pred = translation.create_predicate "var_#{@name}", context.sort_array, type_sig.to_sort unless type_sig.unknown_sig?
+        if @type_sig.is_objset_type?
+          @pred = translation.create_predicate "var_#{@name}", context.sort_array, type_sig.to_sort
+        end
       end
 
-      def resolve_expr(translation, ps, var)
-        @type_sig.unknown_sig? ? false : @pred[ps.first(@context.level), var]
+      def resolve_expr(translation, ps, var = nil)
+        if @type_sig.is_objset_type?
+
+        end
+        return false if @type_sig.is_objset_type? && @type_sig.cardinality.empty?
+        @pred[ps.first(@context.level), var]
       end
 
       def [](*args)
-        @type_sig.unknown_sig? ? false : @pred[args]
+        if @expr.type_sig.is_objset_type? && @expr.type_sig.cardinality.empty?
+          false
+        else
+          @pred[*args]
+        end
       end
     end
 
@@ -907,52 +919,54 @@ module ADSL
         false
       end
     end
+    
+    class DSConstant < DSNode
+      def prepare_expr(translation)
+      end
+
+      def resolve_expr(translation, ps, var = nil)
+        case @type_sig
+        when TypeSig::BasicType::BOOL
+          @value
+        else
+          raise "Cannot resolve expr #{self}"
+        end
+      end
+    end
 
     class DSOr < DSNode
-      def prepare_formula(translation)
+      def prepare_expr(translation)
         @subformulae.each do |sub|
-          sub.prepare_formula translation
+          sub.prepare_expr translation
         end
       end
 
-      def resolve_formula(translation, ps)
-        FOL::Or.new(@subformulae.map{ |sub| sub.resolve_formula translation, ps })
+      def resolve_expr(translation, ps, val = nil)
+        FOL::Or.new(@subformulae.map{ |sub| sub.resolve_expr translation, ps })
       end
     end
     
     class DSAnd < DSNode
-      def prepare_formula(translation)
+      def prepare_expr(translation)
         @subformulae.each do |sub|
-          sub.prepare_formula translation
+          sub.prepare_expr translation
         end
       end
       
-      def resolve_formula(translation, ps)
-        FOL::And.new(@subformulae.map{ |sub| sub.resolve_formula translation, ps })
+      def resolve_expr(translation, ps, val = nil)
+        FOL::And.new(@subformulae.map{ |sub| sub.resolve_expr translation, ps })
       end
     end
 
-    class DSEquiv < DSNode
-      def prepare_formula(translation)
-        @subformulae.each do |sub|
-          sub.prepare_formula translation
-        end
-      end
-      
-      def resolve_formula(translation, ps)
-        FOL::Equiv.new(@subformulae.map{ |sub| sub.resolve_formula translation, ps })
-      end
-    end
-    
     class DSImplies < DSNode
-      def prepare_formula(translation)
-        @subformula1.prepare_formula translation
-        @subformula2.prepare_formula translation
+      def prepare_expr(translation)
+        @subformula1.prepare_expr translation
+        @subformula2.prepare_expr translation
       end
       
-      def resolve_formula(translation, ps)
-        subformula1 = @subformula1.resolve_formula translation, ps
-        subformula2 = @subformula2.resolve_formula translation, ps
+      def resolve_expr(translation, ps, val = nil)
+        subformula1 = @subformula1.resolve_expr translation, ps
+        subformula2 = @subformula2.resolve_expr translation, ps
         FOL::Implies.new(subformula1, subformula2)
       end
     end
@@ -1009,33 +1023,24 @@ module ADSL
     end
 
     class DSNot < DSNode
-      def prepare_formula(translation)
-        @subformula.prepare_formula translation
+      def prepare_expr(translation)
+        @subformula.prepare_expr translation
       end
 
-      def resolve_formula(translation, ps)
-        subformula = @subformula.resolve_formula translation, ps
+      def resolve_expr(translation, ps, val = nil)
+        subformula = @subformula.resolve_expr translation, ps
         FOL::Not.new(subformula)
-      end
-    end
-    
-    class DSBoolean < DSNode
-      def prepare_formula(translation)
-      end
-
-      def resolve_formula(translation, ps)
-        @bool_value
       end
     end
 
     class DSForAll < DSNode
-      def prepare_formula(translation)
-        @subformula.prepare_formula translation
+      def prepare_expr(translation)
+        @subformula.prepare_expr translation
       end
 
-      def resolve_formula(translation, ps)
+      def resolve_expr(translation, ps, val = nil)
         translation.reserve @vars.map(&:type_sig) + @vars.map(&:name) do |var_names|
-          subformula = @subformula.resolve_formula translation, ps
+          subformula = @subformula.resolve_expr translation, ps
           constraints = []
 
           @vars.length.times do |index|
@@ -1050,13 +1055,13 @@ module ADSL
     end
 
     class DSExists < DSNode
-      def prepare_formula(translation)
-        @subformula.prepare_formula translation unless @subformula.nil?
+      def prepare_expr(translation)
+        @subformula.prepare_expr translation unless @subformula.nil?
       end
       
-      def resolve_formula(translation, ps)
+      def resolve_expr(translation, ps, val = nil)
         translation.reserve @vars.map(&:type_sig) + @vars.map(&:name) do |var_names|
-          subformula = @subformula.nil? ? true : @subformula.resolve_formula(translation, ps)
+          subformula = @subformula.nil? ? true : @subformula.resolve_expr(translation, ps)
 
           constraints = []
           @vars.each_index do |index|
@@ -1086,31 +1091,44 @@ module ADSL
     end
 
     class DSEqual < DSNode
-      def prepare_formula(translation)
+      def prepare_expr(translation)
         @exprs.each do |expr|
           expr.prepare_expr translation
         end
       end
 
-      def resolve_formula(translation, ps)
-        translation.reserve @exprs.map(&:type_sig).inject(&:union), :o do |o|
-          exprs = @exprs.map{ |e| e.resolve_expr translation, ps, o }
-          return FOL::ForAll.new(ps, o, FOL::Implies.new(
-            translation.state[ps, o],
-            FOL::Equiv.new(exprs)
-          ))
+      def resolve_expr(translation, ps)
+        shared_type = TypeSig.join(@exprs.map &:type_sig)
+        return false if shared_type.is_invalid_type?
+
+        if shared_type.is_basic_type?
+          exprs = @exprs.map{ |e| e.resolve_expr translation, ps }
+          if shared_type.is_bool_type?
+            FOL::Equiv.new(*exprs)
+          else
+            # other basic types not supported yet
+            raise "Basic type #{ shared_type } unsupported"
+          end
+        else
+          translation.reserve @exprs.map(&:type_sig).inject(&:|), :o do |o|
+            exprs = @exprs.map{ |e| e.resolve_expr translation, ps, o }
+            return FOL::ForAll.new(ps, o, FOL::Implies.new(
+              translation.state[ps, o],
+              FOL::Equiv.new(exprs)
+            ))
+          end
         end
       end
     end
 
     class DSIn < DSNode
-      def prepare_formula(translation)
+      def prepare_expr(translation)
         @objset1.prepare_expr translation
         @objset2.prepare_expr translation
       end
 
-      def resolve_formula(translation, ps)
-        return true if @objset1.type_sig.card_none?
+      def resolve_expr(translation, ps, var = nil)
+        return true if @objset1.type_sig.cardinality.empty?
         translation.reserve @objset1.type_sig, :o do |o|
           return FOL::ForAll.new(o, FOL::Implies.new(
             FOL::And.new(
@@ -1127,12 +1145,12 @@ module ADSL
     end
     
     class DSIsEmpty < DSNode
-      def prepare_formula(translation)
+      def prepare_expr(translation)
         @objset.prepare_expr translation
       end
 
-      def resolve_formula(translation, ps)
-        return true if @objset.type_sig.card_none?
+      def resolve_expr(translation, ps, var = nil)
+        return true if @objset.type_sig.cardinality.empty?
         translation.reserve @objset.type_sig, :o do |o|
           return FOL::ForAll.new(o, FOL::Implies.new(
             FOL::And.new(

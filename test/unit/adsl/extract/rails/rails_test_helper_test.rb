@@ -1,4 +1,5 @@
-require 'test/unit'
+require 'minitest/unit'
+require 'minitest/autorun'
 require 'active_record'
 require 'ruby_parser'
 require 'ruby2ruby'
@@ -13,9 +14,15 @@ class ADSL::Extract::Rails::RailsTestHelperTest < ADSL::Extract::Rails::RailsIns
     assert self.class.const_defined? :Mod
     assert Mod.const_defined? :Blah
 
+    skip "It is not that important that the AR stuff is not cleaned up properly, but fine"
+
+    assert_false Asd.all.respond_to?(:adsl_ast)
+
     a = Asd.new
-    a.blahs.build
     a.save!
+
+    assert_false a.blahs.respond_to?(:adsl_ast)
+    a.blahs.create
 
     assert_equal 1, Asd.all.length
     a_from_db = Asd.all.first

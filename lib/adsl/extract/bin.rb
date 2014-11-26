@@ -1,17 +1,8 @@
 require 'adsl/extract/rails/rails_extractor'
 
 module ADSL
-  module Verification
-    module RailsVerification
-
-      def verify_spass(options = {})
-        ast = extract_ast options
-        
-        require 'adsl/spass/bin'
-        self.class.send :include, ::ADSL::Spass::Bin
-
-        return verify(ast, options[:verify_options])
-      end
+  module Extract
+    module Bin
 
       def extract_ast(options = {})
         options = {
@@ -21,6 +12,15 @@ module ADSL
         ast = options[:ast]
         ast = ADSL::Extract::Rails::RailsExtractor.new(options[:extract_options]).adsl_ast if ast.nil?
         ast
+      end
+
+      def verify_spass(options = {})
+        ast = extract_ast options
+        
+        require 'adsl/spass/bin'
+        self.class.send :include, ::ADSL::Spass::Bin
+
+        return verify(ast, options[:verify_options])
       end
 
       def adsl_translate(options = {})

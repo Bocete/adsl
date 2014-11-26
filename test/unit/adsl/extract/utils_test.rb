@@ -1,11 +1,12 @@
-require 'test/unit'
+require 'minitest/unit'
+require 'minitest/autorun'
 require 'pp'
-require 'adsl/extract/meta'
 require 'adsl/util/test_helper'
-require 'adsl/verification/utils'
+require 'adsl/extract/meta'
+require 'adsl/extract/utils'
 
-class ADSL::Verification::UtilsTest < Test::Unit::TestCase
-  include ADSL::Verification::Utils
+class ADSL::Extract::UtilsTest < MiniTest::Unit::TestCase
+  include ADSL::Extract::Utils
 
   def setup
     eval <<-ruby

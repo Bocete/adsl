@@ -1,5 +1,5 @@
 module ADSL
-  module Verification
+  module Extract
     class InstrumentationFilter
       
       def initialize(options = {})
@@ -14,7 +14,7 @@ module ADSL
           return false unless @options[:method_name] === method_name.to_s
         end
         unless @options[:method_owner].nil?
-          return false if object.is_a?(Fixnum) or object.is_a?(Symbol)
+          return false if object.is_a?(Numeric) or object.is_a?(Symbol)
           method = object.singleton_class.instance_method method_name
           return false unless method.owner == @options[:method_owner]
         end

@@ -3,10 +3,12 @@ require 'adsl/translation/ds_translator'
 require 'adsl/ds/data_store_spec'
 require 'adsl/ds/type_sig'
 require 'adsl/fol/first_order_logic'
-require 'test/unit'
+require 'minitest/unit'
+
+require 'minitest/autorun'
 require 'pp'
 
-class ADSL::Translation::TranslationDSExtensionsTest < Test::Unit::TestCase
+class ADSL::Translation::TranslationDSExtensionsTest < MiniTest::Unit::TestCase
   include ADSL::FOL
 
   def setup

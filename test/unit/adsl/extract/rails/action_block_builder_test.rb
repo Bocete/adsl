@@ -3,7 +3,7 @@ require 'adsl/extract/rails/other_meta'
 require 'adsl/parser/ast_nodes'
 
 module ADSL::Extract::Rails
-  class ActionBlockBuilderTest < Test::Unit::TestCase
+  class ActionBlockBuilderTest < MiniTest::Unit::TestCase
     include ADSL::Parser
 
     def test__in_stmt_frame

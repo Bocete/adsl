@@ -1,9 +1,11 @@
 require 'adsl/parser/adsl_parser.tab'
-require 'test/unit'
+require 'minitest/unit'
+
+require 'minitest/autorun'
 require 'pp'
 
 module ADSL::Parser
-  class GeneralParserTest < Test::Unit::TestCase
+  class GeneralParserTest < MiniTest::Unit::TestCase
     include ADSL::Parser
 
     def test_comments_single_line

@@ -164,16 +164,16 @@ module ADSL
             statement_ps_pairs = stmts.zip pss
             additional_axioms << ADSL::FOL::ForAll.new(pss, ADSL::FOL::And.new(
               statement_ps_pairs.map{ |stmt, ps| ADSL::FOL::Not.new @initial_state[stmt.context_creation_link[ps]] },
-	      statement_ps_pairs.each_index.map do |i|
-	        others = statement_ps_pairs[i+1..-1]
-		others.map{ |other, other_ps|
-		  ADSL::FOL::Not.new(ADSL::FOL::Equal.new(
-		    statement_ps_pairs[i][0].context_creation_link[statement_ps_pairs[i][1]],
-		    other.context_creation_link[other_ps]
-		  ))
-		}
-	      end
-	    ))
+	            statement_ps_pairs.each_index.map do |i|
+	              others = statement_ps_pairs[i+1..-1]
+		            others.map{ |other, other_ps|
+		              ADSL::FOL::Not.new(ADSL::FOL::Equal.new(
+		                statement_ps_pairs[i][0].context_creation_link[statement_ps_pairs[i][1]],
+		                other.context_creation_link[other_ps]
+		              ))
+		            }
+	            end
+	          ))
           end
         end
 

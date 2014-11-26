@@ -21,7 +21,7 @@ module ADSL
 
     class ASTDummyObjset < ::ADSL::Parser::ASTNode
       def objset_effect_domain_analysis(context, info)
-        return [], true if @type_sig.card_none?
+        return [], true if @type_sig.cardinality.empty?
         return @type_sig.all_children(true), false
       end
     end
@@ -213,7 +213,7 @@ module ADSL
 
     class DSForEachIteratorObjset < DSNode
       def objset_effect_domain_analysis(context, info)
-        return @for_each.objset.type_sig.children(true), true
+        return @for_each.objset.type_sig.all_children(true), true
       end
     end
 
@@ -311,7 +311,7 @@ module ADSL
       end
     end
 
-    class DSBoolean < DSNode
+    class DSConstant < DSNode
       def formula_effect_domain_analysis(context, info)
       end
     end
@@ -338,7 +338,7 @@ module ADSL
       attr_accessor :assigned_types, :assigned_local
 
       def objset_effect_domain_analysis(context, info)
-        @assigned_types ||= type_sig.children(true)
+        @assigned_types ||= type_sig.all_children(true)
         @assigned_local = false if @assigned_local.nil?
         return @assigned_types, @assigned_local
       end

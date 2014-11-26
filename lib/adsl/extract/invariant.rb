@@ -1,7 +1,7 @@
 require 'adsl/parser/ast_nodes'
 
 module ADSL
-  module Verification
+  module Extract
     class Invariant
       attr_accessor :description, :formula
 

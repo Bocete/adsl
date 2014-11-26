@@ -42,7 +42,7 @@ module Kernel
         name.to_s
       end
       
-      if value.respond_to?(:adsl_ast) && value.adsl_ast.class.is_objset?
+      if value.respond_to?(:adsl_ast) && value.adsl_ast.class.is_expr?
         assignment = ::ADSL::Parser::ASTExprStmt.new(:expr => ::ADSL::Parser::ASTAssignment.new(
           :var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name),
           :expr => value.adsl_ast
@@ -50,7 +50,7 @@ module Kernel
         if operator == '||='
           old_value = outer_binding.eval name rescue nil
           if old_value.respond_to?(:adsl_ast) &&
-              old_value.adsl_ast.class.is_objset?
+              old_value.adsl_ast.class.is_expr?
             assignment = [
               ::ADSL::Parser::ASTDeclareVar.new(:var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name.dup)),
               ::ADSL::Parser::ASTEither.new(:blocks => [
@@ -125,8 +125,8 @@ module Kernel
     push_frame_expr1, frame1_ret_value, frame1_stmts = arg1
     push_frame_expr2, frame2_ret_value, frame2_stmts = arg2
     if frame1_stmts.length <= 1 && frame2_stmts.length <= 1 &&
-        frame1_ret_value.respond_to?(:adsl_ast) && frame1_ret_value.adsl_ast.class.is_objset? &&
-        frame2_ret_value.respond_to?(:adsl_ast) && frame2_ret_value.adsl_ast.class.is_objset? &&
+        frame1_ret_value.respond_to?(:adsl_ast) && frame1_ret_value.adsl_ast.class.is_expr? &&
+        frame2_ret_value.respond_to?(:adsl_ast) && frame2_ret_value.adsl_ast.class.is_expr? &&
         !frame1_ret_value.adsl_ast.expr_has_side_effects? && !frame2_ret_value.adsl_ast.expr_has_side_effects?
 
       return nil if frame1_ret_value.nil? && frame2_ret_value.nil?
@@ -151,13 +151,13 @@ module Kernel
         return ::ADSL::Parser::ASTEither.new :blocks => [block1, block2]
       end
 
-      result_type.new(:adsl_ast => ::ADSL::Parser::ASTPickOneObjset.new(
-        :objsets => [frame1_ret_value.adsl_ast, frame2_ret_value.adsl_ast]
+      result_type.new(:adsl_ast => ::ADSL::Parser::ASTPickOneExpr.new(
+        :exprs => [frame1_ret_value.adsl_ast, frame2_ret_value.adsl_ast]
       ))
     else
       block1 = ::ADSL::Parser::ASTBlock.new :statements => frame1_stmts
       block2 = ::ADSL::Parser::ASTBlock.new :statements => frame2_stmts
-      ::ADSL::Parser::ASTEither.new :blocks => [block1, block2]
+      return ::ADSL::Parser::ASTEither.new :blocks => [block1, block2]
     end
   end
 end
@@ -172,7 +172,7 @@ module ADSL
           adsl_ast = expr.adsl_ast if adsl_ast.respond_to? :adsl_ast
           return nil unless adsl_ast.is_a? ::ADSL::Parser::ASTNode
           return adsl_ast if adsl_ast.class.is_statement?
-          return ::ADSL::Parser::ASTExprStmt.new :expr => adsl_ast if adsl_ast.class.is_objset?
+          return ::ADSL::Parser::ASTExprStmt.new :expr => adsl_ast if adsl_ast.class.is_expr?
           nil
         end
 
@@ -332,7 +332,10 @@ module ADSL
                 s(:array,
                   s(:call, nil, :ins_push_frame),
                   s(:splat, s(:rescue,
-                    s(:array, block1, s(:call, nil, :ins_pop_frame)),
+                    s(:array,
+                      block1,
+                      s(:call, nil, :ins_pop_frame)
+                    ),
                     s(:resbody,
                       s(:array, s(:const, :Exception)),
                       s(:array, s(:nil), s(:call, nil, :ins_pop_frame))
@@ -342,7 +345,10 @@ module ADSL
                 s(:array,
                   s(:call, nil, :ins_push_frame),
                   s(:splat, s(:rescue,
-                    s(:array, block2, s(:call, nil, :ins_pop_frame)),
+                    s(:array, 
+                      block2,
+                      s(:call, nil, :ins_pop_frame)
+                    ),
                     s(:resbody,
                       s(:array, s(:const, :Exception)),
                       s(:array, s(:nil), s(:call, nil, :ins_pop_frame))

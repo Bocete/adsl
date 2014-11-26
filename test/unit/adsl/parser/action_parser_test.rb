@@ -1,10 +1,13 @@
 require 'adsl/parser/adsl_parser.tab'
 require 'adsl/ds/data_store_spec'
-require 'test/unit'
+require 'adsl/util/test_helper'
+require 'minitest/unit'
+
+require 'minitest/autorun'
 require 'pp'
 
 module ADSL::Parser
-  class ActionParserTest < Test::Unit::TestCase
+  class ActionParserTest < MiniTest::Unit::TestCase
     include ADSL::DS
 
     def test_action__empty
@@ -190,7 +193,7 @@ module ADSL::Parser
         assert_equal spec.classes.first, stmt.objset2.klass
         assert_equal spec.classes.first.members.first, stmt.relation
         
-        assert_raise ADSLError do
+        assert_raises ADSLError do
           parser.parse <<-adsl
             class Class1 { 1 Class1 rel }
             class Class2 {}
@@ -200,7 +203,7 @@ module ADSL::Parser
           adsl
         end
         
-        assert_raise ADSLError do
+        assert_raises ADSLError do
           parser.parse <<-adsl
             class Class1 { 1 Class1 rel }
             class Class2 {}
@@ -258,7 +261,7 @@ module ADSL::Parser
         assert_equal spec.classes[1], stmt.objset2.klass
         assert_equal spec.classes[1].members.first, stmt.relation
 
-        assert_raise ADSLError do
+        assert_raises ADSLError do
           parser.parse <<-adsl
             class Super {}
             class Sub extends Super { 1 Sub rel }
@@ -268,7 +271,7 @@ module ADSL::Parser
           adsl
         end
         
-        assert_raise ADSLError do
+        assert_raises ADSLError do
           parser.parse <<-adsl
             class Super {}
             class Sub extends Super { 1 Sub rel }
@@ -338,7 +341,7 @@ module ADSL::Parser
       assert_equal spec.classes[1], stmt2.objset2.klass
       assert_equal spec.classes[1].members.first, stmt2.relation
 
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-adsl
           class Super {}
           class Sub extends Super { 1 Sub rel }
@@ -348,7 +351,7 @@ module ADSL::Parser
         adsl
       end
       
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-adsl
           class Super {}
           class Sub extends Super { 1 Sub rel }
@@ -388,19 +391,19 @@ module ADSL::Parser
           }
         adsl
       end
-      assert_raise do
+      assert_raises ADSLError do
         parser.parse <<-adsl
           class Class{}
           action do_something(1..0)
         adsl
       end
-      assert_raise do
+      assert_raises ADSLError do
         parser.parse <<-adsl
           class Class{}
           action do_something(0)
         adsl
       end
-      assert_raise do
+      assert_raises ADSLError do
         parser.parse <<-adsl
           class Class{}
           action do_something(0..0)
@@ -447,7 +450,7 @@ module ADSL::Parser
 
       assert_equal relation, spec.actions.first.block.statements.last.relation
       
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-adsl
           class Class { 0+ Class relation }
           class Class2 {}
@@ -479,7 +482,7 @@ module ADSL::Parser
 
       assert_equal relation, spec.actions.first.block.statements.last.relation
       
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-adsl
           class Class { 0+ Class relation }
           class Class2 {}
@@ -512,7 +515,7 @@ module ADSL::Parser
 
         assert_equal relation, spec.actions.first.block.statements.last.relation
         
-        assert_raise ADSLError do
+        assert_raises ADSLError do
           parser.parse <<-adsl
             class Class { 0+ Class relation }
             class Class2 {}
@@ -547,7 +550,7 @@ module ADSL::Parser
       assert_equal klass2.to_sig, stmt.objset1.type_sig
       assert_equal relation, stmt.relation
       
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-adsl
           class Class1 { 0+ Class2 relation }
           class Class2 { 0+ Class2 other_relation }
@@ -642,7 +645,7 @@ module ADSL::Parser
 
     def test_action__types_are_static
       parser = ADSLParser.new
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-adsl
           class Class {}
           class Class2 {}
@@ -656,7 +659,7 @@ module ADSL::Parser
 
     def test_action__either_variable_number_of_blocks
       parser = ADSLParser.new
-      assert_raise do
+      assert_raises ADSLError do
         parser.parse <<-adsl
           class Class {}
           action do_something() {
@@ -699,7 +702,7 @@ module ADSL::Parser
 
     def test_action__unmatching_types_in_either
       parser = ADSLParser.new
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-adsl
           class Class {}
           class Class2 {}
@@ -744,7 +747,7 @@ module ADSL::Parser
           }
         adsl
       end
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-adsl
           class Class {}
           class Class2 { 0+ Class2 relation }
@@ -867,7 +870,7 @@ module ADSL::Parser
     def test_action__if_condition_var_definition
       parser = ADSLParser.new
       spec = nil
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         spec = parser.parse <<-adsl
           class Class {}
           action blah() {
@@ -973,7 +976,7 @@ module ADSL::Parser
         adsl
       end
 
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-adsl
           action do_something() {
             empty.some_relation += empty
@@ -987,22 +990,20 @@ module ADSL::Parser
             1 Class klass
           }
           action do_something() {
-            foreach c: empty {
-              allof(Class).klass += c
-            }
+            c = empty 
+            allof(Class).klass += c
           }
         adsl
       end
       
-      assert_raise ADSLError do
+      assert_raises ADSLError do
         parser.parse <<-adsl
           class Class {
             1 Class klass
           }
           action do_something() {
-            foreach c: empty {
-              c.klass += allof(Class)
-            }
+            c = empty
+            c.klass += allof(Class)
           }
         adsl
       end
@@ -1155,6 +1156,161 @@ module ADSL::Parser
         ADSL
       end
       assert_equal DSFlatForEach, spec.actions.first.block.statements.first.class
+    end
+  end
+
+  def test_action__basic_type_constants
+    parser = ADSLParser.new
+    spec = nil
+
+    assert_nothing_raised ADSLError do
+      spec = parser.parse <<-ADSL
+        class Class {
+          int intfield
+          real realfield
+          decimal decifield
+          string strfield
+          bool boolfield
+        }
+        action blah() {
+          o = oneof(allof(Class))
+          o.intfield = 3
+          o.realfield = 5.425
+          o.decifield = 3.14
+          o.strfield = 'stringvalue'
+          o.boolfield = true
+        }
+      ADSL
+    end
+
+    stats = spec.actions.first.block.statements
+    assert_equal 6, stats.length
+  end
+
+  def test_action__string_constant__escapes
+    parser = ADSLParser.new
+    spec = nil
+    
+    assert_nothing_raised ADSLError do
+      spec = parser.parse %q{
+        class Class { string s }
+        action blah(1 Class o) {
+          o.s = 'asd'
+        }
+      }
+    end
+    stats = spec.actions.first.block.statements
+    assert_equal %q{asd}, stats.first.expr.value
+    
+    assert_raises ADSLError do
+      spec = parser.parse %q{
+        class Class { string s }
+        action blah(1 Class o) {
+          o.s = 'asd'kme'
+        }
+      }
+    end
+
+    assert_nothing_raised ADSLError do
+      spec = parser.parse %q{
+        class Class { string s }
+        action blah(1 Class o) {
+          o.s = 'asd\\'kme'
+        }
+      }
+    end
+    stats = spec.actions.first.block.statements
+    assert_equal %q{asd'kme}, stats.first.expr.value
+
+    assert_nothing_raised ADSLError do
+      spec = parser.parse %q{
+        class Class { string s }
+        action blah(1 Class o) {
+          o.s = 'asd\\\\'kme'
+        }
+      }
+    end
+    stats = spec.actions.first.block.statements
+    assert_equal %q{asd\\'kme}, stats.first.expr.value
+
+    assert_nothing_raised ADSLError do
+      spec = parser.parse %q{
+        class Class { string s }
+        action blah(1 Class o) {
+          o.s = 'asd\\\\\\'kme'
+        }
+      }
+    end
+    stats = spec.actions.first.block.statements
+    assert_equal %q{asd\\\'kme}, stats.first.expr.value
+  end
+
+  def test_action__basic_type_assignment__type_system
+    parser = ADSLParser.new
+    spec = nil
+
+    assert_nothing_raised ADSLError do
+      spec = parser.parse <<-ADSL
+        class Class {
+          int field
+        }
+        action blah() {
+          o = oneof(allof(Class))
+          o.field = 5
+        }
+      ADSL
+    end
+    assert_nothing_raised ADSLError do
+      spec = parser.parse <<-ADSL
+        class Class {
+          int field
+        }
+        action blah() {
+          o = oneof(allof(Class))
+          o2 = oneof(allof(Class))
+          o.field = o2.field
+        }
+      ADSL
+    end
+
+    assert_raises ADSLError do
+      spec = parser.parse <<-ADSL
+        class Class {
+          int field
+          string other_type
+        }
+        action blah() {
+          o = oneof(allof(Class))
+          o.field = o.other_type
+        }
+      ADSL
+    end
+  end
+
+  def test_action__basic_type_assignment__plurals
+    parser = ADSLParser.new
+    spec = nil
+
+    assert_nothing_raised ADSLError do
+      spec = parser.parse <<-ADSL
+        class Class {
+          int field
+        }
+        action blah() {
+          allof(Class).field = oneof(allof(Class)).field
+        }
+      ADSL
+    end
+    
+    assert_raises ADSLError do
+      spec = parser.parse <<-ADSL
+        class Class {
+          int field
+        }
+        action blah() {
+          allof(Class).field = allof(Class).field
+        }
+      ADSL
     end
   end
 end

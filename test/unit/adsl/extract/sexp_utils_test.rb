@@ -1,9 +1,11 @@
-require 'test/unit'
+require 'minitest/unit'
+
+require 'minitest/autorun'
 require 'pp'
 require 'adsl/extract/sexp_utils'
 require 'adsl/util/test_helper'
 
-class ADSL::Extract::SexpUtilsTest < Test::Unit::TestCase
+class ADSL::Extract::SexpUtilsTest < MiniTest::Unit::TestCase
   def test_block_replace__no_match
     sexp = s(:array, s(:lit, 1), s(:lit, 2))
     

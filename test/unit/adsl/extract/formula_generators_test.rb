@@ -1,18 +1,20 @@
-require 'test/unit'
+require 'minitest/unit'
+require 'minitest/autorun'
 require 'pp'
-require 'adsl/extract/meta'
 require 'adsl/util/test_helper'
-require 'adsl/verification/formula_generators'
+require 'adsl/extract/meta'
+require 'adsl/extract/formula_generators'
 require 'adsl/extract/rails/rails_instrumentation_test_case'
+require 'adsl/extract/extraction_error'
 
-class ADSL::Verification::FormulaGeneratorsTest < ADSL::Extract::Rails::RailsInstrumentationTestCase
+class ADSL::Extract::FormulaGeneratorsTest < ADSL::Extract::Rails::RailsInstrumentationTestCase
   include ADSL::Parser
-  include ADSL::Verification
+  include ADSL::Extract
 
   attr_reader :fg
 
   class FG
-    include ADSL::Verification::FormulaGenerators
+    include ADSL::Extract::FormulaGenerators
   end
 
   def setup
@@ -33,8 +35,8 @@ class ADSL::Verification::FormulaGeneratorsTest < ADSL::Extract::Rails::RailsIns
     fg.forall do |asd|
       anything_with_adsl_ast
     end
-    assert_raise do
-      forall do |asd|
+    assert_raises ADSL::Extract::ExtractionError do
+      fg.forall do |asd|
         'blah!'
       end
     end
@@ -132,7 +134,7 @@ class ADSL::Verification::FormulaGeneratorsTest < ADSL::Extract::Rails::RailsIns
 
   def test_quantifier__at_least_one_variable
     [:forall, :exists].each do |quantifier|
-      assert_raise do
+      assert_raises ADSL::Extract::ExtractionError do
         fg.send(quantifier, {}, &lambda do
           anything_with_adsl_ast
         end)
@@ -160,7 +162,7 @@ class ADSL::Verification::FormulaGeneratorsTest < ADSL::Extract::Rails::RailsIns
   end
   
   def test_and_or__prefix_any_number_of_params
-    {:and => ASTAnd, :or => ASTOr, :equiv => ASTEquiv}.each do |operator, klass|
+    {:and => ASTAnd, :or => ASTOr}.each do |operator, klass|
       formula = fg.send(operator, true, false)
       assert_equal klass, formula.adsl_ast.class
       assert_equal true,  formula.adsl_ast.subformulae.first.bool_value
@@ -173,6 +175,18 @@ class ADSL::Verification::FormulaGeneratorsTest < ADSL::Extract::Rails::RailsIns
       assert_equal true,  formula.adsl_ast.subformulae[2].bool_value
       assert_equal false, formula.adsl_ast.subformulae[3].bool_value
     end
+    
+    formula = fg.equal(true, false)
+    assert_equal ASTEqual, formula.adsl_ast.class
+    assert_equal true,  formula.adsl_ast.exprs.first.bool_value
+    assert_equal false, formula.adsl_ast.exprs.second.bool_value
+
+    formula = fg.equal(true, false, true, false)
+    assert_equal ASTEqual, formula.adsl_ast.class
+    assert_equal true,  formula.adsl_ast.exprs[0].bool_value
+    assert_equal false, formula.adsl_ast.exprs[1].bool_value
+    assert_equal true,  formula.adsl_ast.exprs[2].bool_value
+    assert_equal false, formula.adsl_ast.exprs[3].bool_value
   end
 
   def test_and_or__infix

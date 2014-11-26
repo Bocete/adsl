@@ -1,12 +1,12 @@
-require 'test/unit'
+require 'minitest/unit'
+require 'minitest/autorun'
 require 'adsl/util/test_helper'
 require 'adsl/extract/rails/active_record_metaclass_generator'
 require 'adsl/extract/rails/rails_test_helper'
 
-class ADSL::Extract::Rails::RailsInstrumentationTestCase < Test::Unit::TestCase
+class ADSL::Extract::Rails::RailsInstrumentationTestCase < MiniTest::Unit::TestCase
   def setup
     assert_false class_defined? :ADSLMetaAsd, :ADSLMetaKme, 'Mod::ADSLMetaBlah'
-    
     initialize_test_context
   end
 

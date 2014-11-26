@@ -1,9 +1,11 @@
 require 'adsl/fol/first_order_logic'
 require 'adsl/translation/typed_string'
-require 'test/unit'
+require 'minitest/unit'
+
+require 'minitest/autorun'
 require 'pp'
 
-class ADSL::FOL::FirstOrderLogicTest < Test::Unit::TestCase
+class ADSL::FOL::FirstOrderLogicTest < MiniTest::Unit::TestCase
   include ADSL::FOL
 
   def teardown
@@ -35,7 +37,7 @@ class ADSL::FOL::FirstOrderLogicTest < Test::Unit::TestCase
   end
 
   def test_predicate_extensions
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       Predicate.new :name, :type
     end
     assert_nothing_raised do 
@@ -92,10 +94,10 @@ class ADSL::FOL::FirstOrderLogicTest < Test::Unit::TestCase
   end
 
   def test_forall
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       ForAll.new
     end
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       ForAll.new :a, :b
     end
     assert_nothing_raised{ ForAll.new :a }
@@ -108,7 +110,7 @@ class ADSL::FOL::FirstOrderLogicTest < Test::Unit::TestCase
   end
   
   def test_exists
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       Exists.new
     end
     assert_nothing_raised{ Exists.new :a }
@@ -146,10 +148,10 @@ class ADSL::FOL::FirstOrderLogicTest < Test::Unit::TestCase
   
 
   def test_equiv
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       Equiv.new
     end
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       Equiv.new :a
     end
     assert_nothing_raised{ Equiv.new :a, :b }
@@ -168,13 +170,13 @@ class ADSL::FOL::FirstOrderLogicTest < Test::Unit::TestCase
   end
   
   def test_implies
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       Implies.new
     end
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       Implies.new :a
     end
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       Implies.new :a, :b, :c
     end
     assert_nothing_raised{ Implies.new :a, :b }
@@ -194,10 +196,10 @@ class ADSL::FOL::FirstOrderLogicTest < Test::Unit::TestCase
   end
 
   def test_equal
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       Equal.new
     end
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       Equal.new :a
     end
     assert_nothing_raised{ Equal.new :a, :b }
@@ -222,16 +224,16 @@ class ADSL::FOL::FirstOrderLogicTest < Test::Unit::TestCase
   end
 
   def test_if_then_else
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       IfThenElse.new
     end
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       IfThenElse.new :a
     end
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       IfThenElse.new :a, :b
     end
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       IfThenElse.new :a, :b, :c, :d
     end
   end
@@ -242,16 +244,16 @@ class ADSL::FOL::FirstOrderLogicTest < Test::Unit::TestCase
   end
   
   def test_if_then_else_eq
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       IfThenElseEq.new
     end
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       IfThenElseEq.new :a
     end
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       IfThenElseEq.new :a, :b
     end
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       IfThenElseEq.new :a, :b, :c, :d
     end
   end
@@ -262,10 +264,10 @@ class ADSL::FOL::FirstOrderLogicTest < Test::Unit::TestCase
   end
 
   def test_pairwise_equal__explicit_lists
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       PairwiseEqual.new [], [:a]
     end
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       PairwiseEqual.new [:b, :c], [:a]
     end
     assert_nothing_raised{ PairwiseEqual.new([], []) }
@@ -274,10 +276,10 @@ class ADSL::FOL::FirstOrderLogicTest < Test::Unit::TestCase
   end
   
   def test_pairwise_equal__implicit_lists
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       PairwiseEqual.new :a
     end
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       PairwiseEqual.new :b, [[:c]], :a
     end
     assert_nothing_raised{ PairwiseEqual.new }

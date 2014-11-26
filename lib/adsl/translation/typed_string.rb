@@ -1,3 +1,4 @@
+require 'adsl/util/container'
 
 module ADSL
   module Translation

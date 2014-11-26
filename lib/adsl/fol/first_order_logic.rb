@@ -1,4 +1,5 @@
 require 'adsl/util/general'
+require 'adsl/util/container'
 require 'adsl/ds/type_sig'
 require 'active_support/all'
 

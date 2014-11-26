@@ -1,0 +1,3180 @@
+state 61 contains 1 shift/reduce conflicts
+state 70 contains 1 shift/reduce conflicts
+state 79 contains 1 shift/reduce conflicts
+state 80 contains 1 shift/reduce conflicts
+state 81 contains 1 shift/reduce conflicts
+state 82 contains 1 shift/reduce conflicts
+state 83 contains 1 shift/reduce conflicts
+state 84 contains 1 shift/reduce conflicts
+state 85 contains 1 shift/reduce conflicts
+state 86 contains 9 shift/reduce conflicts
+
+
+-------- Grammar --------
+
+rule 1 adslspec: root_elems
+rule 2 root_elems: class_decl root_elems
+rule 3 root_elems: action_decl root_elems
+rule 4 root_elems: invariant_decl root_elems
+rule 5 root_elems: 
+rule 6 class_decl: class IDENT opt_parents "{" member_decls "}"
+rule 7 opt_parents: extends IDENT more_parents
+rule 8 opt_parents: 
+rule 9 more_parents: more_parents "," IDENT
+rule 10 more_parents: 
+rule 11 member_decls: member_decls member_decl
+rule 12 member_decls: 
+rule 13 member_decl: cardinality IDENT IDENT inverse_suffix
+rule 14 member_decl: BASIC_TYPE IDENT
+rule 15 cardinality: NUMBER
+rule 16 cardinality: NUMBER ".." NUMBER
+rule 17 cardinality: NUMBER "+"
+rule 18 inverse_suffix: inverseof IDENT
+rule 19 inverse_suffix: 
+rule 20 action_decl: action IDENT "(" action_args ")" block
+rule 21 action_args: additional_args cardinality IDENT IDENT
+rule 22 action_args: 
+rule 23 additional_args: additional_args cardinality IDENT IDENT ","
+rule 24 additional_args: 
+rule 25 block: "{" statements "}"
+rule 26 statements: statement statements
+rule 27 statements: 
+rule 28 statement: expr
+rule 29 statement: delete expr
+rule 30 statement: expr "." IDENT "+=" expr
+rule 31 statement: expr "." IDENT "-=" expr
+rule 32 statement: expr "." IDENT "=" expr
+rule 33 statement: foreach_stmt
+rule 34 statement: either block or eitherblocks
+rule 35 statement: if expr block optelse
+rule 36 foreach_stmt: foreach IDENT ":" expr block
+rule 37 foreach_stmt: flatforeach IDENT ":" expr block
+rule 38 foreach_stmt: unflatforeach IDENT ":" expr block
+rule 39 optelse: else block
+rule 40 optelse: 
+rule 41 eitherblocks: eitherblocks or block
+rule 42 eitherblocks: block
+rule 43 expr: IDENT
+rule 44 expr: IDENT "=" expr
+rule 45 expr: subset "(" expr ")"
+rule 46 expr: oneof "(" expr ")"
+rule 47 expr: tryoneof "(" expr ")"
+rule 48 expr: allof "(" IDENT ")"
+rule 49 expr: create "(" IDENT ")"
+rule 50 expr: create "(" expr "." IDENT ")"
+rule 51 expr: expr "." IDENT
+rule 52 expr: empty
+rule 53 expr: "(" expr ")"
+rule 54 expr: JS
+rule 55 expr: NUMBER
+rule 56 expr: STRING
+rule 57 expr: forall "(" quantifier_parameters_with_commas ":" expr ")"
+rule 58 expr: exists "(" quantifier_parameters_with_commas expr ")"
+rule 59 expr: not expr
+rule 60 expr: expr and expr
+rule 61 expr: expr or expr
+rule 62 expr: expr "<=>" expr
+rule 63 expr: expr "=>" expr
+rule 64 expr: expr "<=" expr
+rule 65 expr: equiv "(" expr "," expr additional_exprs ")"
+rule 66 expr: implies "(" expr "," expr ")"
+rule 67 expr: expr "==" expr
+rule 68 expr: expr "!=" expr
+rule 69 expr: equal "(" expr "," expr additional_exprs ")"
+rule 70 expr: expr in expr
+rule 71 expr: true
+rule 72 expr: false
+rule 73 expr: "*"
+rule 74 expr: isempty "(" expr ")"
+rule 75 invariant_decl: invariant expr
+rule 76 invariant_decl: invariant IDENT ":" expr
+rule 77 quantifier_parameters_with_commas: quantifier_parameters_with_commas "," quantifier_parameter
+rule 78 quantifier_parameters_with_commas: quantifier_parameter
+rule 79 quantifier_parameter: IDENT IDENT
+rule 80 quantifier_parameter: IDENT in expr
+rule 81 additional_exprs: additional_exprs "," expr
+rule 82 additional_exprs: 
+
+------- Symbols -------
+
+**Nonterminals, with rules where they appear
+
+  $start (58)
+    on right: 
+    on left : 
+  adslspec (59)
+    on right: 
+    on left : 1
+  root_elems (60)
+    on right: 1 2 3 4
+    on left : 2 3 4 5
+  class_decl (61)
+    on right: 2
+    on left : 6
+  action_decl (62)
+    on right: 3
+    on left : 20
+  invariant_decl (63)
+    on right: 4
+    on left : 75 76
+  opt_parents (64)
+    on right: 6
+    on left : 7 8
+  member_decls (65)
+    on right: 6 11
+    on left : 11 12
+  more_parents (66)
+    on right: 7 9
+    on left : 9 10
+  member_decl (67)
+    on right: 11
+    on left : 13 14
+  cardinality (68)
+    on right: 13 21 23
+    on left : 15 16 17
+  inverse_suffix (69)
+    on right: 13
+    on left : 18 19
+  action_args (70)
+    on right: 20
+    on left : 21 22
+  block (71)
+    on right: 20 34 35 36 37 38 39 41 42
+    on left : 25
+  additional_args (72)
+    on right: 21 23
+    on left : 23 24
+  statements (73)
+    on right: 25 26
+    on left : 26 27
+  statement (74)
+    on right: 26
+    on left : 28 29 30 31 32 33 34 35
+  expr (75)
+    on right: 28 29 30 31 32 35 36 37 38 44 45 46 47 50 51 53 57 58 59 60 61 62 63 64 65 66 67 68 69 70 74 75 76 80 81
+    on left : 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74
+  foreach_stmt (76)
+    on right: 33
+    on left : 36 37 38
+  eitherblocks (77)
+    on right: 34 41
+    on left : 41 42
+  optelse (78)
+    on right: 35
+    on left : 39 40
+  quantifier_parameters_with_commas (79)
+    on right: 57 58 77
+    on left : 77 78
+  additional_exprs (80)
+    on right: 65 69 81
+    on left : 81 82
+  quantifier_parameter (81)
+    on right: 77 78
+    on left : 79 80
+
+**Terminals, with rules where they appear
+
+  $end (0) 
+  error (1) 
+  "*" (2) 73
+  "+" (3) 17
+  "==" (4) 67
+  "!=" (5) 68
+  noassoc (6) 
+  NOT (7) 
+  "<=>" (8) 62
+  "<=" (9) 64
+  "=>" (10) 63
+  and (11) 60
+  or (12) 34 41 61
+  "." (13) 30 31 32 50 51
+  "=" (14) 32 44
+  class (15) 6
+  extends (16) 7
+  inverseof (17) 18
+  action (18) 20
+  foreach (19) 36
+  flatforeach (20) 37
+  unflatforeach (21) 38
+  either (22) 34
+  create (23) 49 50
+  delete (24) 29
+  if (25) 35
+  else (26) 39
+  subset (27) 45
+  oneof (28) 46
+  tryoneof (29) 47
+  allof (30) 48
+  invariant (31) 75 76
+  forall (32) 57
+  exists (33) 58
+  in (34) 70 80
+  isempty (35) 74
+  empty (36) 52
+  true (37) 71
+  false (38) 72
+  not (39) 59
+  equal (40) 69
+  equiv (41) 65
+  implies (42) 66
+  unknown (43) 
+  IDENT (44) 6 7 9 13 14 18 20 21 23 30 31 32 36 37 38 43 44 48 49 50 51 76 79 80
+  NUMBER (45) 15 16 17 55
+  STRING (46) 56
+  BASIC_TYPE (47) 14
+  JS (48) 54
+  "{" (49) 6 25
+  "}" (50) 6 25
+  "," (51) 9 23 65 66 69 77 81
+  ".." (52) 16
+  "(" (53) 20 45 46 47 48 49 50 53 57 58 65 66 69 74
+  ")" (54) 20 45 46 47 48 49 50 53 57 58 65 66 69 74
+  "+=" (55) 30
+  "-=" (56) 31
+  ":" (57) 36 37 38 57 76
+
+--------- State ---------
+
+state 0
+
+
+  class         shift, and go to state 6
+  action        shift, and go to state 7
+  invariant     shift, and go to state 8
+  $default      reduce using rule 5 (root_elems)
+
+  adslspec      go to state 1
+  root_elems    go to state 2
+  class_decl    go to state 3
+  action_decl   go to state 4
+  invariant_decl  go to state 5
+
+state 1
+
+
+  $end          shift, and go to state 9
+
+
+state 2
+
+   1) adslspec : root_elems _
+
+  $default      reduce using rule 1 (adslspec)
+
+
+state 3
+
+   2) root_elems : class_decl _ root_elems
+
+  class         shift, and go to state 6
+  action        shift, and go to state 7
+  invariant     shift, and go to state 8
+  $default      reduce using rule 5 (root_elems)
+
+  class_decl    go to state 3
+  root_elems    go to state 10
+  action_decl   go to state 4
+  invariant_decl  go to state 5
+
+state 4
+
+   3) root_elems : action_decl _ root_elems
+
+  class         shift, and go to state 6
+  action        shift, and go to state 7
+  invariant     shift, and go to state 8
+  $default      reduce using rule 5 (root_elems)
+
+  class_decl    go to state 3
+  action_decl   go to state 4
+  root_elems    go to state 11
+  invariant_decl  go to state 5
+
+state 5
+
+   4) root_elems : invariant_decl _ root_elems
+
+  class         shift, and go to state 6
+  action        shift, and go to state 7
+  invariant     shift, and go to state 8
+  $default      reduce using rule 5 (root_elems)
+
+  class_decl    go to state 3
+  action_decl   go to state 4
+  invariant_decl  go to state 5
+  root_elems    go to state 12
+
+state 6
+
+   6) class_decl : class _ IDENT opt_parents "{" member_decls "}"
+
+  IDENT         shift, and go to state 13
+
+
+state 7
+
+  20) action_decl : action _ IDENT "(" action_args ")" block
+
+  IDENT         shift, and go to state 14
+
+
+state 8
+
+  75) invariant_decl : invariant _ expr
+  76) invariant_decl : invariant _ IDENT ":" expr
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 15
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 21
+
+state 9
+
+
+  $end          shift, and go to state 37
+
+
+state 10
+
+   2) root_elems : class_decl root_elems _
+
+  $default      reduce using rule 2 (root_elems)
+
+
+state 11
+
+   3) root_elems : action_decl root_elems _
+
+  $default      reduce using rule 3 (root_elems)
+
+
+state 12
+
+   4) root_elems : invariant_decl root_elems _
+
+  $default      reduce using rule 4 (root_elems)
+
+
+state 13
+
+   6) class_decl : class IDENT _ opt_parents "{" member_decls "}"
+
+  extends       shift, and go to state 39
+  $default      reduce using rule 8 (opt_parents)
+
+  opt_parents   go to state 38
+
+state 14
+
+  20) action_decl : action IDENT _ "(" action_args ")" block
+
+  "("           shift, and go to state 40
+
+
+state 15
+
+  43) expr : IDENT _
+  44) expr : IDENT _ "=" expr
+  76) invariant_decl : invariant IDENT _ ":" expr
+
+  "="           shift, and go to state 41
+  ":"           shift, and go to state 42
+  $default      reduce using rule 43 (expr)
+
+
+state 16
+
+  45) expr : subset _ "(" expr ")"
+
+  "("           shift, and go to state 43
+
+
+state 17
+
+  46) expr : oneof _ "(" expr ")"
+
+  "("           shift, and go to state 44
+
+
+state 18
+
+  47) expr : tryoneof _ "(" expr ")"
+
+  "("           shift, and go to state 45
+
+
+state 19
+
+  48) expr : allof _ "(" IDENT ")"
+
+  "("           shift, and go to state 46
+
+
+state 20
+
+  49) expr : create _ "(" IDENT ")"
+  50) expr : create _ "(" expr "." IDENT ")"
+
+  "("           shift, and go to state 47
+
+
+state 21
+
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+  75) invariant_decl : invariant expr _
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  and           shift, and go to state 49
+  or            shift, and go to state 50
+  "."           shift, and go to state 48
+  in            shift, and go to state 56
+  $default      reduce using rule 75 (invariant_decl)
+
+
+state 22
+
+  52) expr : empty _
+
+  $default      reduce using rule 52 (expr)
+
+
+state 23
+
+  53) expr : "(" _ expr ")"
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 58
+
+state 24
+
+  54) expr : JS _
+
+  $default      reduce using rule 54 (expr)
+
+
+state 25
+
+  55) expr : NUMBER _
+
+  $default      reduce using rule 55 (expr)
+
+
+state 26
+
+  56) expr : STRING _
+
+  $default      reduce using rule 56 (expr)
+
+
+state 27
+
+  57) expr : forall _ "(" quantifier_parameters_with_commas ":" expr ")"
+
+  "("           shift, and go to state 59
+
+
+state 28
+
+  58) expr : exists _ "(" quantifier_parameters_with_commas expr ")"
+
+  "("           shift, and go to state 60
+
+
+state 29
+
+  59) expr : not _ expr
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 61
+
+state 30
+
+  65) expr : equiv _ "(" expr "," expr additional_exprs ")"
+
+  "("           shift, and go to state 62
+
+
+state 31
+
+  66) expr : implies _ "(" expr "," expr ")"
+
+  "("           shift, and go to state 63
+
+
+state 32
+
+  69) expr : equal _ "(" expr "," expr additional_exprs ")"
+
+  "("           shift, and go to state 64
+
+
+state 33
+
+  71) expr : true _
+
+  $default      reduce using rule 71 (expr)
+
+
+state 34
+
+  72) expr : false _
+
+  $default      reduce using rule 72 (expr)
+
+
+state 35
+
+  73) expr : "*" _
+
+  $default      reduce using rule 73 (expr)
+
+
+state 36
+
+  74) expr : isempty _ "(" expr ")"
+
+  "("           shift, and go to state 65
+
+
+state 37
+
+
+  $default      accept
+
+
+state 38
+
+   6) class_decl : class IDENT opt_parents _ "{" member_decls "}"
+
+  "{"           shift, and go to state 66
+
+
+state 39
+
+   7) opt_parents : extends _ IDENT more_parents
+
+  IDENT         shift, and go to state 67
+
+
+state 40
+
+  20) action_decl : action IDENT "(" _ action_args ")" block
+
+  NUMBER        reduce using rule 24 (additional_args)
+  $default      reduce using rule 22 (action_args)
+
+  action_args   go to state 68
+  additional_args  go to state 69
+
+state 41
+
+  44) expr : IDENT "=" _ expr
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 70
+
+state 42
+
+  76) invariant_decl : invariant IDENT ":" _ expr
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 71
+
+state 43
+
+  45) expr : subset "(" _ expr ")"
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 72
+
+state 44
+
+  46) expr : oneof "(" _ expr ")"
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 73
+
+state 45
+
+  47) expr : tryoneof "(" _ expr ")"
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 74
+
+state 46
+
+  48) expr : allof "(" _ IDENT ")"
+
+  IDENT         shift, and go to state 75
+
+
+state 47
+
+  49) expr : create "(" _ IDENT ")"
+  50) expr : create "(" _ expr "." IDENT ")"
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 76
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 77
+
+state 48
+
+  51) expr : expr "." _ IDENT
+
+  IDENT         shift, and go to state 78
+
+
+state 49
+
+  60) expr : expr and _ expr
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 79
+
+state 50
+
+  61) expr : expr or _ expr
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 80
+
+state 51
+
+  62) expr : expr "<=>" _ expr
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 81
+
+state 52
+
+  63) expr : expr "=>" _ expr
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 82
+
+state 53
+
+  64) expr : expr "<=" _ expr
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 83
+
+state 54
+
+  67) expr : expr "==" _ expr
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 84
+
+state 55
+
+  68) expr : expr "!=" _ expr
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 85
+
+state 56
+
+  70) expr : expr in _ expr
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 86
+
+state 57
+
+  43) expr : IDENT _
+  44) expr : IDENT _ "=" expr
+
+  "="           shift, and go to state 41
+  $default      reduce using rule 43 (expr)
+
+
+state 58
+
+  51) expr : expr _ "." IDENT
+  53) expr : "(" expr _ ")"
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  and           shift, and go to state 49
+  or            shift, and go to state 50
+  "."           shift, and go to state 48
+  in            shift, and go to state 56
+  ")"           shift, and go to state 87
+
+
+state 59
+
+  57) expr : forall "(" _ quantifier_parameters_with_commas ":" expr ")"
+
+  IDENT         shift, and go to state 90
+
+  quantifier_parameters_with_commas  go to state 88
+  quantifier_parameter  go to state 89
+
+state 60
+
+  58) expr : exists "(" _ quantifier_parameters_with_commas expr ")"
+
+  IDENT         shift, and go to state 90
+
+  quantifier_parameters_with_commas  go to state 91
+  quantifier_parameter  go to state 89
+
+state 61
+
+  51) expr : expr _ "." IDENT
+  59) expr : not expr _
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+
+  in            shift, and go to state 56
+  in            [reduce using rule 59 (expr)]
+  $default      reduce using rule 59 (expr)
+
+
+state 62
+
+  65) expr : equiv "(" _ expr "," expr additional_exprs ")"
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 92
+
+state 63
+
+  66) expr : implies "(" _ expr "," expr ")"
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 93
+
+state 64
+
+  69) expr : equal "(" _ expr "," expr additional_exprs ")"
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 94
+
+state 65
+
+  74) expr : isempty "(" _ expr ")"
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 95
+
+state 66
+
+   6) class_decl : class IDENT opt_parents "{" _ member_decls "}"
+
+  $default      reduce using rule 12 (member_decls)
+
+  member_decls  go to state 96
+
+state 67
+
+   7) opt_parents : extends IDENT _ more_parents
+
+  $default      reduce using rule 10 (more_parents)
+
+  more_parents  go to state 97
+
+state 68
+
+  20) action_decl : action IDENT "(" action_args _ ")" block
+
+  ")"           shift, and go to state 98
+
+
+state 69
+
+  21) action_args : additional_args _ cardinality IDENT IDENT
+  23) additional_args : additional_args _ cardinality IDENT IDENT ","
+
+  NUMBER        shift, and go to state 99
+
+  cardinality   go to state 100
+
+state 70
+
+  44) expr : IDENT "=" expr _
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  and           shift, and go to state 49
+  or            shift, and go to state 50
+  "."           shift, and go to state 48
+  in            shift, and go to state 56
+  in            [reduce using rule 44 (expr)]
+  $default      reduce using rule 44 (expr)
+
+
+state 71
+
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+  76) invariant_decl : invariant IDENT ":" expr _
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  and           shift, and go to state 49
+  or            shift, and go to state 50
+  "."           shift, and go to state 48
+  in            shift, and go to state 56
+  $default      reduce using rule 76 (invariant_decl)
+
+
+state 72
+
+  45) expr : subset "(" expr _ ")"
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  and           shift, and go to state 49
+  or            shift, and go to state 50
+  "."           shift, and go to state 48
+  in            shift, and go to state 56
+  ")"           shift, and go to state 101
+
+
+state 73
+
+  46) expr : oneof "(" expr _ ")"
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  and           shift, and go to state 49
+  or            shift, and go to state 50
+  "."           shift, and go to state 48
+  in            shift, and go to state 56
+  ")"           shift, and go to state 102
+
+
+state 74
+
+  47) expr : tryoneof "(" expr _ ")"
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  and           shift, and go to state 49
+  or            shift, and go to state 50
+  "."           shift, and go to state 48
+  in            shift, and go to state 56
+  ")"           shift, and go to state 103
+
+
+state 75
+
+  48) expr : allof "(" IDENT _ ")"
+
+  ")"           shift, and go to state 104
+
+
+state 76
+
+  43) expr : IDENT _
+  44) expr : IDENT _ "=" expr
+  49) expr : create "(" IDENT _ ")"
+
+  "="           shift, and go to state 41
+  ")"           shift, and go to state 105
+  $default      reduce using rule 43 (expr)
+
+
+state 77
+
+  50) expr : create "(" expr _ "." IDENT ")"
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  and           shift, and go to state 49
+  or            shift, and go to state 50
+  "."           shift, and go to state 106
+  in            shift, and go to state 56
+
+
+state 78
+
+  51) expr : expr "." IDENT _
+
+  $default      reduce using rule 51 (expr)
+
+
+state 79
+
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  60) expr : expr and expr _
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  in            shift, and go to state 56
+  in            [reduce using rule 60 (expr)]
+  $default      reduce using rule 60 (expr)
+
+
+state 80
+
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  61) expr : expr or expr _
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  in            shift, and go to state 56
+  in            [reduce using rule 61 (expr)]
+  $default      reduce using rule 61 (expr)
+
+
+state 81
+
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  62) expr : expr "<=>" expr _
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  in            shift, and go to state 56
+  in            [reduce using rule 62 (expr)]
+  $default      reduce using rule 62 (expr)
+
+
+state 82
+
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  63) expr : expr "=>" expr _
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  in            shift, and go to state 56
+  in            [reduce using rule 63 (expr)]
+  $default      reduce using rule 63 (expr)
+
+
+state 83
+
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  64) expr : expr "<=" expr _
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  in            shift, and go to state 56
+  in            [reduce using rule 64 (expr)]
+  $default      reduce using rule 64 (expr)
+
+
+state 84
+
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  67) expr : expr "==" expr _
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+
+  in            shift, and go to state 56
+  in            [reduce using rule 67 (expr)]
+  $default      reduce using rule 67 (expr)
+
+
+state 85
+
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  68) expr : expr "!=" expr _
+  70) expr : expr _ in expr
+
+  in            shift, and go to state 56
+  in            [reduce using rule 68 (expr)]
+  $default      reduce using rule 68 (expr)
+
+
+state 86
+
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+  70) expr : expr in expr _
+
+  "=="          shift, and go to state 54
+  "=="          [reduce using rule 70 (expr)]
+  "!="          shift, and go to state 55
+  "!="          [reduce using rule 70 (expr)]
+  "<=>"         shift, and go to state 51
+  "<=>"         [reduce using rule 70 (expr)]
+  "<="          shift, and go to state 53
+  "<="          [reduce using rule 70 (expr)]
+  "=>"          shift, and go to state 52
+  "=>"          [reduce using rule 70 (expr)]
+  and           shift, and go to state 49
+  and           [reduce using rule 70 (expr)]
+  or            shift, and go to state 50
+  or            [reduce using rule 70 (expr)]
+  "."           shift, and go to state 48
+  "."           [reduce using rule 70 (expr)]
+  in            shift, and go to state 56
+  in            [reduce using rule 70 (expr)]
+  $default      reduce using rule 70 (expr)
+
+
+state 87
+
+  53) expr : "(" expr ")" _
+
+  $default      reduce using rule 53 (expr)
+
+
+state 88
+
+  57) expr : forall "(" quantifier_parameters_with_commas _ ":" expr ")"
+  77) quantifier_parameters_with_commas : quantifier_parameters_with_commas _ "," quantifier_parameter
+
+  ","           shift, and go to state 108
+  ":"           shift, and go to state 107
+
+
+state 89
+
+  78) quantifier_parameters_with_commas : quantifier_parameter _
+
+  $default      reduce using rule 78 (quantifier_parameters_with_commas)
+
+
+state 90
+
+  79) quantifier_parameter : IDENT _ IDENT
+  80) quantifier_parameter : IDENT _ in expr
+
+  in            shift, and go to state 110
+  IDENT         shift, and go to state 109
+
+
+state 91
+
+  58) expr : exists "(" quantifier_parameters_with_commas _ expr ")"
+  77) quantifier_parameters_with_commas : quantifier_parameters_with_commas _ "," quantifier_parameter
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  ","           shift, and go to state 108
+  "("           shift, and go to state 23
+
+  expr          go to state 111
+
+state 92
+
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  65) expr : equiv "(" expr _ "," expr additional_exprs ")"
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  and           shift, and go to state 49
+  or            shift, and go to state 50
+  "."           shift, and go to state 48
+  in            shift, and go to state 56
+  ","           shift, and go to state 112
+
+
+state 93
+
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  66) expr : implies "(" expr _ "," expr ")"
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  and           shift, and go to state 49
+  or            shift, and go to state 50
+  "."           shift, and go to state 48
+  in            shift, and go to state 56
+  ","           shift, and go to state 113
+
+
+state 94
+
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  69) expr : equal "(" expr _ "," expr additional_exprs ")"
+  70) expr : expr _ in expr
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  and           shift, and go to state 49
+  or            shift, and go to state 50
+  "."           shift, and go to state 48
+  in            shift, and go to state 56
+  ","           shift, and go to state 114
+
+
+state 95
+
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+  74) expr : isempty "(" expr _ ")"
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  and           shift, and go to state 49
+  or            shift, and go to state 50
+  "."           shift, and go to state 48
+  in            shift, and go to state 56
+  ")"           shift, and go to state 115
+
+
+state 96
+
+   6) class_decl : class IDENT opt_parents "{" member_decls _ "}"
+  11) member_decls : member_decls _ member_decl
+
+  NUMBER        shift, and go to state 99
+  BASIC_TYPE    shift, and go to state 119
+  "}"           shift, and go to state 116
+
+  member_decl   go to state 117
+  cardinality   go to state 118
+
+state 97
+
+   7) opt_parents : extends IDENT more_parents _
+   9) more_parents : more_parents _ "," IDENT
+
+  ","           shift, and go to state 120
+  $default      reduce using rule 7 (opt_parents)
+
+
+state 98
+
+  20) action_decl : action IDENT "(" action_args ")" _ block
+
+  "{"           shift, and go to state 122
+
+  block         go to state 121
+
+state 99
+
+  15) cardinality : NUMBER _
+  16) cardinality : NUMBER _ ".." NUMBER
+  17) cardinality : NUMBER _ "+"
+
+  "+"           shift, and go to state 124
+  ".."          shift, and go to state 123
+  $default      reduce using rule 15 (cardinality)
+
+
+state 100
+
+  21) action_args : additional_args cardinality _ IDENT IDENT
+  23) additional_args : additional_args cardinality _ IDENT IDENT ","
+
+  IDENT         shift, and go to state 125
+
+
+state 101
+
+  45) expr : subset "(" expr ")" _
+
+  $default      reduce using rule 45 (expr)
+
+
+state 102
+
+  46) expr : oneof "(" expr ")" _
+
+  $default      reduce using rule 46 (expr)
+
+
+state 103
+
+  47) expr : tryoneof "(" expr ")" _
+
+  $default      reduce using rule 47 (expr)
+
+
+state 104
+
+  48) expr : allof "(" IDENT ")" _
+
+  $default      reduce using rule 48 (expr)
+
+
+state 105
+
+  49) expr : create "(" IDENT ")" _
+
+  $default      reduce using rule 49 (expr)
+
+
+state 106
+
+  50) expr : create "(" expr "." _ IDENT ")"
+  51) expr : expr "." _ IDENT
+
+  IDENT         shift, and go to state 126
+
+
+state 107
+
+  57) expr : forall "(" quantifier_parameters_with_commas ":" _ expr ")"
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 127
+
+state 108
+
+  77) quantifier_parameters_with_commas : quantifier_parameters_with_commas "," _ quantifier_parameter
+
+  IDENT         shift, and go to state 90
+
+  quantifier_parameter  go to state 128
+
+state 109
+
+  79) quantifier_parameter : IDENT IDENT _
+
+  $default      reduce using rule 79 (quantifier_parameter)
+
+
+state 110
+
+  80) quantifier_parameter : IDENT in _ expr
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 129
+
+state 111
+
+  51) expr : expr _ "." IDENT
+  58) expr : exists "(" quantifier_parameters_with_commas expr _ ")"
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  and           shift, and go to state 49
+  or            shift, and go to state 50
+  "."           shift, and go to state 48
+  in            shift, and go to state 56
+  ")"           shift, and go to state 130
+
+
+state 112
+
+  65) expr : equiv "(" expr "," _ expr additional_exprs ")"
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 131
+
+state 113
+
+  66) expr : implies "(" expr "," _ expr ")"
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 132
+
+state 114
+
+  69) expr : equal "(" expr "," _ expr additional_exprs ")"
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 133
+
+state 115
+
+  74) expr : isempty "(" expr ")" _
+
+  $default      reduce using rule 74 (expr)
+
+
+state 116
+
+   6) class_decl : class IDENT opt_parents "{" member_decls "}" _
+
+  $default      reduce using rule 6 (class_decl)
+
+
+state 117
+
+  11) member_decls : member_decls member_decl _
+
+  $default      reduce using rule 11 (member_decls)
+
+
+state 118
+
+  13) member_decl : cardinality _ IDENT IDENT inverse_suffix
+
+  IDENT         shift, and go to state 134
+
+
+state 119
+
+  14) member_decl : BASIC_TYPE _ IDENT
+
+  IDENT         shift, and go to state 135
+
+
+state 120
+
+   9) more_parents : more_parents "," _ IDENT
+
+  IDENT         shift, and go to state 136
+
+
+state 121
+
+  20) action_decl : action IDENT "(" action_args ")" block _
+
+  $default      reduce using rule 20 (action_decl)
+
+
+state 122
+
+  25) block : "{" _ statements "}"
+
+  "*"           shift, and go to state 35
+  foreach       shift, and go to state 144
+  flatforeach   shift, and go to state 145
+  unflatforeach  shift, and go to state 146
+  either        shift, and go to state 142
+  create        shift, and go to state 20
+  delete        shift, and go to state 140
+  if            shift, and go to state 143
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+  $default      reduce using rule 27 (statements)
+
+  statements    go to state 137
+  statement     go to state 138
+  expr          go to state 139
+  foreach_stmt  go to state 141
+
+state 123
+
+  16) cardinality : NUMBER ".." _ NUMBER
+
+  NUMBER        shift, and go to state 147
+
+
+state 124
+
+  17) cardinality : NUMBER "+" _
+
+  $default      reduce using rule 17 (cardinality)
+
+
+state 125
+
+  21) action_args : additional_args cardinality IDENT _ IDENT
+  23) additional_args : additional_args cardinality IDENT _ IDENT ","
+
+  IDENT         shift, and go to state 148
+
+
+state 126
+
+  50) expr : create "(" expr "." IDENT _ ")"
+  51) expr : expr "." IDENT _
+
+  ")"           shift, and go to state 149
+  $default      reduce using rule 51 (expr)
+
+
+state 127
+
+  51) expr : expr _ "." IDENT
+  57) expr : forall "(" quantifier_parameters_with_commas ":" expr _ ")"
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  and           shift, and go to state 49
+  or            shift, and go to state 50
+  "."           shift, and go to state 48
+  in            shift, and go to state 56
+  ")"           shift, and go to state 150
+
+
+state 128
+
+  77) quantifier_parameters_with_commas : quantifier_parameters_with_commas "," quantifier_parameter _
+
+  $default      reduce using rule 77 (quantifier_parameters_with_commas)
+
+
+state 129
+
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+  80) quantifier_parameter : IDENT in expr _
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  and           shift, and go to state 49
+  or            shift, and go to state 50
+  "."           shift, and go to state 48
+  in            shift, and go to state 56
+  $default      reduce using rule 80 (quantifier_parameter)
+
+
+state 130
+
+  58) expr : exists "(" quantifier_parameters_with_commas expr ")" _
+
+  $default      reduce using rule 58 (expr)
+
+
+state 131
+
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  65) expr : equiv "(" expr "," expr _ additional_exprs ")"
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  and           shift, and go to state 49
+  or            shift, and go to state 50
+  "."           shift, and go to state 48
+  in            shift, and go to state 56
+  $default      reduce using rule 82 (additional_exprs)
+
+  additional_exprs  go to state 151
+
+state 132
+
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  66) expr : implies "(" expr "," expr _ ")"
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  and           shift, and go to state 49
+  or            shift, and go to state 50
+  "."           shift, and go to state 48
+  in            shift, and go to state 56
+  ")"           shift, and go to state 152
+
+
+state 133
+
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  69) expr : equal "(" expr "," expr _ additional_exprs ")"
+  70) expr : expr _ in expr
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  and           shift, and go to state 49
+  or            shift, and go to state 50
+  "."           shift, and go to state 48
+  in            shift, and go to state 56
+  $default      reduce using rule 82 (additional_exprs)
+
+  additional_exprs  go to state 153
+
+state 134
+
+  13) member_decl : cardinality IDENT _ IDENT inverse_suffix
+
+  IDENT         shift, and go to state 154
+
+
+state 135
+
+  14) member_decl : BASIC_TYPE IDENT _
+
+  $default      reduce using rule 14 (member_decl)
+
+
+state 136
+
+   9) more_parents : more_parents "," IDENT _
+
+  $default      reduce using rule 9 (more_parents)
+
+
+state 137
+
+  25) block : "{" statements _ "}"
+
+  "}"           shift, and go to state 155
+
+
+state 138
+
+  26) statements : statement _ statements
+
+  "*"           shift, and go to state 35
+  foreach       shift, and go to state 144
+  flatforeach   shift, and go to state 145
+  unflatforeach  shift, and go to state 146
+  either        shift, and go to state 142
+  create        shift, and go to state 20
+  delete        shift, and go to state 140
+  if            shift, and go to state 143
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+  $default      reduce using rule 27 (statements)
+
+  statement     go to state 138
+  statements    go to state 156
+  expr          go to state 139
+  foreach_stmt  go to state 141
+
+state 139
+
+  28) statement : expr _
+  30) statement : expr _ "." IDENT "+=" expr
+  31) statement : expr _ "." IDENT "-=" expr
+  32) statement : expr _ "." IDENT "=" expr
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  and           shift, and go to state 49
+  or            shift, and go to state 50
+  "."           shift, and go to state 157
+  in            shift, and go to state 56
+  $default      reduce using rule 28 (statement)
+
+
+state 140
+
+  29) statement : delete _ expr
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 158
+
+state 141
+
+  33) statement : foreach_stmt _
+
+  $default      reduce using rule 33 (statement)
+
+
+state 142
+
+  34) statement : either _ block or eitherblocks
+
+  "{"           shift, and go to state 122
+
+  block         go to state 159
+
+state 143
+
+  35) statement : if _ expr block optelse
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 160
+
+state 144
+
+  36) foreach_stmt : foreach _ IDENT ":" expr block
+
+  IDENT         shift, and go to state 161
+
+
+state 145
+
+  37) foreach_stmt : flatforeach _ IDENT ":" expr block
+
+  IDENT         shift, and go to state 162
+
+
+state 146
+
+  38) foreach_stmt : unflatforeach _ IDENT ":" expr block
+
+  IDENT         shift, and go to state 163
+
+
+state 147
+
+  16) cardinality : NUMBER ".." NUMBER _
+
+  $default      reduce using rule 16 (cardinality)
+
+
+state 148
+
+  21) action_args : additional_args cardinality IDENT IDENT _
+  23) additional_args : additional_args cardinality IDENT IDENT _ ","
+
+  ","           shift, and go to state 164
+  $default      reduce using rule 21 (action_args)
+
+
+state 149
+
+  50) expr : create "(" expr "." IDENT ")" _
+
+  $default      reduce using rule 50 (expr)
+
+
+state 150
+
+  57) expr : forall "(" quantifier_parameters_with_commas ":" expr ")" _
+
+  $default      reduce using rule 57 (expr)
+
+
+state 151
+
+  65) expr : equiv "(" expr "," expr additional_exprs _ ")"
+  81) additional_exprs : additional_exprs _ "," expr
+
+  ","           shift, and go to state 166
+  ")"           shift, and go to state 165
+
+
+state 152
+
+  66) expr : implies "(" expr "," expr ")" _
+
+  $default      reduce using rule 66 (expr)
+
+
+state 153
+
+  69) expr : equal "(" expr "," expr additional_exprs _ ")"
+  81) additional_exprs : additional_exprs _ "," expr
+
+  ","           shift, and go to state 166
+  ")"           shift, and go to state 167
+
+
+state 154
+
+  13) member_decl : cardinality IDENT IDENT _ inverse_suffix
+
+  inverseof     shift, and go to state 169
+  $default      reduce using rule 19 (inverse_suffix)
+
+  inverse_suffix  go to state 168
+
+state 155
+
+  25) block : "{" statements "}" _
+
+  $default      reduce using rule 25 (block)
+
+
+state 156
+
+  26) statements : statement statements _
+
+  $default      reduce using rule 26 (statements)
+
+
+state 157
+
+  30) statement : expr "." _ IDENT "+=" expr
+  31) statement : expr "." _ IDENT "-=" expr
+  32) statement : expr "." _ IDENT "=" expr
+  51) expr : expr "." _ IDENT
+
+  IDENT         shift, and go to state 170
+
+
+state 158
+
+  29) statement : delete expr _
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  and           shift, and go to state 49
+  or            shift, and go to state 50
+  "."           shift, and go to state 48
+  in            shift, and go to state 56
+  $default      reduce using rule 29 (statement)
+
+
+state 159
+
+  34) statement : either block _ or eitherblocks
+
+  or            shift, and go to state 171
+
+
+state 160
+
+  35) statement : if expr _ block optelse
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  and           shift, and go to state 49
+  or            shift, and go to state 50
+  "."           shift, and go to state 48
+  in            shift, and go to state 56
+  "{"           shift, and go to state 122
+
+  block         go to state 172
+
+state 161
+
+  36) foreach_stmt : foreach IDENT _ ":" expr block
+
+  ":"           shift, and go to state 173
+
+
+state 162
+
+  37) foreach_stmt : flatforeach IDENT _ ":" expr block
+
+  ":"           shift, and go to state 174
+
+
+state 163
+
+  38) foreach_stmt : unflatforeach IDENT _ ":" expr block
+
+  ":"           shift, and go to state 175
+
+
+state 164
+
+  23) additional_args : additional_args cardinality IDENT IDENT "," _
+
+  $default      reduce using rule 23 (additional_args)
+
+
+state 165
+
+  65) expr : equiv "(" expr "," expr additional_exprs ")" _
+
+  $default      reduce using rule 65 (expr)
+
+
+state 166
+
+  81) additional_exprs : additional_exprs "," _ expr
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 176
+
+state 167
+
+  69) expr : equal "(" expr "," expr additional_exprs ")" _
+
+  $default      reduce using rule 69 (expr)
+
+
+state 168
+
+  13) member_decl : cardinality IDENT IDENT inverse_suffix _
+
+  $default      reduce using rule 13 (member_decl)
+
+
+state 169
+
+  18) inverse_suffix : inverseof _ IDENT
+
+  IDENT         shift, and go to state 177
+
+
+state 170
+
+  30) statement : expr "." IDENT _ "+=" expr
+  31) statement : expr "." IDENT _ "-=" expr
+  32) statement : expr "." IDENT _ "=" expr
+  51) expr : expr "." IDENT _
+
+  "="           shift, and go to state 180
+  "+="          shift, and go to state 178
+  "-="          shift, and go to state 179
+  $default      reduce using rule 51 (expr)
+
+
+state 171
+
+  34) statement : either block or _ eitherblocks
+
+  "{"           shift, and go to state 122
+
+  eitherblocks  go to state 181
+  block         go to state 182
+
+state 172
+
+  35) statement : if expr block _ optelse
+
+  else          shift, and go to state 184
+  $default      reduce using rule 40 (optelse)
+
+  optelse       go to state 183
+
+state 173
+
+  36) foreach_stmt : foreach IDENT ":" _ expr block
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 185
+
+state 174
+
+  37) foreach_stmt : flatforeach IDENT ":" _ expr block
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 186
+
+state 175
+
+  38) foreach_stmt : unflatforeach IDENT ":" _ expr block
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 187
+
+state 176
+
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+  81) additional_exprs : additional_exprs "," expr _
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  and           shift, and go to state 49
+  or            shift, and go to state 50
+  "."           shift, and go to state 48
+  in            shift, and go to state 56
+  $default      reduce using rule 81 (additional_exprs)
+
+
+state 177
+
+  18) inverse_suffix : inverseof IDENT _
+
+  $default      reduce using rule 18 (inverse_suffix)
+
+
+state 178
+
+  30) statement : expr "." IDENT "+=" _ expr
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 188
+
+state 179
+
+  31) statement : expr "." IDENT "-=" _ expr
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 189
+
+state 180
+
+  32) statement : expr "." IDENT "=" _ expr
+
+  "*"           shift, and go to state 35
+  create        shift, and go to state 20
+  subset        shift, and go to state 16
+  oneof         shift, and go to state 17
+  tryoneof      shift, and go to state 18
+  allof         shift, and go to state 19
+  forall        shift, and go to state 27
+  exists        shift, and go to state 28
+  isempty       shift, and go to state 36
+  empty         shift, and go to state 22
+  true          shift, and go to state 33
+  false         shift, and go to state 34
+  not           shift, and go to state 29
+  equal         shift, and go to state 32
+  equiv         shift, and go to state 30
+  implies       shift, and go to state 31
+  IDENT         shift, and go to state 57
+  NUMBER        shift, and go to state 25
+  STRING        shift, and go to state 26
+  JS            shift, and go to state 24
+  "("           shift, and go to state 23
+
+  expr          go to state 190
+
+state 181
+
+  34) statement : either block or eitherblocks _
+  41) eitherblocks : eitherblocks _ or block
+
+  or            shift, and go to state 191
+  $default      reduce using rule 34 (statement)
+
+
+state 182
+
+  42) eitherblocks : block _
+
+  $default      reduce using rule 42 (eitherblocks)
+
+
+state 183
+
+  35) statement : if expr block optelse _
+
+  $default      reduce using rule 35 (statement)
+
+
+state 184
+
+  39) optelse : else _ block
+
+  "{"           shift, and go to state 122
+
+  block         go to state 192
+
+state 185
+
+  36) foreach_stmt : foreach IDENT ":" expr _ block
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  and           shift, and go to state 49
+  or            shift, and go to state 50
+  "."           shift, and go to state 48
+  in            shift, and go to state 56
+  "{"           shift, and go to state 122
+
+  block         go to state 193
+
+state 186
+
+  37) foreach_stmt : flatforeach IDENT ":" expr _ block
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  and           shift, and go to state 49
+  or            shift, and go to state 50
+  "."           shift, and go to state 48
+  in            shift, and go to state 56
+  "{"           shift, and go to state 122
+
+  block         go to state 194
+
+state 187
+
+  38) foreach_stmt : unflatforeach IDENT ":" expr _ block
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  and           shift, and go to state 49
+  or            shift, and go to state 50
+  "."           shift, and go to state 48
+  in            shift, and go to state 56
+  "{"           shift, and go to state 122
+
+  block         go to state 195
+
+state 188
+
+  30) statement : expr "." IDENT "+=" expr _
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  and           shift, and go to state 49
+  or            shift, and go to state 50
+  "."           shift, and go to state 48
+  in            shift, and go to state 56
+  $default      reduce using rule 30 (statement)
+
+
+state 189
+
+  31) statement : expr "." IDENT "-=" expr _
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  and           shift, and go to state 49
+  or            shift, and go to state 50
+  "."           shift, and go to state 48
+  in            shift, and go to state 56
+  $default      reduce using rule 31 (statement)
+
+
+state 190
+
+  32) statement : expr "." IDENT "=" expr _
+  51) expr : expr _ "." IDENT
+  60) expr : expr _ and expr
+  61) expr : expr _ or expr
+  62) expr : expr _ "<=>" expr
+  63) expr : expr _ "=>" expr
+  64) expr : expr _ "<=" expr
+  67) expr : expr _ "==" expr
+  68) expr : expr _ "!=" expr
+  70) expr : expr _ in expr
+
+  "=="          shift, and go to state 54
+  "!="          shift, and go to state 55
+  "<=>"         shift, and go to state 51
+  "<="          shift, and go to state 53
+  "=>"          shift, and go to state 52
+  and           shift, and go to state 49
+  or            shift, and go to state 50
+  "."           shift, and go to state 48
+  in            shift, and go to state 56
+  $default      reduce using rule 32 (statement)
+
+
+state 191
+
+  41) eitherblocks : eitherblocks or _ block
+
+  "{"           shift, and go to state 122
+
+  block         go to state 196
+
+state 192
+
+  39) optelse : else block _
+
+  $default      reduce using rule 39 (optelse)
+
+
+state 193
+
+  36) foreach_stmt : foreach IDENT ":" expr block _
+
+  $default      reduce using rule 36 (foreach_stmt)
+
+
+state 194
+
+  37) foreach_stmt : flatforeach IDENT ":" expr block _
+
+  $default      reduce using rule 37 (foreach_stmt)
+
+
+state 195
+
+  38) foreach_stmt : unflatforeach IDENT ":" expr block _
+
+  $default      reduce using rule 38 (foreach_stmt)
+
+
+state 196
+
+  41) eitherblocks : eitherblocks or block _
+
+  $default      reduce using rule 41 (eitherblocks)
+

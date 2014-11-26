@@ -1,4 +1,6 @@
-require 'test/unit'
+require 'minitest/unit'
+
+require 'minitest/autorun'
 require 'active_record'
 require 'ruby_parser'
 require 'ruby2ruby'

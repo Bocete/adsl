@@ -1,16 +1,16 @@
-require 'adsl/verification/invariant'
-require 'adsl/verification/formula_generators'
+require 'adsl/extract/invariant'
+require 'adsl/extract/formula_generators'
 require 'adsl/extract/rails/invariant_instrumenter'
-require 'adsl/verification/instrumentation_filter'
+require 'adsl/extract/instrumentation_filter'
 
 module ADSL
   module Extract
     module Rails
       class InvariantExtractor
 
-        include ADSL::Verification
-        include ADSL::Verification::FormulaGenerators
-        include ADSL::Verification::InstrumentationFilterGenerators
+        include ADSL::Extract
+        include ADSL::Extract::FormulaGenerators
+        include ADSL::Extract::InstrumentationFilterGenerators
 
         attr_reader :invariants
 

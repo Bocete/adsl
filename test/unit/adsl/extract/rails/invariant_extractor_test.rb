@@ -1,4 +1,6 @@
-require 'test/unit'
+require 'minitest/unit'
+
+require 'minitest/autorun'
 require 'adsl/util/test_helper'
 require 'adsl/extract/rails/invariant_extractor'
 require 'adsl/extract/rails/rails_instrumentation_test_case'

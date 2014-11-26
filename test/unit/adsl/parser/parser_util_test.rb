@@ -1,10 +1,12 @@
 require 'adsl/parser/adsl_parser.tab.rb'
 require 'adsl/ds/type_sig'
-require 'test/unit'
+require 'minitest/unit'
+
+require 'minitest/autorun'
 require 'pp'
 
 module ADSL::Parser
-  class ParserUtilTest < Test::Unit::TestCase
+  class ParserUtilTest < MiniTest::Unit::TestCase
     include ADSL::Parser
     include ADSL::DS
 

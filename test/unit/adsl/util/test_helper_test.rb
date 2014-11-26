@@ -1,8 +1,10 @@
-require 'test/unit'
+require 'minitest/unit'
+
+require 'minitest/autorun'
 require 'adsl/util/test_helper'
 require 'adsl/fol/first_order_logic'
 
-class ADSL::Util::TestHelperTest < Test::Unit::TestCase
+class ADSL::Util::TestHelperTest < MiniTest::Unit::TestCase
   def test_adsl_assert__plain
     adsl_assert :correct, <<-ADSL
       class Class {}
@@ -33,7 +35,7 @@ class ADSL::Util::TestHelperTest < Test::Unit::TestCase
       class TestClassDefinedBasic
       end
     ruby
-    assert_true class_defined? :TestClassDefinedBasic
+    assert class_defined? :TestClassDefinedBasic
   end
 
   def test_class_defined__multiple
@@ -42,7 +44,7 @@ class ADSL::Util::TestHelperTest < Test::Unit::TestCase
       class Multiple1
       end
     ruby
-    assert_true class_defined? :Multiple1, :Multiple2
+    assert class_defined? :Multiple1, :Multiple2
   end
   
   def test_unload_class__classes_unload

@@ -1,9 +1,11 @@
-require 'test/unit'
+require 'minitest/unit'
+
+require 'minitest/autorun'
 require 'adsl/extract/meta'
 require 'pp'
 require 'adsl/util/test_helper'
 
-class ADSL::Util::MetaTest < Test::Unit::TestCase
+class ADSL::Util::MetaTest < MiniTest::Unit::TestCase
   def setup
     assert !class_defined?(:Foo, :Bar)
   end
@@ -16,7 +18,7 @@ class ADSL::Util::MetaTest < Test::Unit::TestCase
     eval <<-ruby
       class Foo; end
     ruby
-    assert_raise do
+    assert_raises ArgumentError do
       Foo.new.replace_method :a, "def a; end"
     end
   end

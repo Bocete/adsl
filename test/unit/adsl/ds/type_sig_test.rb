@@ -1,8 +1,13 @@
-require 'test/unit'
+require 'minitest/unit'
+
+require 'minitest/autorun'
+require 'adsl/ds/data_store_spec'
 require 'adsl/ds/type_sig'
 require 'pp'
 
-class ADSL::DS::TypeSigTest < Test::Unit::TestCase
+class ADSL::DS::TypeSigTest < MiniTest::Unit::TestCase
+  include ADSL::DS::TypeSig
+  
   def test_class__superclass_of
     parent = ADSL::DS::DSClass.new :name => 'parent'
     child1 = ADSL::DS::DSClass.new :name => 'child1', :parents => Set[parent]
@@ -35,8 +40,8 @@ class ADSL::DS::TypeSigTest < Test::Unit::TestCase
     assert_equal     child1.to_sig, child1.to_sig
     assert_not_equal child1.to_sig, child2.to_sig
 
-    assert_equal parent.to_sig, child1.to_sig.join(child2.to_sig)
-    assert_equal parent.to_sig, child1.to_sig.join(parent.to_sig)
+    assert_equal parent.to_sig, child1.to_sig & child2.to_sig
+    assert_equal parent.to_sig, child1.to_sig & parent.to_sig
 
     assert parent.to_sig >= child1.to_sig
     assert parent.to_sig > child1.to_sig
@@ -52,21 +57,54 @@ class ADSL::DS::TypeSigTest < Test::Unit::TestCase
     child2 = ADSL::DS::DSClass.new :name => 'child2', :parents => Set[parent1, parent2]
     subchild = ADSL::DS::DSClass.new :name => 'subchild', :parents => Set[child1, child2]
 
-    join = child1.to_sig.join child2.to_sig
+    join = child1.to_sig & child2.to_sig
 
     assert join.classes == Set[parent1, parent2]
   end
 
-  def test_type_sig__randoms
+  def test_type_sig__is_unknown_type?
     klass = ADSL::DS::DSClass.new :name => 'klass'
-    
-    random1 = ADSL::DS::TypeSig.random
-    random2 = ADSL::DS::TypeSig.random
-    non_random1 = ADSL::DS::TypeSig::ObjsetType.new klass
-    non_random2 = ADSL::DS::TypeSig::ObjsetType.new klass
+    assert_false ADSL::DS::TypeSig::ObjsetType.new(klass).is_unknown_type?
 
-    assert_equal non_random1, non_random2
-    assert_not_equal non_random1, random1
-    assert_not_equal random1, random2
+    assert ADSL::DS::TypeSig::UNKNOWN.is_unknown_type?
+
+    assert_false ADSL::DS::TypeSig::BasicType::INT.is_unknown_type?
+    assert_false ADSL::DS::TypeSig::BasicType::BOOL.is_unknown_type?
+  end
+
+  def test_type_sig__is_bool_type?
+    klass = ADSL::DS::DSClass.new :name => 'klass'
+    assert_false ADSL::DS::TypeSig::ObjsetType.new(klass).is_bool_type?
+
+    assert_false ADSL::DS::TypeSig::UNKNOWN.is_bool_type?
+
+    assert_false ADSL::DS::TypeSig::BasicType::INT.is_bool_type?
+    assert       ADSL::DS::TypeSig::BasicType::BOOL.is_bool_type?
+  end
+
+  def test_type_sig__is_objset_type?
+    klass = ADSL::DS::DSClass.new :name => 'klass'
+    assert ADSL::DS::TypeSig::ObjsetType.new(klass).is_objset_type?
+
+    assert ADSL::DS::DSEmptyObjset.new.type_sig.is_objset_type?
+
+    assert_false ADSL::DS::TypeSig::UNKNOWN.is_objset_type?
+
+    assert_false ADSL::DS::TypeSig::BasicType::INT.is_objset_type?
+    assert_false ADSL::DS::TypeSig::BasicType::BOOL.is_objset_type?
+  end
+
+  def test_type_sig__basic_type__hierarchy
+    assert BasicType::INT < BasicType::REAL
+    assert BasicType::INT < BasicType::DECIMAL
+    assert BasicType::DECIMAL < BasicType::REAL
+    assert_false BasicType::BOOL < BasicType::INT
+    assert_false BasicType::BOOL > BasicType::INT
+  end
+
+  def test_type_sig__basic_type__join
+    assert_equal BasicType::DECIMAL, BasicType::DECIMAL & BasicType::INT
+    assert_equal BasicType::REAL, BasicType::DECIMAL & BasicType::REAL
+    assert (BasicType::DECIMAL & BasicType::STRING).is_invalid_type?
   end
 end

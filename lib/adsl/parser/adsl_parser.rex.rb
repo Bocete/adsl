@@ -6,6 +6,7 @@
 
 require 'racc/parser'
 require 'adsl/parser/ast_nodes'
+require 'adsl/util/numeric_extensions'
 
 class ADSL::Parser::ADSLParser < Racc::Parser
   require 'strscan'
@@ -80,6 +81,9 @@ class ADSL::Parser::ADSLParser < Racc::Parser
       when (text = @ss.scan(/create\b/))
          action { [:create, lineno] }
 
+      when (text = @ss.scan(/derefcreate\b/))
+         action { [:derefcreate, lineno] }
+
       when (text = @ss.scan(/delete\b/))
          action { [:delete, lineno] }
 
@@ -98,10 +102,10 @@ class ADSL::Parser::ADSLParser < Racc::Parser
       when (text = @ss.scan(/either\b/))
          action { [:either, lineno] }
 
-      when (text = @ss.scan(/if/))
+      when (text = @ss.scan(/if\b/))
          action { [:if, lineno] }
 
-      when (text = @ss.scan(/else/))
+      when (text = @ss.scan(/else\b/))
          action { [:else, lineno] }
 
       when (text = @ss.scan(/action\b/))
@@ -143,7 +147,7 @@ class ADSL::Parser::ADSLParser < Racc::Parser
       when (text = @ss.scan(/!=/))
          action { [text, lineno] }
 
-      when (text = @ss.scan(/!|not\b/))
+      when (text = @ss.scan(/(?:!|not)\b/))
          action { [:not, lineno] }
 
       when (text = @ss.scan(/and\b/))
@@ -151,9 +155,6 @@ class ADSL::Parser::ADSLParser < Racc::Parser
 
       when (text = @ss.scan(/equal\b/))
          action { [:equal, lineno] }
-
-      when (text = @ss.scan(/equiv\b/))
-         action { [:equiv, lineno] }
 
       when (text = @ss.scan(/empty\b/))
          action { [:empty, lineno] }
@@ -200,10 +201,13 @@ class ADSL::Parser::ADSLParser < Racc::Parser
       when (text = @ss.scan(/\*/))
          action { [text, lineno] }
 
-      when (text = @ss.scan(/[01]/))
-         action { [text, lineno] }
+      when (text = @ss.scan(/[0-9]+(?:\.[0-9]+)?/))
+         action { [:NUMBER, { :value => text.to_f,   :lineno => lineno }] }
 
-      when (text = @ss.scan(/Int|String|Real|Decimal|Bool/))
+      when (text = @ss.scan(/((?<![\\])['"])((?:.(?!(?<![\\])\1))*.?)\1/))
+         action { [:STRING, { :value => text[1..-2], :lineno => lineno }] }
+
+      when (text = @ss.scan(/(?:int|string|real|decimal|bool)\b/))
          action { [:BASIC_TYPE, [text, lineno]] }
 
       when (text = @ss.scan(/`(?:[^\\]*(?:\\[^`])?)*`/))

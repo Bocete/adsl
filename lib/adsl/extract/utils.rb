@@ -1,7 +1,7 @@
 require 'adsl/parser/ast_nodes'
 
 module ADSL
-  module Verification
+  module Extract
     module Utils
 
       def t(text)

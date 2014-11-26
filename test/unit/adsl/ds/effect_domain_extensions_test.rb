@@ -1,10 +1,12 @@
-require 'test/unit'
+require 'minitest/unit'
+
+require 'minitest/autorun'
 require 'adsl/ds/data_store_spec'
 require 'adsl/ds/effect_domain_extensions'
 require 'adsl/util/test_helper'
 require 'set'
 
-class ADSL::DS::AstNodesTest < Test::Unit::TestCase
+class ADSL::DS::AstNodesTest < MiniTest::Unit::TestCase
   include ADSL::DS
 
   def setup

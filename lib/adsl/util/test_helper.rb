@@ -1,12 +1,13 @@
 require 'active_support/core_ext/numeric/time'
-require 'test/unit'
+require 'minitest/unit'
+require 'minitest/autorun'
 require 'adsl/parser/adsl_parser.tab'
 require 'adsl/prover/engine'
 require 'adsl/util/general'
 require 'adsl/ds/data_store_spec'
 require 'adsl/translation/ds_extensions'
 
-class Test::Unit::TestCase
+class MiniTest::Unit::TestCase
   TESTING_TIMEOUT = 5.seconds
   
   def adsl_assert(expected_result, input, options={})
@@ -25,7 +26,7 @@ class Test::Unit::TestCase
       
       result = engine.run[:result]
       if result == :unknown || result == :timeout
-        puts "inconclusive result on testcase #{self.class.name}.#{method_name}"
+        message "inconclusive result"# on testcase #{self.class.name}.#{method_name}"
       else
         puts fol.to_spass_string if expected_result != result
 	assert_equal expected_result, result
@@ -54,6 +55,21 @@ class Test::Unit::TestCase
     end
   end
 
+  def assert_false(actual, failure_msg = nil)
+    assert !actual, failure_msg
+  end
+
+  def assert_not_equal(expected, actual, failure_msg = nil)
+    failure_msg ||= "Elements asserted to be equal: #{expected}, #{actual}"
+    assert expected != actual, failure_msg
+  end
+
+  def assert_nothing_raised(failure_msg = nil)
+    yield
+  rescue StandardError => e
+    flunk "Exception raised: #{ e.message }"
+  end
+
   def assert_set_equal(expected, actual, failure_msg = nil)
     expected.each do |elem|
       assert_block failure_msg || "Actual collection does not contain `#{elem}'" do
@@ -75,9 +91,14 @@ class Test::Unit::TestCase
     end
   end
 
+  def assert_block(msg = nil)
+    val = yield
+    assert val, msg
+  end
+
   def assert_equal_nospace(s1, s2)
-    s1nospace = s1.gsub /\s+/, ''
-    s2nospace = s2.gsub /\s+/, ''
+    s1nospace = s1.gsub /\s+/m, ''
+    s2nospace = s2.gsub /\s+/m, ''
     assert_equal s1nospace, s2nospace, "#{s1} expected, but was #{s2}"
   end
 

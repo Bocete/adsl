@@ -3,10 +3,12 @@ require 'adsl/prover/z3/fol_extensions'
 require 'adsl/ds/data_store_spec'
 require 'adsl/translation/ds_extensions'
 require 'adsl/util/test_helper'
-require 'test/unit'
+require 'minitest/unit'
+
+require 'minitest/autorun'
 require 'pp'
 
-class ADSL::Prover::Z3FolExtensionsTest < Test::Unit::TestCase
+class ADSL::Prover::Z3FolExtensionsTest < MiniTest::Unit::TestCase
   include ADSL::FOL
   
   def test_literals

@@ -1,8 +1,10 @@
 require 'active_record'
 require 'active_support'
 require 'adsl/parser/ast_nodes'
+require 'adsl/extract/meta'
 require 'adsl/extract/rails/other_meta'
 require 'adsl/util/test_helper'
+require 'adsl/extract/extraction_error'
 
 module ADSL
   module Extract
@@ -13,7 +15,9 @@ module ADSL
 
         def initialize(ar_class)
           @ar_class = ar_class
-          raise "Cyclic destroy dependency detected on class #{@ar_class}. Translation aborted" if cyclic_destroy_dependency?
+          if cyclic_destroy_dependency?
+            raise ExtractionError, "Cyclic destroy dependency detected on class #{@ar_class}. Translation aborted"
+          end
         end
 
         def destroy_deps(origin_class)
@@ -61,7 +65,7 @@ module ADSL
               # just dont treat it as an inverse
               nil
             else
-              raise "Multiple opposite relations found for #{reflection}: #{canditates}" if candidates.length > 1
+              raise ExtractionError, "Multiple opposite relations found for #{reflection}: #{canditates}" if candidates.length > 1
               candidates.first.name.to_s
             end
           when :has_and_belongs_to_many
@@ -69,12 +73,12 @@ module ADSL
             candidates = target_class.constantize.reflections.values.select do |r|
               r.macro == :has_and_belongs_to_many && r.options[:join_table] == join_table
             end
-            raise "No inverse relations found for #{reflection}" if candidates.empty?
-            raise "Multiple opposite relations found for #{reflection}: #{canditates}" if candidates.length > 1
+            raise ExtractionError, "No inverse relations found for #{reflection}" if candidates.empty?
+            raise ExtractionError, "Multiple opposite relations found for #{reflection}: #{canditates}" if candidates.length > 1
             foreign_name = candidates.first.name.to_s
             assoc_name < foreign_name ? nil : foreign_name
           else
-            raise "Unknown association macro `#{reflection.macro}' on #{reflection}"
+            raise ExtractionError, "Unknown association macro `#{reflection.macro}' on #{reflection}"
           end
 
           ASTRelation.new(
@@ -119,6 +123,7 @@ module ADSL
           refls = reflections :this_class => nil
           new_class.send :define_method, :destroy do |*args|
             stmts = []
+
             object = if self.adsl_ast.expr_has_side_effects?
               var_name = ASTIdent.new(:text => "__delete_#{ self.class.adsl_ast_class_name }_temp_var")
               stmts << ASTExprStmt.new(:expr => ASTAssignment.new(:var_name => var_name.dup, :expr => self.adsl_ast))
@@ -169,6 +174,7 @@ module ADSL
             attr_accessible :adsl_ast
 
             def initialize(attributes = {}, options = {})
+              raise ExtractionError if attributes[:adsl_ast].is_a? Class
               attributes = {} if attributes.is_a?(MetaUnknown)
               super({
                 :adsl_ast => ASTCreateObjset.new(:class_name => ASTIdent.new(:text => self.class.adsl_ast_class_name))
@@ -256,7 +262,7 @@ module ADSL
 
             def include?(other)
               other = other.adsl_ast if other.respond_to? :adsl_ast
-              if other.is_a? ASTNode and other.class.is_objset?
+              if other.is_a? ASTNode and other.class.is_expr?
                 ASTIn.new :objset1 => other, :objset2 => self.adsl_ast
               else
                 super
@@ -267,7 +273,7 @@ module ADSL
 
             def ==(other)
               other = other.adsl_ast if other.respond_to? :adsl_ast
-              if other.is_a? ASTNode and other.class.is_objset?
+              if other.is_a? ASTNode and other.class.is_expr?
                 ASTEqual.new :objsets => [self.adsl_ast, other]
               else
                 super
@@ -276,7 +282,7 @@ module ADSL
 
             def !=(other)
               other = other.adsl_ast if other.respond_to? :adsl_ast
-              if other.is_a? ASTNode and other.class.is_objset?
+              if other.is_a? ASTNode and other.class.is_expr?
                 ASTNot.new(:subformula => ASTEqual.new(:objsets => [self.adsl_ast, other]))
               else
                 super
@@ -323,7 +329,9 @@ module ADSL
             def <<(param)
               return self unless self.adsl_ast.is_a?(ASTMemberAccess)
               return super unless param.respond_to? :adsl_ast
-              raise "Invalid type added on dereference: #{param.class.name} to #{self.class.name}" unless param.class <= self.class
+              unless param.class <= self.class
+                raise ExtractionError, "Invalid type added on dereference: #{param.class.name} to #{self.class.name}"
+              end
               ASTCreateTup.new(
                 :objset1 => self.adsl_ast.objset.dup,
                 :rel_name => self.adsl_ast.member_name.dup,
@@ -481,6 +489,8 @@ module ADSL
                     )
                   ))
                 end
+                alias_method :create,  :build
+                alias_method :create!, :build
 
                 def <<(param)
                   target = param.adsl_ast
