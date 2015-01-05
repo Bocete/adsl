@@ -36,13 +36,14 @@ module ADSL
 
           times = times.map{ |time| time[3].to_f/100 + time[2].to_i + time[1].to_i*60 + time[0].to_i*60*60 }
           
-          result[:total_time] = times.sum.seconds
+          result[:total_time] = times.first.seconds
           result[:spass_preparation_time] = times[1..2].sum.seconds
           result[:spass_proof_lookup_time] = times[3..5].sum.seconds
     
           result[:proof_clause_count] = /^SPASS derived (\d+) clauses.*$/.match(output)[1].to_i
           
           result[:memory] = /^\s*SPASS allocated (\d+) KBytes.*$/.match(output)[1].to_i
+          result[:steps] = /^\s*SPASS derived (\d+) clauses,.*$/.match(output)[1].to_i
   
           result_line = /^SPASS beiseite: (.+)\.$/.match(output)[1]
           case result_line

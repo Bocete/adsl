@@ -16,7 +16,7 @@ class MiniTest::Unit::TestCase
     ds_spec = ADSL::Parser::ADSLParser.new.parse input
     raise "Exactly one action required in ADSL" if ds_spec.actions.length != 1
     action_name = ds_spec.actions.first.name
-    provers = (options[:prover] || ['spass', 'z3']).to_a
+    provers = (options[:prover] || ['spass', 'z3', 'z3_sortless']).to_a
     provers.each do |prover|
       translation = ds_spec.translate_action(action_name)
       fol = translation.to_fol.optimize!
@@ -28,8 +28,7 @@ class MiniTest::Unit::TestCase
       if result == :unknown || result == :timeout
         message "inconclusive result"# on testcase #{self.class.name}.#{method_name}"
       else
-        puts fol.to_spass_string if expected_result != result
-	assert_equal expected_result, result
+	      assert_equal expected_result, result, "Error for prover #{prover}"
       end
     end
   end

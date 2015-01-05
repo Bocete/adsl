@@ -38,6 +38,7 @@ module ADSL
       def to_smt2_string
         output = []
 
+        output << "(set-option :produce-proofs true)"
         output += @sorts.map{ |s| "(declare-sort #{s.name} 0)" }
         output += @functions.map(&:to_smt2_string)
         output += @predicates.map(&:to_smt2_string)
@@ -53,13 +54,21 @@ module ADSL
 
     class Function
       def to_smt2_string
-        "(declare-fun #{@name} (#{ @sorts.map(&:name).join ' ' }) #{@ret_sort.name})"
+        if @sorts.empty?
+          "(declare-const #{@name} #{@ret_sort.name})"
+        else
+          "(declare-fun #{@name} (#{ @sorts.map(&:name).join ' ' }) #{@ret_sort.name})"
+        end
       end
     end
     
     class Predicate
       def to_smt2_string
-        "(declare-fun #{@name} (#{ @sorts.map(&:name).join ' ' }) Bool)"
+        if @sorts.empty?
+          "(declare-const #{@name} Bool)"
+        else
+          "(declare-fun #{@name} (#{ @sorts.map(&:name).join ' ' }) Bool)"
+        end
       end
     end
 

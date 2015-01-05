@@ -824,7 +824,7 @@ module ADSL
       end
 
       def [](*args)
-        if @expr.type_sig.is_objset_type? && @expr.type_sig.cardinality.empty?
+        if @type_sig.is_objset_type? && @type_sig.cardinality.empty?
           false
         else
           @pred[*args]
