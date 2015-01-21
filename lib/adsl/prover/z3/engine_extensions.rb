@@ -30,7 +30,7 @@ module ADSL
           stats = Hash[*stat_string.split(/\s+/)]
           result[:total_time] = (stats[':total-time'] || stats[':time']).to_f.seconds
           result[:memory] = stats[':memory'].to_f * 1024 # mb to kb
-          result[:steps] = stats[':added-eqs'].to_i
+          result[:steps] = stats[':propagations'].to_i
 
           first_line = output.match /^\w+$/
           case first_line.to_s

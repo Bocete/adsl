@@ -16,7 +16,7 @@ class MiniTest::Unit::TestCase
     ds_spec = ADSL::Parser::ADSLParser.new.parse input
     raise "Exactly one action required in ADSL" if ds_spec.actions.length != 1
     action_name = ds_spec.actions.first.name
-    provers = (options[:prover] || ['spass', 'z3', 'z3_sortless']).to_a
+    provers = (options[:prover] || ['spass', 'z3', 'z3_unsorted']).to_a
     provers.each do |prover|
       translation = ds_spec.translate_action(action_name)
       fol = translation.to_fol.optimize!

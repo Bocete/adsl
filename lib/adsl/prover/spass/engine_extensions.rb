@@ -30,7 +30,7 @@ module ADSL
           result[:formula_count] = formulae.length
           result[:average_formula_length] = formulae.map(&:length).sum / formulae.length
     
-          times = output.scan(/(\d):(\d\d):(\d\d)\.(\d\d)/)
+          times = output.scan(/(\d+):(\d+):(\d+)\.(\d+)/)
           
           raise "Incorrect time format extracted from spass output. Tail of spass output: #{output}" if times.length != 6
 
