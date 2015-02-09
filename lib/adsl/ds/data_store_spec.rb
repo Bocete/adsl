@@ -223,7 +223,7 @@ module ADSL
       container_for :for_each, :before_var, :inside_var
 
       def type_sig
-        DSTypeSig.join @before_var.type_sig, @inside_var.type_sig
+        TypeSig.join @before_var.type_sig, @inside_var.type_sig
       end
     end
     
@@ -268,7 +268,7 @@ module ADSL
       container_for :objsets
 
       def type_sig
-        DSTypeSig.join objsets.map(&:type_sig)
+        TypeSig.join objsets.map(&:type_sig)
       end
     end
 

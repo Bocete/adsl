@@ -1,20 +1,20 @@
 require 'minitest/unit'
-
 require 'minitest/autorun'
-require 'adsl/verification/rails_verification'
+
+require 'adsl/extract/bin'
 require 'adsl/extract/rails/rails_instrumentation_test_case'
 require 'adsl/util/test_helper'
 
-class ADSL::Verification::RailsVerificationTest < ADSL::Extract::Rails::RailsInstrumentationTestCase
-  include ADSL::Verification::RailsVerification
+class ADSL::Extract::BranchVerificationTest < ADSL::Extract::Rails::RailsInstrumentationTestCase
+  include ADSL::Extract::Bin
 
   def verify_options_for(action)
     {
       :output => :silent,
       :check_satisfiability => false,
       :halt_on_error => true,
-      :timeout => 120,
-      :actions => [action.to_s]
+      :timeout => 40,
+      :action => action
     }
   end
   
@@ -33,7 +33,7 @@ class ADSL::Verification::RailsVerificationTest < ADSL::Extract::Rails::RailsIns
       invariant(self.not.exists{ |asd| })
     ruby
 
-    assert_false verify_spass :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing)
+    assert_false verify :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing)
   end
   
   def test_verify_spass__branch_with_return__matters
@@ -52,7 +52,7 @@ class ADSL::Verification::RailsVerificationTest < ADSL::Extract::Rails::RailsIns
       invariant(self.not.exists{ |asd| })
     ruby
 
-    assert_false verify_spass :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing)
+    assert_false verify :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing)
   end
   
   def test_verify_spass__branch_with_return__may_create_but_will_delete
@@ -70,7 +70,7 @@ class ADSL::Verification::RailsVerificationTest < ADSL::Extract::Rails::RailsIns
       invariant(self.not.exists{ |asd| })
     ruby
 
-    assert verify_spass :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing)
+    assert verify :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing)
   end
   
   def test_verify_spass__branch_with_return__may_create_or_delete
@@ -88,7 +88,7 @@ class ADSL::Verification::RailsVerificationTest < ADSL::Extract::Rails::RailsIns
       invariant(self.not.exists{ |asd| })
     ruby
     
-    assert_false verify_spass :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing)
+    assert_false verify :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing)
   end
    
   def test_verify_spass__variable_assignments
@@ -108,7 +108,7 @@ class ADSL::Verification::RailsVerificationTest < ADSL::Extract::Rails::RailsIns
       invariant(self.not.exists{ |asd| })
     ruby
 
-    assert verify_spass :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing)
+    assert verify :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing)
   end
   
 end

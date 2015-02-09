@@ -267,18 +267,17 @@ module ADSL
         post_state = translation.create_state "post_create_#{@klass.name}"
         prev_state = translation.state
         translation.reserve @context.make_ps do |ps|
-          
-      translation.reserve @klass.to_sort, :o do |o|
+          translation.reserve @klass.to_sort, :o do |o|
             translation.create_formula ForAll.new(ps, Implies.new(
               @context.type_pred(ps),
               And[
                 Not.new(prev_state[ps, @context_creation_link[ps]]),
-        @klass.precise_type_pred[@context_creation_link[ps]],
+                @klass.precise_type_pred[@context_creation_link[ps]],
                 ForAll[o, Equiv.new(Or.new(prev_state[ps, o], Equal[o, @context_creation_link[ps]]), post_state[ps, o])]
               ]
             ))
           end
-
+  
           relevant_from_relations = translation.classes.map{ |c| c.relations }.flatten.select{ |r| r.from_class >= @klass }
           relevant_to_relations   = translation.classes.map{ |c| c.relations }.flatten.select{ |r| r.to_class >= @klass }
           
@@ -287,36 +286,36 @@ module ADSL
             And.new(
               relevant_from_relations.map do |rel|
                 translation.reserve rel, :r do |r|
-          ForAll.new(r, Equiv.new(
-            post_state[ps, r],
+                  ForAll.new(r, Equiv.new(
+                    post_state[ps, r],
                     And.new(
-              prev_state[ps, r],
-              Not.new(Equal.new(
-                rel.left_link[r],
-            @context_creation_link[ps]
-              ))
-            )
-          ))
+                      prev_state[ps, r],
+                      Not.new(Equal.new(
+                        rel.left_link[r],
+                        @context_creation_link[ps]
+                      ))
+                    )
+                  ))
                 end
               end,
               relevant_to_relations.map do |rel|
                 translation.reserve rel, :r do |r|
-          ForAll.new(r, Equiv.new(
-            post_state[ps, r],
+                  ForAll.new(r, Equiv.new(
+                    post_state[ps, r],
                     And.new(
-              prev_state[ps, r],
-              Not.new(Equal.new(
-                rel.right_link[r],
-            @context_creation_link[ps]
-              ))
-            )
-          ))
+                      prev_state[ps, r],
+                      Not.new(Equal.new(
+                        rel.right_link[r],
+                        @context_creation_link[ps]
+                      ))
+                    )
+                  ))
                 end
               end,
             )
           ))
         end
-
+  
         post_state.link_to_previous_state prev_state
         translation.state = post_state
       end

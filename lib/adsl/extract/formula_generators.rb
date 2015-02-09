@@ -29,7 +29,6 @@ module ADSL
         raise ExtractionError, "A block needs to be passed to quantifiers" if block.nil?
         raise ExtractionError, "At least some variables need to be given to the block" if block.parameters.empty?
         in_formula_builder do |fb|
-          
           param_types = {}
           block.parameters.each do |param|
             classname = infer_classname_from_varname param[1]
@@ -54,10 +53,11 @@ module ADSL
               param_types[param[1].to_sym].all.adsl_ast
             ]
           }
-          subformula = block.(*block.parameters.map do |param|
+          block_params = block.parameters.map do |param|
             param_types[param[1].to_sym].new :adsl_ast => ASTVariable.new(:var_name => t(param[1]))
-          end)
-          subformula = subformula.adsl_ast if subformula.respond_to? :adsl_ast
+          end
+          subformula = block.(*block_params)
+          subformula = subformula.adsl_ast if !subformula.nil? and subformula.respond_to? :adsl_ast
           subformula = ASTBoolean.new(:bool_value => true) if subformula.nil?
           unless subformula.is_a?(ASTNode) && subformula.class.is_expr? 
             raise ExtractionError, "Invalid formula #{subformula} returned by block in `#{quantifier}'"
@@ -79,7 +79,8 @@ module ADSL
           if param.nil?
             fb.adsl_stack << :not
           else
-            fb.adsl_stack << ASTNot.new(:subformula => param.adsl_ast)
+            subtree = param.respond_to?(:adsl_ast) ? param.adsl_ast : param
+            fb.adsl_stack << ASTNot.new(:subformula => subtree)
           end
         end
       end

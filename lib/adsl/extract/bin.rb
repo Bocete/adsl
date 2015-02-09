@@ -1,4 +1,6 @@
 require 'adsl/extract/rails/rails_extractor'
+require 'adsl/translation/ds_extensions'
+require 'adsl/prover/engine'
 
 module ADSL
   module Extract
@@ -14,13 +16,24 @@ module ADSL
         ast
       end
 
-      def verify_spass(options = {})
-        ast = extract_ast options
-        
-        require 'adsl/spass/bin'
-        self.class.send :include, ::ADSL::Spass::Bin
+      def to_fol(ast, options)
+        action_name = nil
+        action_name = options[:verify_options][:action].to_s
+        action_name = ast.actions.first.name if ast.actions.length == 1
+        raise "Action name undefined" if action_name.nil? || action_name.empty?
 
-        return verify(ast, options[:verify_options])
+        ds_spec = ast.typecheck_and_resolve
+        ds_spec.translate_action(action_name).to_fol
+      end
+
+      def verify(options = {})
+        ast = extract_ast options
+        fol = to_fol ast, options
+        
+        engine = ADSL::Prover::Engine.new [:spass, :z3], fol, options[:verify_options]
+
+        result = engine.verify
+        return result[:result] == :correct
       end
 
       def adsl_translate(options = {})

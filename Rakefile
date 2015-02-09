@@ -77,56 +77,70 @@ namespace :test do
     t.test_files = FileList['test/unit/adsl/**/*_test.rb']
     t.verbose = true
   end
-  
+ 
+
   namespace :integrations do
     Rake::TestTask.new(name=:prover) do |t|
       t.libs += ["lib"]
       t.test_files = FileList['test/integration/prover/**/*_test.rb']
       t.verbose = true
     end
-    
+   
+    namespace :extract do
+      Rake::TestTask.new(name=:basic) do |t|
+        t.libs += ["lib"]
+        t.test_files = FileList['test/integration/extract/basic_test.rb']
+        t.verbose = true
+      end
+
+      Rake::TestTask.new(name=:branch) do |t|
+        t.libs += ["lib"]
+        t.test_files = FileList['test/integration/extract/branch_test.rb']
+        t.verbose = true
+      end
+    end
     Rake::TestTask.new(name=:extract) do |t|
       t.libs += ["lib"]
       t.test_files = FileList['test/integration/extract/**/*_test.rb']
       t.verbose = true
     end
 
-    namespace :sails do
-      desc 'Setup Sails installation to verify code synthesis'
-      task :setup do
-        require 'adsl/synthesis/sails/test_helper'
-        ADSL::Synthesis::Sails::TestHelper.setup
-      end
-
-      desc 'Cleanup Sails installation used to verify code synthesis'
-      task :cleanup do
-        require 'adsl/synthesis/sails/test_helper'
-        ADSL::Synthesis::Sails::TestHelper.cleanup
-      end
-
-      desc 'test whether tests work in general'
-      task :basic => ["integrations:sails:setup"]
-      Rake::TestTask.new(name=:basic) do |t|
-        t.libs += ["lib"]
-        t.test_files = FileList['test/integration/sails/basic/**/*_test.rb']
-        t.verbose = true
-      end
-
-      desc 'association generation and dereferencing'
-      task :schema => ["integrations:sails:setup"]
-      Rake::TestTask.new(name=:schema) do |t|
-        t.libs += ["lib"]
-        t.test_files = FileList['test/integration/sails/schema/**/*_test.rb']
-        t.verbose = true
-      end
-    end
-
-    task :sails => ["integrations:sails:setup"]
-    Rake::TestTask.new(name=:sails) do |t|
-      t.libs += ["lib"]
-      t.test_files = FileList['test/integration/sails/**/*_test.rb']
-      t.verbose = true
-    end
+#    namespace :sails do
+#      desc 'Setup Sails installation to verify code synthesis'
+#      task :setup do
+#        require 'adsl/synthesis/sails/test_helper'
+#        ADSL::Synthesis::Sails::TestHelper.setup
+#      end
+#
+#      desc 'Cleanup Sails installation used to verify code synthesis'
+#      task :cleanup do
+#        require 'adsl/synthesis/sails/test_helper'
+#        ADSL::Synthesis::Sails::TestHelper.cleanup
+#      end
+#
+#      desc 'test whether tests work in general'
+#      task :basic => ["integrations:sails:setup"]
+#      Rake::TestTask.new(name=:basic) do |t|
+#        t.libs += ["lib"]
+#        t.test_files = FileList['test/integration/sails/basic/**/*_test.rb']
+#        t.verbose = true
+#      end
+#
+#      desc 'association generation and dereferencing'
+#      task :schema => ["integrations:sails:setup"]
+#      Rake::TestTask.new(name=:schema) do |t|
+#        t.libs += ["lib"]
+#        t.test_files = FileList['test/integration/sails/schema/**/*_test.rb']
+#        t.verbose = true
+#      end
+#    end
+#
+#    task :sails => ["integrations:sails:setup"]
+#    Rake::TestTask.new(name=:sails) do |t|
+#      t.libs += ["lib"]
+#      t.test_files = FileList['test/integration/sails/**/*_test.rb']
+#      t.verbose = true
+#    end
   end
   
   desc "Test All Integrations"

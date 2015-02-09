@@ -643,7 +643,7 @@ module ADSL
           card_str = card[1] == Float::INFINITY ? "#{card[0]}+" : "#{card[0]}..#{card[1]}"
           args << "#{card_str} #{type} #{name}"
         end
-        "action #{@name.text}(#{ args.join ', ' }) {\n#{ @block.to_adsl.adsl_indent }}\n"
+        "action #{@name.text}(#{ args.join ', ' }) {\n#{ @block.to_adsl.adsl_indent }\n}\n"
       end
     end
 
@@ -936,7 +936,7 @@ module ADSL
       end
 
       def to_adsl
-        "either #{ @blocks.map{ |b| "{\n#{ b.to_adsl.adsl_indent }}" } & " or " }\n"
+        "either #{ @blocks.map{ |b| "{\n#{ b.to_adsl.adsl_indent }}" }.join(" or ") }\n"
       end
     end
 
@@ -1351,7 +1351,7 @@ module ADSL
 
     class ASTJSExpr < ASTNode
       node_fields :js
-      node_type :base_type
+      node_type :expr
 
       def typecheck_and_resolve(context)
         ADSL::DS::DSAnything.new
@@ -1360,7 +1360,7 @@ module ADSL
 
     class ASTMemberAccess < ASTNode
       node_fields :objset, :member_name
-      node_type :base_type
+      node_type :expr
       
       def expr_has_side_effects?
         @objset.nil? ? false : @objset.expr_has_side_effects?
@@ -1394,7 +1394,7 @@ module ADSL
 
     class ASTDereferenceCreate < ASTNode
       node_fields :objset, :rel_name, :empty_first
-      node_type :statement
+      node_type :expr
 
       def expr_has_side_effects?; true; end
 
@@ -1542,7 +1542,7 @@ module ADSL
           end
           subformula = @subformula.typecheck_and_resolve context
           unless subformula.type_sig.is_bool_type?
-            raise ADSLError, "Quanitifcation formula is not boolean (type provided `#{subformula.type_sig}` on line #{ @lineno })"
+            raise ADSLError, "Quantification formula is not boolean (type provided `#{subformula.type_sig}` on line #{ @lineno })"
           end
 
           return ADSL::DS::DSForAll.new :vars => vars, :objsets => objsets, :subformula => subformula
@@ -1588,7 +1588,7 @@ module ADSL
           end
           subformula = @subformula.nil? ? ADSL::DS::DSConstant::TRUE : @subformula.typecheck_and_resolve(context)
           unless subformula && subformula.type_sig.is_bool_type?
-            raise ADSLError, "Quanitifcation formula is not boolean (type provided `#{subformula.type_sig}` on line #{ @lineno })"
+            raise ADSLError, "Quantification formula is not boolean (type provided `#{subformula.type_sig}` on line #{ @lineno })"
           end
 
           return ADSL::DS::DSExists.new :vars => vars, :objsets => objsets, :subformula => subformula
