@@ -27,9 +27,6 @@ module ADSL
           result[:average_formula_length] = formulae.map(&:length).sum / formulae.length
   
           temp = output.scan(/\(((?::[\w\-]+\s+\d+(?:\.\d+)?\s*)+)\)/)
-          if temp.empty?
-            puts @smt2_unsorted_code
-          end
           stat_string = temp[0][0]
           stats = Hash[*stat_string.split(/\s+/)]
           result[:total_time] = (stats[':total-time'] || stats[':time']).to_f.seconds

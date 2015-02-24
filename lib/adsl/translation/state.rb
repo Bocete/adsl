@@ -1,8 +1,28 @@
 require 'adsl/fol/first_order_logic'
+require 'adsl/parser/ast_nodes'
 
 module ADSL
   module Translation
     include ADSL::FOL
+
+    class NonState
+      def [](*ps, o)
+        raise ADSL::Parser::ADSLError, "NonState can only be used outside contexts (#{ps})" unless ps.flatten.empty?
+        true
+      end
+
+      def registered_sorts
+        []
+      end
+
+      def link_to_previous_state
+        raise ADSL::Parser::ADSLError, "NonState cannot be linked to other states sequentially"
+      end
+
+      def sort_difference(other)
+        raise ADSL::Parser::ADSLError, "NonState cannot be linked to other states sequentially"
+      end
+    end
     
     class State
       attr_accessor :pred_map, :name, :context_sorts

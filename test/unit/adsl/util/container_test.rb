@@ -89,16 +89,16 @@ class ADSL::Util::GeneralTest < MiniTest::Unit::TestCase
         container_for :field2
       end
     ruby
-    assert_equal [:field, :field2], Foo.container_for_fields.to_a.sort_by{ |a| a.to_s }
-    assert_equal [:field, :field2], Foo2.container_for_fields.to_a.sort_by{ |a| a.to_s }
+    assert_equal [:field, :field2], Foo.container_for_fields.to_a.sort_by(&:to_s)
+    assert_equal [:field, :field2], Foo2.container_for_fields.to_a.sort_by(&:to_s)
 
     eval <<-ruby
       class Foo2 < Foo
         container_for :field3
       end
     ruby
-    assert_equal [:field, :field2], Foo.container_for_fields.to_a.sort_by{ |a| a.to_s }
-    assert_equal [:field, :field2, :field3], Foo2.container_for_fields.to_a.sort_by{ |a| a.to_s }
+    assert_equal [:field, :field2], Foo.container_for_fields.to_a.sort_by(&:to_s)
+    assert_equal [:field, :field2, :field3], Foo2.container_for_fields.to_a.sort_by(&:to_s)
   end
 
   def test_doesnt_list
@@ -121,10 +121,10 @@ class ADSL::Util::GeneralTest < MiniTest::Unit::TestCase
       end
     ruby
 
-    assert_equal [:field1, :field2], Foo.container_for_fields.to_a.sort_by{ |a| a.to_s }
+    assert_equal [:field1, :field2], Foo.container_for_fields.to_a.sort_by(&:to_s)
     assert Foo.method_defined?(:recursively_gather)
-    assert_equal Set[], Foo.new.recursively_gather(:field1)
-    assert_equal Set[:a], Foo.new(:field1 => :a).recursively_gather(:field1)
+    assert_equal [], Foo.new.recursively_gather{ |c| c.field1 if c.is_a? Foo }
+    assert_equal [:a], Foo.new(:field1 => :a).recursively_gather{ |c| c.field1 if c.is_a? Foo }
     
     foo = Foo.new
     foo.content = :kme
@@ -132,12 +132,12 @@ class ADSL::Util::GeneralTest < MiniTest::Unit::TestCase
     foo.field1.content = :kme2
     foo.field2 = Foo.new :field1 => Foo.new
     foo.field2.content = :kme
-    assert_equal Set[:kme, :kme2], foo.recursively_gather(:content)
+    assert_equal [:kme, :kme, :kme2], foo.recursively_gather{ |c| c.content if c.is_a? Foo }
 
     newchild = Foo.new
     newchild.content = :asd
     foo.field1 = [newchild, foo.field1]
-    assert_equal Set[:kme, :kme2, :asd], foo.recursively_gather(:content)
+    assert_equal [:kme, :kme, :kme2, :asd], foo.recursively_gather{ |c| c.content if c.is_a? Foo }
   end
 
   def test_recursively_gather_recursively_safe
@@ -151,7 +151,7 @@ class ADSL::Util::GeneralTest < MiniTest::Unit::TestCase
     foo = Foo.new
     foo.field = foo
     foo.content = :a
-    assert_equal Set[:a], foo.recursively_gather(:content)
+    assert_equal [:a], foo.recursively_gather{ |c| c.content if c.is_a? Foo }
   end
 
   def test_recursively_comparable__appears

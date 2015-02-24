@@ -7,6 +7,14 @@ module ADSL
   module DS
     module TypeSig
 
+      def self.remove_direct_subtypes(sig_set)
+        copy_of = sig_set.dup
+        sig_set.each do |sig|
+          copy_of.delete_if{ |other| other < sig }
+        end
+        copy_of
+      end
+
       class Common
         include ADSL::Util::PartialOrdered
 
@@ -140,6 +148,7 @@ module ADSL
         end
 
         def ==(other)
+          return false unless other.is_a? ObjsetCardinality
           @min == other.min && @max == other.max
         end
         alias_method :eql?, :==
@@ -257,6 +266,7 @@ module ADSL
         end
   
         def compare(other)
+          return nil unless other.is_a? Common
           return -1 if other.is_unknown_type? || other.is_ambiguous_objset_type?
           return nil unless other.is_objset_type?
 

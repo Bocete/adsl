@@ -6,6 +6,7 @@ require 'adsl/prover/engine'
 require 'adsl/util/general'
 require 'adsl/ds/data_store_spec'
 require 'adsl/translation/ds_extensions'
+require 'adsl/translation/verification_problems'
 
 class MiniTest::Unit::TestCase
   TESTING_TIMEOUT = 5.seconds
@@ -18,17 +19,22 @@ class MiniTest::Unit::TestCase
     action_name = ds_spec.actions.first.name
     provers = (options[:prover] || ['spass', 'z3', 'z3_unsorted']).to_a
     provers.each do |prover|
-      translation = ds_spec.translate_action(action_name)
+      if options.include?(:conjecture) 
+        problems = [ADSL::Translation::FOLVerificationProblem.new(ds_spec, options[:conjecture])]
+      else
+        problems = ds_spec.generate_problems action_name
+      end
+      translation = ds_spec.translate_action(action_name, *problems.flatten)
       fol = translation.to_fol.optimize!
-      fol.conjecture = options[:conjecture] if options.include? :conjecture
 
       engine = ADSL::Prover::Engine.new prover, fol, :timeout => options[:timeout]
       
-      result = engine.run[:result]
-      if result == :unknown || result == :timeout
+      result = engine.run
+      if result[:result] == :unknown || result[:result] == :timeout
         message "inconclusive result"# on testcase #{self.class.name}.#{method_name}"
       else
-	      assert_equal expected_result, result, "Error for prover #{prover}"
+        errmsg = "Error for prover #{prover}\ninput:\n#{result[:input]}"
+	      assert_equal expected_result, result[:result], errmsg 
       end
     end
   end

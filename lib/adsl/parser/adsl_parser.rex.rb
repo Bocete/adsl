@@ -69,6 +69,12 @@ class ADSL::Parser::ADSLParser < Racc::Parser
       when (text = @ss.scan(/\/\*(?:[^\*]*(?:\*+[^\/]+)?)*\*\//))
         ;
 
+      when (text = @ss.scan(/authenticable\b/))
+         action { [:authenticable, lineno] }
+
+      when (text = @ss.scan(/usergroup\b/))
+         action { [:usergroup, lineno] }
+
       when (text = @ss.scan(/class\b/))
          action { [:class, lineno] }
 
@@ -95,6 +101,15 @@ class ADSL::Parser::ADSLParser < Racc::Parser
 
       when (text = @ss.scan(/unflatforeach\b/))
          action { [:unflatforeach, lineno] }
+
+      when (text = @ss.scan(/currentuser\b/))
+         action { [:currentuser, lineno] }
+
+      when (text = @ss.scan(/inusergroup\b/))
+         action { [:inusergroup, lineno] }
+
+      when (text = @ss.scan(/allofusergroup\b/))
+         action { [:allofusergroup, lineno] }
 
       when (text = @ss.scan(/foreach\b/))
          action { [:foreach, lineno] }
@@ -138,6 +153,9 @@ class ADSL::Parser::ADSLParser < Racc::Parser
       when (text = @ss.scan(/invariant\b/))
          action { [:invariant, lineno] }
 
+      when (text = @ss.scan(/rule\b/))
+         action { [:roole, lineno] }
+
       when (text = @ss.scan(/true\b/))
          action { [:true, lineno] }
 
@@ -167,6 +185,21 @@ class ADSL::Parser::ADSLParser < Racc::Parser
 
       when (text = @ss.scan(/unknown\b/))
          action { [:unknown, lineno] }
+
+      when (text = @ss.scan(/permit\b/))
+         action { [:permit, lineno] }
+
+      when (text = @ss.scan(/read\b/))
+         action { [:read, lineno] }
+
+      when (text = @ss.scan(/edit\b/))
+         action { [:edit, lineno] }
+
+      when (text = @ss.scan(/assoc\b/))
+         action { [:assoc, lineno] }
+
+      when (text = @ss.scan(/deassoc\b/))
+         action { [:deassoc, lineno] }
 
       when (text = @ss.scan(/\.\./))
          action { [text, lineno] }

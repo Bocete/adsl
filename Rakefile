@@ -80,6 +80,25 @@ namespace :test do
  
 
   namespace :integrations do
+    namespace :prover do
+      Rake::TestTask.new(name=:basic) do |t|
+        t.libs += ["lib"]
+        t.test_files = FileList['test/integration/prover/basic_test.rb']
+        t.verbose = true
+      end
+
+      Rake::TestTask.new(name=:branch) do |t|
+        t.libs += ["lib"]
+        t.test_files = FileList['test/integration/prover/branch_test.rb']
+        t.verbose = true
+      end
+      
+      Rake::TestTask.new(name=:ac) do |t|
+        t.libs += ["lib"]
+        t.test_files = FileList['test/integration/prover/access_control_test.rb']
+        t.verbose = true
+      end
+    end
     Rake::TestTask.new(name=:prover) do |t|
       t.libs += ["lib"]
       t.test_files = FileList['test/integration/prover/**/*_test.rb']

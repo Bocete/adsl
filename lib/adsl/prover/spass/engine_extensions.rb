@@ -55,6 +55,9 @@ module ADSL
             result[:result] = :timeout
           end
 
+          result[:input] = @spass_code
+          result[:output] = output
+
           result
         end
 

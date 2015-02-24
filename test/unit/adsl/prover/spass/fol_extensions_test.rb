@@ -35,12 +35,8 @@ class ADSL::Prover::SpassFolExtensionsTest < MiniTest::Unit::TestCase
     theorem.predicates += preds
     theorem.axioms << And.new(*preds.map{ |p| p[] })
     string = theorem.to_spass_string
-    assert_include_nospace string, "predicates[(predname1, 1), (predname2, 1)]"
-    assert_include_nospace string, "formula(forall( [o1, o2], equiv(predname1(o1), predname1(o2)) ))."
-    assert_include_nospace string, "formula(forall( [o1, o2], equiv(predname2(o1), predname2(o2)) ))."
-    assert_include_nospace string, <<-SPASS
-      formula(forall( [n], and(predname1(n), predname2(n)) )).
-    SPASS
+    assert_include_nospace string, "predicates[(predname1, 0), (predname2, 0)]"
+    assert_include_nospace string, "formula(and(predname1, predname2))."
   end
 
   def test__theorem__nullary_functions
@@ -49,14 +45,10 @@ class ADSL::Prover::SpassFolExtensionsTest < MiniTest::Unit::TestCase
     theorem.sorts << sort
     functions = 2.times.map{ |i| Function.new sort, "predname#{i+1}" }
     theorem.functions += functions
-    theorem.axioms << And.new(*functions.map{ |p| p[] })
+    theorem.axioms << Equal.new(*functions.map{ |p| p[] })
     string = theorem.to_spass_string
-    assert_include_nospace string, "functions[(predname1, 1), (predname2, 1)]"
-    assert_include_nospace string, "formula(forall( [o1, o2], equal(predname1(o1), predname1(o2)) ))."
-    assert_include_nospace string, "formula(forall( [o1, o2], equal(predname2(o1), predname2(o2)) ))."
-    assert_include_nospace string, <<-SPASS
-      formula(forall( [n], and(predname1(n), predname2(n)) )).
-    SPASS
+    assert_include_nospace string, "functions[(predname1, 0), (predname2, 0)]"
+    assert_include_nospace string, "formula(equal(predname1, predname2))."
   end
 
   def test_literals

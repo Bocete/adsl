@@ -12,7 +12,7 @@ module ADSL
           :extract_options => {}
         }.merge options
         ast = options[:ast]
-        ast = ADSL::Extract::Rails::RailsExtractor.new(options[:extract_options]).adsl_ast if ast.nil?
+        ast ||= ADSL::Extract::Rails::RailsExtractor.new(options[:extract_options]).adsl_ast
         ast
       end
 
@@ -23,7 +23,8 @@ module ADSL
         raise "Action name undefined" if action_name.nil? || action_name.empty?
 
         ds_spec = ast.typecheck_and_resolve
-        ds_spec.translate_action(action_name).to_fol
+        problems = ds_spec.generate_problems action_name
+        ds_spec.translate_action(action_name, *problems).to_fol
       end
 
       def verify(options = {})

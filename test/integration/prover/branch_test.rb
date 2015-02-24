@@ -3,7 +3,7 @@ require 'minitest/unit'
 
 require 'minitest/autorun'
 
-class ControlFlowTranslationTest < MiniTest::Unit::TestCase
+class BranchTest < MiniTest::Unit::TestCase
   include ADSL::FOL
   
   def test_either__blank

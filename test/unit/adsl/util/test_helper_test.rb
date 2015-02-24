@@ -1,5 +1,4 @@
 require 'minitest/unit'
-
 require 'minitest/autorun'
 require 'adsl/util/test_helper'
 require 'adsl/fol/first_order_logic'

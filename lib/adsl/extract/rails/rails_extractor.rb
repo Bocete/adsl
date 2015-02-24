@@ -57,7 +57,7 @@ module ADSL
           ar_class_names = @ar_classes.map(&:adsl_ast_class_name)
           
           @invariant_extractor = ADSL::Extract::Rails::InvariantExtractor.new ar_class_names
-          @invariants = @invariant_extractor.extract(options[:invariants]).map{ |inv| inv.adsl_ast }
+          @invariants = @invariant_extractor.extract(options[:invariants]).map(&:adsl_ast)
           @instrumentation_filters = @invariant_extractor.instrumentation_filters
           @instrumentation_filters += options[:instrumentation_filters]
 
@@ -228,7 +228,10 @@ module ADSL
           ADSL::Parser::ASTSpec.new(
             :classes => @ar_classes.map(&:adsl_ast),
             :actions => @actions,
-            :invariants => @invariants
+            :invariants => @invariants,
+            :usergroups => [],
+            :rules => [],
+            :ac_rules => []
           )
         end
       end

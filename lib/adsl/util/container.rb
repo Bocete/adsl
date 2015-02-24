@@ -19,9 +19,10 @@ module ADSL
         self
       end
     
-      def recursively_gather(method)
+      def recursively_gather
+        raise "Recursively gather requires a block" unless block_given?
         to_inspect = [self]
-        inspected = Set[]
+        inspected = []
         while not to_inspect.empty?
           elem = to_inspect.pop
           inspected << elem
@@ -35,11 +36,10 @@ module ADSL
             end
           end
         end
-        result = Set[]
-        inspected.each do |val|
-          result = result + [val.send(method)].flatten if val.class.method_defined?(method)
+        result = inspected.map do |val|
+          yield val
         end
-        result.delete_if{ |a| a.nil? }.flatten
+        [*result.flatten.compact]
       end
 
       module ClassMethods

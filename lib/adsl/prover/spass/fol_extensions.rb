@@ -44,22 +44,10 @@ module ADSL
         spass_wrap "list_of_#{what.to_s}.%s\nend_of_list.", content.flatten.map{ |c| "\n  " + c.to_s }.join("")
       end
 
-      def replace_nullary_argument_preds(formula_string)
-        return formula_string unless formula_string.include? "()"
-        not_existing_string = "n"
-        symbols_in_formula = formula_string.scan /\w+/
-        not_existing_string = not_existing_string.increment_suffix while symbols_in_formula.include? not_existing_string
-        "forall( [#{not_existing_string}], #{formula_string.gsub(/(\w+)\(\)/){ "#{ $1 }(#{ not_existing_string })" }})"
-      end
-
       def to_spass_string
         sorts = @sorts.map{ |s| s.name }.join ', '
-        functions = @functions.map do |f|
-          "(#{f.name}, #{ [f.arity, 1].max })"
-        end.join ', '
-        predicates = @predicates.map do |p|
-          "(#{p.name}, #{ [p.arity, 1].max })"
-        end.join ', '
+        functions = @functions.map{ |f| "(#{f.name}, #{ f.arity })" }.join ', '
+        predicates = @predicates.map{ |p| "(#{p.name}, #{ p.arity })" }.join ', '
         
         axioms = []
               
@@ -67,29 +55,24 @@ module ADSL
           axioms << "formula(forall( [o], #{ FOL::OneOf.new(@sorts.map{ |s| s[:o] }).optimize.to_spass_string } ))."
         end
         axioms += @predicates.map do |p|
-          if p.arity == 0
-                  "formula(forall( [o1, o2], equiv(#{p.name}(o1), #{p.name}(o2)) ))."
-          else
-            args = p.arity.times.map{ |i| "o#{i}" }
-            "formula(forall( [#{args.join ', '}], implies(#{p.name}(#{args.join ', '}), #{And.new(
-              p.arity.times.map{ |i| p.sorts[i][args[i]] }
-            ).optimize.to_spass_string }) ))."
-          end
-        end
-        axioms += @functions.select{ |f| f.arity == 0 }.map do |f|
-          "formula(forall( [o1, o2], equal(#{f.name}(o1), #{f.name}(o2)) ))."
+          next if p.arity == 0
+          args = p.arity.times.map{ |i| "o#{i}" }
+          "formula(forall( [#{args.join ', '}], implies(#{p.name}(#{args.join ', '}), #{And.new(
+            p.arity.times.map{ |i| p.sorts[i][args[i]] }
+          ).optimize.to_spass_string }) ))."
         end
         axioms += @functions.map do |f|
+          next if f.arity == 0
           args = f.arity.times.map{ |i| "o#{i}" }
           args = [:o] if args.empty?
           "formula(forall( [#{args.join ', '}], #{f.ret_sort.name}(#{f.name}(#{args.join ', '})) ))."
         end
-        
-        axioms += @axioms.map{ |f| "formula(#{ replace_nullary_argument_preds f.optimize.to_spass_string })." }
+       
+        axioms += @axioms.map{ |f| "formula(#{ f.optimize.to_spass_string })." }
 
         conjecture = "formula(#{@conjecture.optimize.to_spass_string})."
         
-        spass = <<-SPASS
+        spass = <<-SPASS.gsub(/\n\s*\n/, "\n").gsub(/\ {8}/, "")
         begin_problem(Blahblah).
         list_of_descriptions.
           name({* *}).
@@ -116,12 +99,14 @@ module ADSL
 
     class PredicateCall
       def to_spass_string
+        return @predicate.name if @predicate.arity == 0
         "#{@predicate.name}(#{@args.map(&:to_spass_string).join ', '})"
       end
     end
     
     class FunctionCall
       def to_spass_string
+        return @function.name if @function.arity == 0
         "#{@function.name}(#{@args.map(&:to_spass_string).join ', '})"
       end
     end

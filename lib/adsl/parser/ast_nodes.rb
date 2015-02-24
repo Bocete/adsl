@@ -22,6 +22,14 @@ class NilClass
   alias_method :to_adsl, :to_s
 end
 
+class TrueClass
+  alias_method :to_adsl, :to_s
+end
+
+class FalseClass
+  alias_method :to_adsl, :to_s
+end
+
 module ADSL
   module Parser
    
@@ -115,7 +123,7 @@ module ADSL
     class ADSLError < StandardError; end
     
     class ASTTypecheckResolveContext
-      attr_accessor :classes, :members, :actions, :invariants, :var_stack, :pre_stmts 
+      attr_accessor :classes, :usergroups, :members, :actions, :invariants, :ac_rules, :rules, :var_stack, :pre_stmts 
 
       class ASTStackFrame < ActiveSupport::OrderedHash
         attr_accessor :var_write_listeners
@@ -150,7 +158,7 @@ module ADSL
             listener.call name
           end
         end
-        
+
         def dup
           other = ASTStackFrame.new
           self.each do |key, val|
@@ -169,6 +177,7 @@ module ADSL
       def initialize
         # name => [astnode, dsobj]
         @classes = ActiveSupport::OrderedHash.new
+        @usergroups = ActiveSupport::OrderedHash.new
 
         # classname => name => [astnode, dsobj]
         @members = ActiveSupport::OrderedHash.new{ |hash, key| hash[key] = ActiveSupport::OrderedHash.new }
@@ -177,6 +186,8 @@ module ADSL
         @actions = ActiveSupport::OrderedHash.new
 
         @invariants = []
+        @ac_rules = []
+        @rules = []
         @var_stack = []
         @pre_stmts = []
       end
@@ -186,6 +197,9 @@ module ADSL
         source.classes.each do |name, value|
           @classes[name] = value.dup
         end
+        source.usergroups.each do |name, value|
+          @usergroups[name] = value.dup
+        end
         source.members.each do |class_name, class_entry|
           entries = @members[class_name]
           class_entry.each do |name, value|
@@ -194,6 +208,8 @@ module ADSL
         end
         @actions = source.actions.dup
         @invariants = source.invariants.dup
+        @ac_rules = source.ac_rules.dup
+        @rules = source.rules.dup
         @var_stack = source.var_stack.map{ |frame| frame.dup }
         @pre_stmts = source.pre_stmts.map{ |stmt| stmt.dup }
       end
@@ -307,6 +323,21 @@ module ADSL
         packed.delete_if { |v, vars| vars.uniq.length == 1 }
         packed
       end
+        
+      def auth_class
+        return @auth_class unless @auth_class.nil?
+        candidates = @classes.values.select{ |cn, c| c.authenticable? }
+        if candidates.empty?
+          return nil
+        elsif candidates.length > 1
+          raise ADSLError, "There can be at most one authenticable class: #{
+            candidates.map(&:first).map(&:name).map(&:text).join ', '
+          }"
+        else
+          @auth_class = candidates.first
+          return @auth_class
+        end
+      end
     end
 
     class ASTDummyObjset < ASTNode
@@ -339,7 +370,7 @@ module ADSL
     end
 
     class ASTSpec < ASTNode
-      node_fields :classes, :actions, :invariants
+      node_fields :classes, :usergroups, :actions, :invariants, :ac_rules, :rules
 
       def typecheck_and_resolve
         context = ASTTypecheckResolveContext.new
@@ -349,7 +380,7 @@ module ADSL
           if context.classes.include? class_node.name.text
             raise ADSLError, "Duplicate class name '#{class_node.name.text}' on line #{class_node.name.lineno} (first definition on line #{context.classes[class_node.name.text][0].name.lineno}"
           end
-          klass = ADSL::DS::DSClass.new :name => class_node.name.text
+          klass = ADSL::DS::DSClass.new :name => class_node.name.text, :authenticable => class_node.authenticable
           context.classes[klass.name] = [class_node, klass]
         end
 
@@ -364,6 +395,17 @@ module ADSL
         end
         context.classes.values.each do |class_node, klass|
           raise ADSLError, "Cyclic inheritance detected with class #{klass.name}" if klass.all_parents.include? klass
+        end
+
+        # auth stuff
+        # this call might raise exceptions
+        authclass = context.auth_class
+        if authclass
+          @usergroups.each do |ug_node|
+            ug_node.typecheck_and_resolve context
+          end
+        elsif @usergroups.length > 0
+          raise ADSLError, "UserGroups can only be declared if there exists an authenticable class"
         end
 
         # setup children of said classes
@@ -402,6 +444,11 @@ module ADSL
           action_node.typecheck_and_resolve context
         end
 
+        @rules.each do |rule_node|
+          context.rules << (rule_node.typecheck_and_resolve context)
+        end
+
+
         # make sure invariants have unique names; create names for unnamed invariants
         names = Set.new
         @invariants.each do |invariant_node|
@@ -422,10 +469,17 @@ module ADSL
           invariant = invariant_node.typecheck_and_resolve context
         end
 
+        @ac_rules.each do |ac_rule|
+          context.ac_rules << ac_rule.typecheck_and_resolve(context)
+        end
+
         ADSL::DS::DSSpec.new(
           :classes => context.classes.map{ |a, b| b[1] }, 
+          :usergroups => context.usergroups.map{ |a, b| b[1] },
           :actions => context.actions.map{ |a, b| b[1] },
-          :invariants => context.invariants.dup
+          :invariants => context.invariants.dup,
+          :ac_rules => context.ac_rules.dup,
+          :rules => context.rules.dup
         )
       end
 
@@ -450,14 +504,31 @@ module ADSL
       end
     end
     
+    class ASTUserGroup < ASTNode
+      node_fields :name
+
+      def typecheck_and_resolve(context)
+        name = @name.text
+        if context.usergroups.include? name
+          raise ADSLError, "Duplicate usergroup name #{name} at line #{@lineno}"
+        end
+        ug = ADSL::DS::DSUserGroup.new :name => name
+        context.usergroups[name] = [self, ug]
+      end
+    end
+    
     class ASTClass < ASTNode
-      node_fields :name, :parent_names, :members
+      node_fields :name, :parent_names, :members, :authenticable
 
       def typecheck_and_resolve(context)
         klass = context.classes[@name.text][1]
         @members.each do |member_node|
           member_node.typecheck_and_resolve context
         end
+      end
+
+      def authenticable?
+        @authenticable
       end
 
       def to_adsl
@@ -841,7 +912,9 @@ module ADSL
         vars_read_before_being_written_to.each do |var_name|
           before_var_node, before_var = before_context.lookup_var var_name, false
           inside_var_node, inside_var = context.lookup_var var_name, false
-          lambda_expr = ADSL::DS::DSForEachPreLambdaExpr.new :for_each => for_each, :before_var => before_var, :inside_var => inside_var
+          lambda_expr = ADSL::DS::DSForEachPreLambdaExpr.new(
+            :for_each => for_each, :before_var => before_var, :inside_var => inside_var
+          )
           var = ADSL::DS::DSVariable.new :name => var_name, :type_sig => before_var.type_sig
           assignment = ADSL::DS::DSAssignment.new :var => var, :expr => lambda_expr
           block.replace before_var, var
@@ -854,7 +927,9 @@ module ADSL
         post_lambda_assignments = vars_needing_post_lambdas.map do |var_name|
           before_var_node, before_var = before_context.lookup_var var_name, false
           inside_var_node, inside_var = context.lookup_var var_name, false
-          lambda_expr = ADSL::DS::DSForEachPostLambdaExpr.new :for_each => for_each, :before_var => before_var, :inside_var => inside_var
+          lambda_expr = ADSL::DS::DSForEachPostLambdaExpr.new(
+            :for_each => for_each, :before_var => before_var, :inside_var => inside_var
+          )
           var = ADSL::DS::DSVariable.new :name => var_name, :type_sig => before_var.type_sig
           ADSL::DS::DSAssignment.new :var => var, :expr => lambda_expr
         end
@@ -1443,6 +1518,117 @@ module ADSL
       end
     end
 
+    class ASTCurrentUser < ASTNode
+      node_fields
+      node_type :expr
+
+      def typecheck_and_resolve(context)
+        auth_class_node, auth_class = context.auth_class
+        raise ADSLError, "currentuser (line #{@lineno}) cannot be used in lack of an authclass" if auth_class_node.nil?
+        return ADSL::DS::DSCurrentUser.new :type_sig => auth_class.to_sig.with_cardinality(1)
+      end
+
+      def to_adsl
+        "currentuser"
+      end
+    end
+
+    class ASTInUserGroup < ASTNode
+      node_fields :objset, :groupname
+      node_type :expr
+
+      def typecheck_and_resolve(context)
+        auth_class_node, auth_class = context.auth_class
+        if auth_class.nil?
+          raise ADSLError, "Inusergroup cannot be used without having defined an authenticable class (line #{@lineno})"
+        end
+        if @objset
+          objset = @objset.typecheck_and_resolve context
+          unless objset.type_sig <= auth_class.to_sig
+            raise ADSLError, "Only instances of the authenticable class may belong to usergroups (line #{@lineno})"
+          end
+        else
+          objset = ADSL::DS::DSCurrentUser.new
+        end
+        group = context.usergroups[@groupname.text]
+        if group.nil?
+          raise ADSLError, "No groupname found by name #{@groupname.text} on line #{@lineno}"
+        end
+        ADSL::DS::DSInUserGroup.new :objset => objset, :usergroup => group[1]
+      end
+
+      def optimize
+        until_no_change super do |node|
+          node.objset = onde.objset.optimize
+        end
+      end
+
+      def to_adsl
+        @objset.is_a?(ASTCurrentUser) ? "inusergroup(#{groupname.text})" : "inusergroup(#{@objset.to_adsl}, #{@groupname.text})"
+      end
+    end
+
+    class ASTAllOfUserGroup < ASTNode
+      node_fields :groupname
+      node_type :expr
+
+      def typecheck_and_resolve(context)
+        auth_class_node, auth_class = context.auth_class
+        if auth_class.nil?
+          raise ADSLError, "Inusergroup cannot be used without having defined an authenticable class (line #{@lineno})"
+        end
+        group = context.usergroups[@groupname.text]
+        if group.nil?
+          raise ADSLError, "No groupname found by name #{@groupname.text} on line #{@lineno}"
+        end
+        type_sig = auth_class.to_sig.with_cardinality(1)
+        ADSL::DS::DSAllOfUserGroup.new :usergroup => group[1], :type_sig => type_sig
+      end
+    end
+
+    class ASTPermit < ASTNode
+      node_fields :group_names, :ops, :expr
+
+      def typecheck_and_resolve(context)
+        auth_class_node, auth_class = context.auth_class
+        if auth_class.nil?
+          raise ADSLError, "Inusergroup cannot be used without having defined an authenticable class (line #{@lineno})"
+        end
+
+        groups = @group_names.map do |gn|
+          group_name = gn.text
+          group = context.usergroups[group_name]
+          raise ADSLError, "No groupname found by name #{gn.text} on line #{gn.lineno}" if group.nil?
+          group[1]
+        end
+        groups << ADSL::DS::DSAllUsers.new if groups.empty?
+
+        ops = Set[*@ops.map do |op, line|
+          case op
+          when :read, :create, :delete, :assoc, :deassoc
+            op
+          when :edit
+            [:create, :delete]
+          else 
+            raise ADSLError, "Unknown permission #{op} on line #{@lineno}"
+          end
+        end.flatten]
+        
+        expr = @expr.typecheck_and_resolve context
+        is_deref = expr.is_a?(ADSL::DS::DSDereference)
+        if is_deref
+          ops << :assoc if ops.include?(:create)
+          ops << :deassoc if ops.include?(:delete)
+        else
+          [:assoc, :deassoc].each do |op|
+            raise ADSLError, "#{op} permission is only applicable to dereferences (line #{@lineno})" if ops.include? op
+          end
+        end
+
+        ADSL::DS::DSPermit.new :usergroups => groups, :ops => ops, :expr => expr
+      end
+    end
+
     class ASTInvariant < ASTNode
       node_fields :name, :formula
 
@@ -1476,6 +1662,34 @@ module ADSL
       def to_adsl
         n = (@name.nil? || @name.text.nil?) ? "" : "#{ @name.text.gsub(/\s/, '_') }: "
         "invariant #{n}#{ @formula.to_adsl }\n"
+      end
+    end
+
+    class ASTRule < ASTNode
+      node_fields :formula
+
+      def typecheck_and_resolve(context)
+        @formula.preorder_traverse do |node|
+          if node.respond_to? :expr_has_side_effects?
+            raise ADSLError, "Object set cannot have sideeffects at line #{node.lineno}" if node.expr_has_side_effects?
+          end
+        end
+        formula = @formula.typecheck_and_resolve context
+        unless formula.type_sig.is_bool_type?
+          raise ADSLError, "Rule formula is not boolean (type provided `#{formula.type_sig}` on line #{ @lineno })"
+        end
+
+        return ADSL::DS::DSRule.new :formula => formula
+      end
+
+      def optimize
+        until_no_change super do |node|
+          node.formula = node.formula.optimize
+        end
+      end
+
+      def to_adsl
+        "rule #{@formula.to_adsl}\n"
       end
     end
 

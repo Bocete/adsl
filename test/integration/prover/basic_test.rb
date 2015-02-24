@@ -3,7 +3,7 @@ require 'minitest/unit'
 
 require 'minitest/autorun'
 
-class BasicTranslationTest < MiniTest::Unit::TestCase
+class BasicTest < MiniTest::Unit::TestCase
   include ADSL::FOL
   
   def test_blank_data_store
@@ -624,8 +624,8 @@ class BasicTranslationTest < MiniTest::Unit::TestCase
       class Class { 0..1 Class rel }
       action blah() {
         o = oneof(allof(Class))
-	o.rel += create(Class)
-	o.rel += create(Class)
+        o.rel += create(Class)
+        o.rel += create(Class)
       }
     ADSL
   end
@@ -636,6 +636,25 @@ class BasicTranslationTest < MiniTest::Unit::TestCase
       class Class2 { 1 Class1 rel inverseof rel }
       action blah() {}
       invariant forall(Class1 a: a == a.rel.rel)
+    ADSL
+  end
+
+  def test__rule_booleans
+    adsl_assert :incorrect, <<-ADSL
+      class Class {}
+      action blah() {
+        delete allof(Class)
+      }
+      invariant exists(Class c)
+      rule true
+    ADSL
+    adsl_assert :correct, <<-ADSL
+      class Class {}
+      action blah() {
+        delete allof(Class)
+      }
+      invariant exists(Class c)
+      rule false
     ADSL
   end
 end

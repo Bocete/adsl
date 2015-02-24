@@ -1,6 +1,7 @@
 require 'adsl/translation/ds_translator'
 require 'adsl/translation/state'
 require 'adsl/translation/util'
+require 'adsl/translation/verification_problems'
 require 'adsl/fol/first_order_logic'
 require 'adsl/ds/data_store_spec'
 require 'adsl/ds/type_sig'
@@ -13,14 +14,18 @@ module ADSL
     end
     
     class DSSpec < DSNode
-      def translate_action(action_name, *listed_invariants)
+
+      def find_action_by_name(action_name)
+        return nil if action_name.nil?
+        actions = @actions.select{ |a| a.name == action_name }
+        raise ArgumentError, "Action '#{action_name}' not found" if actions.empty?
+        actions.first
+      end
+      
+      def translate_action(action_name, *problems)
         translation = ADSL::Translation::DSTranslator.new
 
-        if action_name
-          action = @actions.select{ |a| a.name == action_name }
-          raise ArgumentError, "Action '#{action_name}' not found" if action.empty?
-          action = action.first
-        end
+        action = find_action_by_name action_name
 
         translation.classes.concat @classes
         @classes.each do |klass|
@@ -68,49 +73,72 @@ module ADSL
 
         relations = @classes.map{ |c| c.relations }.flatten
         relation_sorts = relations.map(&:to_sort).uniq
+        
+        # define authentication
+        if auth_class
+          @usergroups.each do |ug|
+            ug.translate translation
+          end
+          translation.current_user = translation.create_function auth_class.to_sort, 'current_user'
+          translation.create_formula ADSL::FOL::And.new(
+            auth_class[translation.current_user[]],
+            translation.initial_state[translation.current_user[]]
+          )
+        end
 
+        @rules.each do |rule|
+          rule.prepare translation
+          translation.create_formula rule.formula.resolve_expr(translation, [])
+        end
+
+        translation.state = translation.initial_state
         # enforce cardinality in the first state
         relations.each do |rel|
           rel.enforce_cardinality translation
         end
 
         action.translate(translation) if action_name
-        
+      
+        # make sure all create objs create mutually exclusive stuff
+        translation.create_obj_stmts.each do |klass, stmts|
+          translation.reserve stmts.map{ |s| s.context.make_ps } do |pss|
+            statement_ps_pairs = stmts.zip pss
+            translation.create_formula ADSL::FOL::ForAll.new(pss, ADSL::FOL::And.new(
+              statement_ps_pairs.map{ |stmt, ps| ADSL::FOL::Not.new translation.initial_state[stmt.context_creation_link[ps]] },
+	            statement_ps_pairs.each_index.map do |i|
+	              others = statement_ps_pairs[i+1..-1]
+		            others.map{ |other, other_ps|
+		              ADSL::FOL::Not.new(ADSL::FOL::Equal.new(
+		                statement_ps_pairs[i][0].context_creation_link[statement_ps_pairs[i][1]],
+		                other.context_creation_link[other_ps]
+		              ))
+		            }
+	            end
+	          ))
+          end
+        end
+
         # enforce cardinality in the final state too
         relations.each do |rel|
           rel.enforce_cardinality translation
         end
 
         @invariants.each do |inv|
-          inv.formula.prepare_expr translation
+          inv.prepare translation
+        end
+        @ac_rules.each do |rule|
+          rule.prepare translation
         end
 
-        if action_name
-          translation.state = translation.initial_state
-          pre_invariants = @invariants.map{ |invariant| invariant.formula.resolve_expr(translation, []) }
-        
-          listed_invariants = @invariants if listed_invariants.empty?
-          translation.state = translation.final_state
-          post_invariants = listed_invariants.map{ |invariant| invariant.formula.resolve_expr(translation, []) }
-          
-          translation.create_conjecture FOL::Implies.new(
-            FOL::And.new(pre_invariants),
-            FOL::And.new(post_invariants)
-          )
-        else
-          # used to check for contradictions in the model
-          invariants_formulae = invariants.map do |invariant|
-            formula = invariant.formula
-            dummy_state = translation.create_predicate 'always_true', 1
-            translation.create_formula FOL::ForAll.new(:o, dummy_state[:o])
-            translation.state = dummy_state
-            formula.resolve_expr(translation, [])
-          end
-          translation.create_conjecture FOL::Not.new(FOL::And.new(invariants_formulae))
+        problem_formulas = problems.map{ |p| p.generate_conjecture translation }
+        if problem_formulas.include? nil
+          raise "Problem #{ problems[problem_formulas.index nil] } not translated to a formula"
         end
+        translation.set_conjecture ADSL::FOL::And[*problem_formulas].optimize
 
         return translation
       end
+
     end
     
     class DSAction < DSNode
@@ -125,7 +153,7 @@ module ADSL
 
       def translate(translation)
         translation.context = translation.root_context
-        
+
         @args.length.times do |i|
           cardinality = @cardinalities[i]
           arg = @args[i]
@@ -144,13 +172,13 @@ module ADSL
             
           if cardinality[1] == 1
             translation.reserve arg.type_sig, :o1, arg.type_sig, :o2 do |o1, o2|
-              translation.create_formula ForAll[o1, o2, Implies[
+              formula = ForAll[o1, o2, Implies[
                 And[arg[o1], arg[o2]],
                 Equal[o1, o2]
               ]]
+              translation.create_formula formula
             end
           end
-
         end
 
         @block.migrate_state translation
@@ -195,6 +223,7 @@ module ADSL
 
     class DSRelation < DSNode
       include FOL
+      attr_accessor :type_pred
 
       def [](variable)
         @type_pred[variable]
@@ -212,11 +241,15 @@ module ADSL
         @inverse_of.nil? ? @right_link : @inverse_of.left_link
       end
 
+      def type_pred_sort
+        @sort
+      end
+
       def translate(translation)
         if @inverse_of.nil?
           name = "Assoc#{@from_class.name}#{@name.camelize}"
           @sort = translation.create_sort "#{name}Sort"
-      @type_pred = translation.create_predicate name, @sort
+          @type_pred = translation.create_predicate name, @sort
           @left_link = translation.create_function @from_class.to_sort, "#{name}_left", @sort
           @right_link = translation.create_function  @to_class.to_sort, "#{name}_right", @sort
           translation.create_formula ForAll[@sort, :t, And[
@@ -247,6 +280,82 @@ module ADSL
             ]]
           end
         end
+      end
+    end
+
+    class DSUserGroup < DSNode
+      attr_accessor :pred
+
+      def translate(translation)
+        @pred = translation.create_predicate "UserGroup#{@name}", translation.auth_class.to_sort
+        translation.create_formula ADSL::FOL::ForAll[translation.auth_class.to_sort, :o, ADSL::FOL::Implies[
+          @pred[:o],
+          translation.auth_class[:o]
+        ]]
+      end
+
+      def [](o)
+        @pred[o]
+      end
+    end
+
+    class DSAllUsers < DSNode
+      def translate(translation)
+      end
+
+      def [](o)
+        true
+      end
+    end
+
+    class DSInUserGroup < DSNode
+      def prepare_expr(translation)
+        @objset.prepare_expr translation
+      end
+
+      def resolve_expr(translation, ps, var = nil)
+        translation.reserve translation.auth_class, :o do |o|
+          return ADSL::FOL::ForAll[o, ADSL::FOL::Implies[
+            @objset.resolve_expr(translation, ps, o),
+            @usergroup[o]
+          ]]
+        end
+      end
+    end
+
+    class DSCurrentUser < DSNode
+      def prepare_expr(translation)
+      end
+
+      def resolve_expr(translation, ps, var)
+        ADSL::FOL::Equal.new(translation.current_user[], var)
+      end
+    end
+
+    class DSAllOfUserGroup < DSNode
+      def prepare_expr(translation)
+      end
+
+      def resolve_expr(translation, ps, var)
+        @usergroup[var]
+      end
+    end
+
+    class DSPermit < DSNode
+      def prepare(translation)
+        @expr.prepare_expr translation
+      end
+    end
+
+    class DSInvariant < DSNode
+      def prepare(translation)
+        @formula.prepare_expr translation
+      end
+    end
+    
+    class DSRule < DSNode
+      def prepare(translation)
+        @formula.prepare_expr translation
       end
     end
 
@@ -699,7 +808,7 @@ module ADSL
                   ),
                   Implies.new(
                     And.new(@context.type_pred(ps), Not[Exists[prev, context.just_before[ps_without_last, ps.last, prev]]]),
-            translation.states_equivalent_formula(affected_sorts, ps, @post_iteration_state, ps_without_last, @post_state)
+                    translation.states_equivalent_formula(affected_sorts, ps, @post_iteration_state, ps_without_last, @post_state)
                   )
                 ))
               )
@@ -815,9 +924,6 @@ module ADSL
       end
 
       def resolve_expr(translation, ps, var = nil)
-        if @type_sig.is_objset_type?
-
-        end
         return false if @type_sig.is_objset_type? && @type_sig.cardinality.empty?
         @pred[ps.first(@context.level), var]
       end

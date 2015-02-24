@@ -8,10 +8,11 @@ module ADSL
 
     class DSTranslator
       attr_accessor :context
-      attr_accessor :initial_state, :state, :final_state
+      attr_accessor :initial_state, :state, :final_state, :non_state
+      attr_accessor :current_user
       attr_reader :root_context
       attr_reader :create_obj_stmts, :all_contexts, :classes
-      attr_reader :conjectures
+      attr_reader :conjectures, :formulae
 
       include FOL
 
@@ -24,17 +25,19 @@ module ADSL
         @functions = []
         @predicates = []
         @sorts = []
-        @formulae = [[]]
+        @formulae = []
         @conjectures = []
         @all_contexts = []
 
         @root_context = create_context 'root_context', true, nil, nil
         @context = @root_context
+
+        @non_state = ADSL::Translation::NonState.new
         
         @initial_state = create_state :init_state
         # klass => Set[ [stmt] ]
         @create_obj_stmts = Hash.new{ |hash, klass| hash[klass] = [] }
-        @state = @initial_state
+        @state = @non_state
       end
 
       def create_sort name
@@ -114,17 +117,15 @@ module ADSL
       end
       
       def states_equivalent_formula(sorts, ps1, s1, ps2, s2)
-        And.new(
-          sorts.map do |s|
-            reserve s, :o do |o|
-              ForAll.new(o, Equiv.new(s1[ps1, o], s2[ps2, o]))
-            end
-          end
-        )
+        And[*sorts.map{ |s|
+          reserve(s, :o){ |o|
+            ForAll[o, Equiv[s1[ps1, o], s2[ps2, o]]]
+          }
+        }]
       end
 
       def create_formula(formula)
-        @formulae.last.push formula
+        @formulae.push formula
       end
 
       def create_sort(name)
@@ -135,6 +136,10 @@ module ADSL
 
       def create_conjecture(formula)
         @conjectures.push formula
+      end
+
+      def set_conjecture(formula)
+        @conjectures = [formula]
       end
 
       def create_function(ret_sort, name, *sorts)
@@ -149,6 +154,10 @@ module ADSL
         pred
       end
 
+      def auth_class
+        @classes.select(&:authenticable?).first
+      end
+
       def register_name(name)
         name = name.to_s
         name = name.increment_suffix while @registered_names.include? name
@@ -157,31 +166,11 @@ module ADSL
       end
       
       def to_fol
-        additional_axioms = []
-
-        @create_obj_stmts.each do |klass, stmts|
-          reserve stmts.map{ |s| s.context.make_ps } do |pss|
-            statement_ps_pairs = stmts.zip pss
-            additional_axioms << ADSL::FOL::ForAll.new(pss, ADSL::FOL::And.new(
-              statement_ps_pairs.map{ |stmt, ps| ADSL::FOL::Not.new @initial_state[stmt.context_creation_link[ps]] },
-	            statement_ps_pairs.each_index.map do |i|
-	              others = statement_ps_pairs[i+1..-1]
-		            others.map{ |other, other_ps|
-		              ADSL::FOL::Not.new(ADSL::FOL::Equal.new(
-		                statement_ps_pairs[i][0].context_creation_link[statement_ps_pairs[i][1]],
-		                other.context_creation_link[other_ps]
-		              ))
-		            }
-	            end
-	          ))
-          end
-        end
-
         return ADSL::FOL::Theorem.new(
           :sorts => @sorts,
           :predicates => @predicates,
           :functions => @functions,
-          :axioms => @formulae.flatten + additional_axioms,
+          :axioms => @formulae,
           :conjecture => And[@conjectures].optimize
         )
       end

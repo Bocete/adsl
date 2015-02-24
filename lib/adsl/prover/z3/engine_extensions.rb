@@ -42,6 +42,9 @@ module ADSL
             result[:result] = :timeout
           end
 
+          result[:input] = @smt2_code
+          result[:output] = output
+
           result
         end
 

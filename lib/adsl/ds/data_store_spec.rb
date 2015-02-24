@@ -6,11 +6,15 @@ module ADSL
   module DS
     class DSNode
       def list_entity_classes_written_to
-        recursively_gather :entity_class_writes
+        recursively_gather do |e|
+          e.entity_class_writes.uniq if e.respond_to? :entity_class_writes
+        end
       end
 
       def list_entity_classes_read
-        recursively_gather :entity_class_reads
+        recursively_gather do |e|
+          e.entity_class_reads.uniq if e.respond_to? :entity_class_reads
+        end
       end
 
       def replace(what, with)
@@ -47,19 +51,30 @@ module ADSL
     end
     
     class DSSpec < DSNode
-      container_for :classes, :actions, :invariants
+      container_for :classes, :usergroups, :actions, :invariants, :ac_rules, :rules
+      attr_reader :auth_class
+
+      def initialize(args={})
+        super args
+        @auth_class = @classes.select{ |c| c.authenticable? }.first
+      end
     end
 
     class DSClass < DSNode
       include ADSL::Util::PartialOrdered
 
-      container_for :name, :sort, :parents, :children, :members
+      container_for :name, :sort, :parents, :children, :members, :authenticable
 
       def initialize(args={})
         args[:members]  ||= []
         args[:parents]  ||= []
         args[:children] ||= []
+        args[:authenticable] ||= false
         super args
+      end
+
+      def authenticable?
+        @authenticable
       end
 
       def to_s
@@ -105,6 +120,36 @@ module ADSL
       def fields
         @members.select{ |m| m.is_a? DSField }
       end
+    end
+
+    class DSUserGroup < DSNode
+      container_for :name
+    end
+
+    class DSAllUsers < DSNode
+      container_for
+    end
+
+    class DSInUserGroup < DSNode
+      container_for :objset, :usergroup
+
+      def type_sig
+        ADSL::DS::TypeSig::BasicType::BOOL
+      end
+    end
+
+    class DSCurrentUser < DSNode
+      container_for :type_sig
+    end
+
+    class DSAllOfUserGroup < DSNode
+      container_for :usergroup, :type_sig
+    end
+
+    class DSPermit < DSNode
+      container_for :usergroups, :ops, :expr
+
+      OPS = Set[:read, :create, :delete]
     end
 
     class DSRelation < DSNode
@@ -324,6 +369,10 @@ module ADSL
 
     class DSInvariant < DSNode
       container_for :name, :formula
+    end
+
+    class DSRule < DSNode
+      container_for :formula
     end
 
     class DSConstant < DSNode
