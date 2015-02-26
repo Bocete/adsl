@@ -55,6 +55,14 @@ module ADSL
       attr_reader :auth_class
 
       def initialize(args={})
+        args = {
+          :classes => [],
+          :usergroups => [],
+          :actions => [],
+          :invariants => [],
+          :ac_rules => [],
+          :rules => []
+        }.merge args
         super args
         @auth_class = @classes.select{ |c| c.authenticable? }.first
       end
@@ -146,10 +154,24 @@ module ADSL
       container_for :usergroup, :type_sig
     end
 
+    class DSPermittedByType < DSNode
+      container_for :ops, :klass
+
+      def type_sig
+        TypeSig::BasicType::BOOL
+      end
+    end
+
+    class DSPermitted < DSNode
+      container_for :ops, :expr
+
+      def type_sig
+        TypeSig::BasicType::BOOL
+      end
+    end
+
     class DSPermit < DSNode
       container_for :usergroups, :ops, :expr
-
-      OPS = Set[:read, :create, :delete]
     end
 
     class DSRelation < DSNode

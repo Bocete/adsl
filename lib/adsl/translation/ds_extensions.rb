@@ -23,11 +23,10 @@ module ADSL
       end
       
       def translate_action(action_name, *problems)
-        translation = ADSL::Translation::DSTranslator.new
+        translation = ADSL::Translation::DSTranslator.new self
 
         action = find_action_by_name action_name
 
-        translation.classes.concat @classes
         @classes.each do |klass|
           klass.translate(translation)
         end
@@ -341,9 +340,79 @@ module ADSL
       end
     end
 
+    class DSPermittedByType < DSNode
+      def prepare_expr(translation)
+      end
+
+      def resolve_expr(translation, ps, var = nil)
+        permits = translation.spec.ac_rules
+        permits.select!{ |p| p.expr.type_sig >= @klass.to_sig }
+        ADSL::FOL::And[@ops.map do |op|
+          applicable_permits = permits.select{ |p| p.ops.include? op }
+          groups = applicable_permits.map(&:usergroups).flatten
+          ADSL::FOL::Or[*groups.map{ |g| g[translation.current_user[]] }]
+        end]
+      end
+    end
+    
+    class DSPermitted < DSNode
+      def prepare_expr(translation)
+        @expr.prepare_expr translation
+      end
+
+      def resolve_expr(translation, ps, var = nil)
+        ADSL::FOL::And[*@ops.map do |op|
+          if op == :assoc or op == :deassoc
+            translation.reserve @expr.relation.type_pred_sort, :t do |t|
+              permitted = translation.spec.gen_is_permissible_formula(translation, op, ps, nil, o)
+              ADSL::FOL::ForAll.new t, ADSL::FOL::Implies.new(
+                And[
+                  @expr.objset.resolve_expr(translation, ps, @expr.relation.left_link[t]),
+                  translation.state[t],
+                  translation.state[@expr.relation.right_link[t]]
+                ],
+                permitted
+              )
+            end
+          else
+            translation.reserve @expr.type_sig, :o do |o|
+              permitted = translation.spec.gen_is_permissible_formula(translation, op, ps, @expr.type_sig, o)
+              ADSL::FOL::ForAll.new o, ADSL::FOL::Implies.new(
+                @expr.resolve_expr(translation, ps, o),
+                permitted
+              )
+            end
+          end
+        end]
+      end
+    end
+
     class DSPermit < DSNode
       def prepare(translation)
         @expr.prepare_expr translation
+      end
+
+      def gen_covers_formula(translation, op, ps, var_type_sig, var)
+        return false unless @ops.include? op
+        if op == :assoc or op == :deassoc
+          return false if @expr.relation.type_pred_sort != var.to_sort
+        else
+          return false unless @expr.type_sig >= var_type_sig
+        end
+        group_applicable = ADSL::FOL::Or[*@usergroups.map{ |g| g[translation.current_user[]] }]
+        if op == :assoc or op == :deassoc
+          ADSL::FOL::And[
+            group_applicable,
+            @expr.objset.resolve_expr(translation, ps, @expr.relation.left_link[var]),
+            translation.state[var],
+            translation.state[@expr.relation.right_link[var]]
+          ]
+        else
+          ADSL::FOL::And[
+            group_applicable,
+            @expr.resolve_expr(translation, ps, var)
+          ]
+        end
       end
     end
 
@@ -387,8 +456,8 @@ module ADSL
             ))
           end
   
-          relevant_from_relations = translation.classes.map{ |c| c.relations }.flatten.select{ |r| r.from_class >= @klass }
-          relevant_to_relations   = translation.classes.map{ |c| c.relations }.flatten.select{ |r| r.to_class >= @klass }
+          relevant_from_relations = translation.spec.classes.map(&:relations).flatten.select{ |r| r.from_class >= @klass }
+          relevant_to_relations   = translation.spec.classes.map(&:relations).flatten.select{ |r| r.to_class >= @klass }
           
           translation.create_formula ForAll.new(ps, Implies.new(
             @context.type_pred(ps),

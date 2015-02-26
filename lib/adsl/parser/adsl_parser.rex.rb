@@ -189,6 +189,12 @@ class ADSL::Parser::ADSLParser < Racc::Parser
       when (text = @ss.scan(/permit\b/))
          action { [:permit, lineno] }
 
+      when (text = @ss.scan(/permitted\b/))
+         action { [:permitted, lineno] }
+
+      when (text = @ss.scan(/permittedbytype\b/))
+         action { [:permittedbytype, lineno] }
+
       when (text = @ss.scan(/read\b/))
          action { [:read, lineno] }
 

@@ -394,5 +394,39 @@ module ADSL::Parser
       end
     end
 
+    def test_permitted_by_type__requires_the_right_class
+      parser = ADSLParser.new
+      assert_raises ADSLError do
+        parser.parse <<-adsl
+          authenticable class User {}
+          action blah() {
+            a = permittedbytype(create Nonexistent)
+          }
+        adsl
+      end
+    end
+
+    def test_permitted_by_type__ops_match
+      parser = ADSLParser.new
+      expected = {
+        :read => [:read],
+        :create => [:create],
+        :delete => [:delete],
+        :edit => [:create, :delete]
+      }
+      expected.each do |op, result|
+        assert_nothing_raised ADSLError do
+          spec = parser.parse <<-adsl
+            authenticable class User {}
+            action blah() {
+              a = permittedbytype(#{op} User)
+            }
+          adsl
+          action = spec.actions.first
+          assert_set_equal result, action.block.statements.first.expr.ops
+        end
+      end
+    end
+
   end
 end

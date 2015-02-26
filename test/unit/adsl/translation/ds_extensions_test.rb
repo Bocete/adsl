@@ -13,11 +13,12 @@ class ADSL::Translation::TranslationDSExtensionsTest < MiniTest::Unit::TestCase
   include ADSL::FOL
 
   def setup_class_test
-    @t = ADSL::Translation::DSTranslator.new
     @parent  = ADSL::DS::DSClass.new :name => 'Parent'
     @child1  = ADSL::DS::DSClass.new :name => 'Child1', :parents => [@parent]
     @child2  = ADSL::DS::DSClass.new :name => 'Child2', :parents => [@parent]
     @diamond = ADSL::DS::DSClass.new :name => 'Diamond', :parents => [@child1, @child2]
+    spec = ADSL::DS::DSSpec.new(:classes => [@parent, @child1, @child2, @diamond])
+    @t = ADSL::Translation::DSTranslator.new spec
 
     [@parent, @child1, @diamond, @child2].each do |c|
       c.translate @t

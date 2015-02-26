@@ -5,6 +5,7 @@ require 'set'
 require 'adsl/ds/data_store_spec'
 require 'adsl/ds/effect_domain_extensions'
 require 'adsl/util/general'
+require 'adsl/parser/util'
 
 class Array
   def optimize
@@ -310,20 +311,6 @@ module ADSL
         member
       end
 
-      def self.context_vars_that_differ(*contexts)
-        vars_per_context = []
-        contexts.each do |context|
-          vars_per_context << context.var_stack.inject(ActiveSupport::OrderedHash.new) { |so_far, frame| so_far.merge! frame }
-        end
-        all_vars = vars_per_context.map{ |c| c.keys }.flatten.uniq
-        packed = ActiveSupport::OrderedHash.new
-        all_vars.each do |v|
-          packed[v] = vars_per_context.map{ |vpc| vpc[v][1] }
-        end
-        packed.delete_if { |v, vars| vars.uniq.length == 1 }
-        packed
-      end
-        
       def auth_class
         return @auth_class unless @auth_class.nil?
         candidates = @classes.values.select{ |cn, c| c.authenticable? }
@@ -979,7 +966,7 @@ module ADSL
 
         lambdas = []
 
-        ASTTypecheckResolveContext::context_vars_that_differ(*contexts).each do |var_name, exprs|
+        ADSL::Parser::Util.context_vars_that_differ(*contexts).each do |var_name, exprs|
           type_sig = ADSL::DS::TypeSig.join exprs.map(&:type_sig)
           var = ADSL::DS::DSVariable.new :name => var_name, :type_sig => type_sig
           expr = ADSL::DS::DSEitherLambdaExpr.new :either => either, :exprs => exprs
@@ -1046,7 +1033,7 @@ module ADSL
         ds_if = ADSL::DS::DSIf.new :condition => condition, :then_block => blocks[0], :else_block => blocks[1]
 
         lambdas = []
-        ASTTypecheckResolveContext::context_vars_that_differ(*contexts).each do |var_name, exprs|
+        ADSL::Parser::Util.context_vars_that_differ(*contexts).each do |var_name, exprs|
           type_sig = ADSL::DS::TypeSig.join exprs.map(&:type_sig)
           var = ADSL::DS::DSVariable.new :name => var_name, :type_sig => type_sig
           expr = ADSL::DS::DSIfLambdaExpr.new :if => ds_if, :then_expr => exprs[0], :else_expr => exprs[1]
@@ -1586,6 +1573,41 @@ module ADSL
       end
     end
 
+    class ASTPermittedByType < ASTNode
+      node_fields :ops, :class_name
+      node_type :expr
+
+      def typecheck_and_resolve(context)
+        auth_class_node, auth_class = context.auth_class
+        if auth_class.nil?
+          raise ADSLError, "Permissions cannot be checked in a permissionless system (line #{@lineno})"
+        end
+        
+        ops, expr = ADSL::Parser::Util.ops_and_expr_from_nodes context, @ops, nil
+
+        klass_node, klass = context.classes[@class_name.text]
+        raise ADSLError, "Unknown class name #{@class_name.text} on line #{@class_name.lineno}" if klass.nil?
+        
+        ADSL::DS::DSPermittedByType.new :ops => ops, :klass => klass
+      end
+    end
+
+    class ASTPermitted < ASTNode
+      node_fields :ops, :expr
+      node_type :expr
+
+      def typecheck_and_resolve(context)
+        auth_class_node, auth_class = context.auth_class
+        if auth_class.nil?
+          raise ADSLError, "Permissions cannot be checked in a permissionless system (line #{@lineno})"
+        end
+        
+        ops, expr = ADSL::Parser::Util.ops_and_expr_from_nodes context, @ops, @expr
+        
+        ADSL::DS::DSPermitted.new :ops => ops, :expr => expr
+      end
+    end
+
     class ASTPermit < ASTNode
       node_fields :group_names, :ops, :expr
 
@@ -1603,27 +1625,7 @@ module ADSL
         end
         groups << ADSL::DS::DSAllUsers.new if groups.empty?
 
-        ops = Set[*@ops.map do |op, line|
-          case op
-          when :read, :create, :delete, :assoc, :deassoc
-            op
-          when :edit
-            [:create, :delete]
-          else 
-            raise ADSLError, "Unknown permission #{op} on line #{@lineno}"
-          end
-        end.flatten]
-        
-        expr = @expr.typecheck_and_resolve context
-        is_deref = expr.is_a?(ADSL::DS::DSDereference)
-        if is_deref
-          ops << :assoc if ops.include?(:create)
-          ops << :deassoc if ops.include?(:delete)
-        else
-          [:assoc, :deassoc].each do |op|
-            raise ADSLError, "#{op} permission is only applicable to dereferences (line #{@lineno})" if ops.include? op
-          end
-        end
+        ops, expr = ADSL::Parser::Util.ops_and_expr_from_nodes context, @ops, @expr
 
         ADSL::DS::DSPermit.new :usergroups => groups, :ops => ops, :expr => expr
       end

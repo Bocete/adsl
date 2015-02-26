@@ -11,13 +11,14 @@ module ADSL
       attr_accessor :initial_state, :state, :final_state, :non_state
       attr_accessor :current_user
       attr_reader :root_context
-      attr_reader :create_obj_stmts, :all_contexts, :classes
+      attr_reader :create_obj_stmts, :all_contexts
+      attr_reader :spec
       attr_reader :conjectures, :formulae
 
       include FOL
 
-      def initialize
-        @classes = []
+      def initialize(spec)
+        @spec = spec
         # the pool of symbol names that are used
         @registered_names = []
         # the pool of variable names that are used
@@ -155,7 +156,7 @@ module ADSL
       end
 
       def auth_class
-        @classes.select(&:authenticable?).first
+        @spec.classes.select(&:authenticable?).first
       end
 
       def register_name(name)

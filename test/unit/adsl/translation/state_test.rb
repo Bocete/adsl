@@ -8,7 +8,7 @@ require 'adsl/util/test_helper'
 
 class ADSL::Translation::StateTest < MiniTest::Unit::TestCase
   def test_sort_difference__plain
-    translator = ADSL::Translation::DSTranslator.new
+    translator = ADSL::Translation::DSTranslator.new(ADSL::DS::DSSpec.new)
 
     state1 = translator.create_state 's1'
     state2 = translator.create_state 's2'
@@ -29,7 +29,7 @@ class ADSL::Translation::StateTest < MiniTest::Unit::TestCase
   end
 
   def test_sort_difference__linked
-    translator = ADSL::Translation::DSTranslator.new
+    translator = ADSL::Translation::DSTranslator.new(ADSL::DS::DSSpec.new)
 
     state1 = translator.create_state 's1'
     state2 = translator.create_state 's2'

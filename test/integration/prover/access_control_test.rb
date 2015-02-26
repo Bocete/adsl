@@ -253,4 +253,231 @@ class IntegrationsAccessControlTest < MiniTest::Unit::TestCase
       permit edit currentuser.friends
     ADSL
   end
+
+  def test_permitted_create
+    adsl_assert :incorrect, <<-ADSL
+      authenticable class User {}
+      class Stuff {}
+      usergroup Mod
+      action blah() {
+        create(Stuff)
+      }
+      permit Mod edit allof(User)
+    ADSL
+    adsl_assert :correct, <<-ADSL
+      authenticable class User {}
+      class Stuff {}
+      usergroup Mod
+      action blah() {
+        if permitted(create allof(Stuff)) {
+          create(Stuff)
+        }
+      }
+      permit Mod edit allof(User)
+    ADSL
+    adsl_assert :correct, <<-ADSL
+      authenticable class User {}
+      class Stuff {}
+      usergroup Mod
+      action blah() {
+        if permitted(create allof(Stuff)) {
+          create(Stuff)
+        }
+      }
+    ADSL
+  end
+
+  def test_not_permitted_implies_skip
+    adsl_assert :correct, <<-ADSL
+      authenticable class User {}
+      class Stuff {}
+      action blah() {
+        if permitted(delete allof(Stuff)) {
+          delete oneof(allof(Stuff))
+        }
+      }
+      invariant exists(Stuff u)
+    ADSL
+    adsl_assert :correct, <<-ADSL
+      authenticable class User {}
+      class Stuff {}
+      action blah() {
+        if permitted(delete allof(Stuff)) {
+          delete oneof(allof(Stuff))
+        }
+      }
+      invariant not exists(Stuff s)
+    ADSL
+  end
+
+  def test_permitted_might_pass_if_right_usergroup
+    # this action may create an object
+    # if the currentuser happens to be a mod
+    adsl_assert :correct, <<-ADSL
+      authenticable class User {}
+      class Stuff {}
+      usergroup Mod
+      action blah() {
+        if permittedbytype(create User) {
+          create(Stuff)
+        }
+      }
+      invariant exists(Stuff s)
+    ADSL
+    adsl_assert :correct, <<-ADSL
+      authenticable class User {}
+      class Stuff {}
+      usergroup Mod
+      action blah() {
+        if permittedbytype(create User) {
+          create(Stuff)
+        }
+      }
+      invariant not exists(Stuff s)
+    ADSL
+  end
+  
+  def test_permitted_create
+    adsl_assert :incorrect, <<-ADSL
+      authenticable class User {}
+      class Stuff {}
+      usergroup Mod
+      action blah() {
+        delete allof(Stuff)
+      }
+      permit Mod edit allof(Stuff)
+    ADSL
+    adsl_assert :correct, <<-ADSL
+      authenticable class User {}
+      class Stuff {}
+      usergroup Mod
+      action blah() {
+        if permitted(delete allof(Stuff)) {
+          delete allof(Stuff)
+        }
+      }
+      permit Mod edit allof(Stuff)
+    ADSL
+    adsl_assert :correct, <<-ADSL
+      authenticable class User {}
+      class Stuff {}
+      usergroup Mod
+      action blah() {
+        if permitted(delete allof(Stuff)) {
+          delete allof(Stuff)
+        }
+      }
+    ADSL
+  end
+  
+  def test_permitted_create_deref
+    adsl_assert :incorrect, <<-ADSL
+      authenticable class User {
+        0+ Note notes
+      }
+      class Note {
+        1 User owner inverseof notes
+      }
+      usergroup Mod
+      action blah() {
+        delete currentuser.notes
+      }
+      permit Mod edit allof(Note)
+    ADSL
+    adsl_assert :correct, <<-ADSL
+      authenticable class User {
+        0+ Note notes
+      }
+      class Note {
+        1 User owner inverseof notes
+      }
+      action blah() {
+        delete currentuser.notes
+      }
+      permit edit allof(Note)
+    ADSL
+    adsl_assert :correct, <<-ADSL
+      authenticable class User {
+        0+ Note notes
+      }
+      class Note {
+        1 User owner inverseof notes
+      }
+      action blah() {
+        delete currentuser.notes
+      }
+      permit edit currentuser.notes
+    ADSL
+  end
+
+  def test_floating_tuple_permission
+    adsl_assert :incorrect, <<-ADSL
+      authenticable class User {
+        0+ Other others
+      }
+      class Other {}
+      action blah() {
+        obj = oneof(allof(Other))
+        delete obj
+      }
+      permit read allof(Other)
+      permit edit currentuser.others
+    ADSL
+    adsl_assert :incorrect, <<-ADSL
+      authenticable class User {
+        0+ Other others
+      }
+      class Other {}
+      action blah() {
+        obj = oneof(allof(Other))
+        currentuser.others += obj
+        currentuser.others -= obj
+        delete obj
+      }
+      permit read allof(Other)
+      permit edit currentuser.others
+    ADSL
+  end
+
+  def test_should_this_be_allowed
+    adsl_assert :incorrect, <<-ADSL
+      authenticable class User {
+        1 Other others
+      }
+      class Other {}
+      action blah() {
+        currentuser.others = create(Other)
+        currentuser.others = create(Other)
+        currentuser.others = create(Other)
+      }
+      permit edit currentuser.others
+    ADSL
+  end
+
+  def test__permitted_by_type_is_dumb
+    adsl_assert :correct, <<-ADSL
+      authenticable class User {
+        1 Other others
+      }
+      class Other {}
+      action blah() {
+        if permitted(delete allof(Other)) {
+          delete allof(Other)
+        }
+      }
+      permit delete currentuser.others
+    ADSL
+    adsl_assert :incorrect, <<-ADSL
+      authenticable class User {
+        1 Other others
+      }
+      class Other {}
+      action blah() {
+        if permittedbytype(delete Other) {
+          delete allof(Other)
+        }
+      }
+      permit delete currentuser.others
+    ADSL
+  end
 end

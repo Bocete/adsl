@@ -13,7 +13,7 @@ class ADSL::Translation::DSTranslatorTest < MiniTest::Unit::TestCase
   include ADSL::FOL
 
   def test_translation__unique_predicate_names
-    t = ADSL::Translation::DSTranslator.new
+    t = ADSL::Translation::DSTranslator.new(ADSL::DS::DSSpec.new)
     sort1 = t.create_sort :sort
     sort2 = t.create_sort :sort
     assert_equal "sort",   sort1.name
@@ -44,7 +44,7 @@ class ADSL::Translation::DSTranslatorTest < MiniTest::Unit::TestCase
   end
 
   def test_translation__reserve
-    t = ADSL::Translation::DSTranslator.new
+    t = ADSL::Translation::DSTranslator.new(ADSL::DS::DSSpec.new)
     sort1 = t.create_sort :sort1
     sort2 = t.create_sort :sort2
     t.reserve sort1, :o do |o|
@@ -90,7 +90,7 @@ class ADSL::Translation::DSTranslatorTest < MiniTest::Unit::TestCase
   end
 
   def test_translation__quantification
-    t = ADSL::Translation::DSTranslator.new
+    t = ADSL::Translation::DSTranslator.new(ADSL::DS::DSSpec.new)
     
     sort1 = ADSL::FOL::Sort.new 'sort1'
     sort2 = ADSL::FOL::Sort.new 'sort2'
@@ -190,7 +190,7 @@ class ADSL::Translation::DSTranslatorTest < MiniTest::Unit::TestCase
   end
 
   def test_translation__prepare_sorts
-    translation = ADSL::Translation::DSTranslator.new
+    translation = ADSL::Translation::DSTranslator.new(ADSL::DS::DSSpec.new)
     klass1 = ADSL::DS::DSClass.new :name => 'name', :parents => [], :members => []
     klass2 = ADSL::DS::DSClass.new :name => 'name', :parents => [], :members => []
 
@@ -202,7 +202,7 @@ class ADSL::Translation::DSTranslatorTest < MiniTest::Unit::TestCase
   end
 
   def test_translation__pre_post_create_objs
-    translation = ADSL::Translation::DSTranslator.new
+    translation = ADSL::Translation::DSTranslator.new(ADSL::DS::DSSpec.new)
     a_klass = ADSL::DS::DSClass.new(:name => "a", :parents => [], :members => [])
     a_stmt = ADSL::DS::DSCreateObj.new(:klass => a_klass)
     b_klass = ADSL::DS::DSClass.new(:name => "b", :parents => [], :members => [])
@@ -220,7 +220,7 @@ class ADSL::Translation::DSTranslatorTest < MiniTest::Unit::TestCase
   end
 
   def test__sort_setup
-    t = ADSL::Translation::DSTranslator.new
+    t = ADSL::Translation::DSTranslator.new(ADSL::DS::DSSpec.new)
     parent = ADSL::DS::DSClass.new :name => 'parent'
     child1 = ADSL::DS::DSClass.new :name => 'child1', :parents => [parent]
     child2 = ADSL::DS::DSClass.new :name => 'child2', :parents => [parent]
@@ -240,7 +240,7 @@ class ADSL::Translation::DSTranslatorTest < MiniTest::Unit::TestCase
   end
 
   def test__type_sig
-    t = ADSL::Translation::DSTranslator.new
+    t = ADSL::Translation::DSTranslator.new(ADSL::DS::DSSpec.new)
     parent = ADSL::DS::DSClass.new :name => 'parent'
     child1 = ADSL::DS::DSClass.new :name => 'child1', :parents => [parent]
     child2 = ADSL::DS::DSClass.new :name => 'child2', :parents => [parent]

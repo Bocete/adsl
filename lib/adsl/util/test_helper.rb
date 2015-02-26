@@ -20,7 +20,7 @@ class MiniTest::Unit::TestCase
     provers = (options[:prover] || ['spass', 'z3', 'z3_unsorted']).to_a
     provers.each do |prover|
       if options.include?(:conjecture) 
-        problems = [ADSL::Translation::FOLVerificationProblem.new(ds_spec, options[:conjecture])]
+        problems = [ADSL::Translation::FOLVerificationProblem.new(options[:conjecture])]
       else
         problems = ds_spec.generate_problems action_name
       end

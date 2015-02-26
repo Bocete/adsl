@@ -11,7 +11,7 @@ class ADSLParser
     left '<=>'
     right '='
   preclow
-  token authenticable usergroup class extends inverseof action foreach flatforeach unflatforeach either or create derefcreate delete if else subset oneof tryoneof allof invariant forall exists in isempty empty true false not and equal implies unknown currentuser inusergroup allofusergroup permit edit read assoc deassoc IDENT NUMBER STRING BASIC_TYPE JS roole
+  token authenticable usergroup class extends inverseof action foreach flatforeach unflatforeach either or create derefcreate delete if else subset oneof tryoneof allof invariant forall exists in isempty empty true false not and equal implies unknown currentuser inusergroup allofusergroup permit permitted permittedbytype edit read assoc deassoc IDENT NUMBER STRING BASIC_TYPE JS roole
   start adslspec
 rule
   adslspec: root_elems { return ASTSpec.new(:lineno => lineno,
@@ -166,6 +166,9 @@ rule
       | inusergroup '(' expr ',' IDENT ')'
                { return ASTInUserGroup.new :lineno => val[0], :objset => val[2], :groupname => val[4] }
       | allofusergroup '(' IDENT ')' { return ASTAllOfUserGroup.new :lineno => val[0], :groupname => val[2] }
+      | permitted '(' perm_op_list expr ')' { return ASTPermitted.new :lineno => val[0], :ops => val[2], :expr => val[3] }
+      | permittedbytype '(' perm_op_list IDENT ')'
+               { return ASTPermittedByType.new :lineno => val[0], :ops => val[2], :class_name => val[3] }
 
   invariant_decl: invariant expr {
           return ASTInvariant.new :lineno => val[0], :name => nil, :formula => val[1]

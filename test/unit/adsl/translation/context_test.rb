@@ -13,7 +13,7 @@ class ADSL::Translation::ContextTest < MiniTest::Unit::TestCase
   include ADSL::FOL
 
   def test_context__names_of_context_related_stuff
-    t = ADSL::Translation::DSTranslator.new
+    t = ADSL::Translation::DSTranslator.new(ADSL::DS::DSSpec.new)
     sort = t.create_sort :sort
     c1 = ADSL::Translation::FlatContext.new t, 'a', t.context, sort
     c1sub = ADSL::Translation::ChainedContext.new t, 'a', c1, sort
@@ -27,7 +27,7 @@ class ADSL::Translation::ContextTest < MiniTest::Unit::TestCase
   end
 
   def test_context__make_ps
-    t = ADSL::Translation::DSTranslator.new
+    t = ADSL::Translation::DSTranslator.new(ADSL::DS::DSSpec.new)
     sort = t.create_sort :sort
     sort2 = t.create_sort :sort2
     assert_equal [], t.context.make_ps
@@ -42,7 +42,7 @@ class ADSL::Translation::ContextTest < MiniTest::Unit::TestCase
   end
 
   def test_context_common__get_common_level
-    t = ADSL::Translation::DSTranslator.new
+    t = ADSL::Translation::DSTranslator.new(ADSL::DS::DSSpec.new)
     sort = t.create_sort :sort
     root_c = t.context
     c1 = ADSL::Translation::FlatContext.new t, 'a', t.context, sort
@@ -61,7 +61,7 @@ class ADSL::Translation::ContextTest < MiniTest::Unit::TestCase
   
   def test_context__order_in_root_context
     # supposed to emulate two statements in the same for loop
-    t = ADSL::Translation::DSTranslator.new
+    t = ADSL::Translation::DSTranslator.new(ADSL::DS::DSSpec.new)
     context = t.context
 
     assert_equal true, context.before(context, :c, :temp, true)
@@ -71,7 +71,7 @@ class ADSL::Translation::ContextTest < MiniTest::Unit::TestCase
 
   def test_context__order_same_lvl_chained
     # supposed to emulate two statements in the same chained foreach loop
-    t = ADSL::Translation::DSTranslator.new
+    t = ADSL::Translation::DSTranslator.new(ADSL::DS::DSSpec.new)
     sort = t.create_sort :sort
     c1 = ADSL::Translation::ChainedContext.new t, 'a', t.context, sort
 
@@ -87,7 +87,7 @@ class ADSL::Translation::ContextTest < MiniTest::Unit::TestCase
   
   def test_context__order_same_lvl_flat
     # supposed to emulate two statements in the same flat foreach loop
-    t = ADSL::Translation::DSTranslator.new
+    t = ADSL::Translation::DSTranslator.new(ADSL::DS::DSSpec.new)
     sort = t.create_sort :sort
     c1 = ADSL::Translation::FlatContext.new t, 'a', t.context, sort
 
@@ -97,7 +97,7 @@ class ADSL::Translation::ContextTest < MiniTest::Unit::TestCase
 
   def test_context__order_with_subcontext
     # supposed to emulate a c1 statement followed by a c2 foreach with a stmt inside
-    t = ADSL::Translation::DSTranslator.new
+    t = ADSL::Translation::DSTranslator.new(ADSL::DS::DSSpec.new)
     sort = t.create_sort :sort
     c1 = ADSL::Translation::FlatContext.new t, 'a', t.context, sort
     c2 = ADSL::Translation::ChainedContext.new t, 'a', c1, sort
@@ -129,7 +129,7 @@ class ADSL::Translation::ContextTest < MiniTest::Unit::TestCase
   end
 
   def test_context__listed_in_all_context
-    t = ADSL::Translation::DSTranslator.new
+    t = ADSL::Translation::DSTranslator.new(ADSL::DS::DSSpec.new)
     sort = t.create_sort :sort
     c2 = t.create_context 'a', true, t.context, sort
     c3 = t.create_context 'a', true, c2, sort
@@ -139,7 +139,7 @@ class ADSL::Translation::ContextTest < MiniTest::Unit::TestCase
   end
 
   def test_context__statements_in_two_nested_fors
-    t = ADSL::Translation::DSTranslator.new
+    t = ADSL::Translation::DSTranslator.new(ADSL::DS::DSSpec.new)
     sort = t.create_sort :sort
     outside_for_context = ADSL::Translation::ChainedContext.new t, 'a', t.context, sort
     inside_for_context = ADSL::Translation::ChainedContext.new t, 'a', outside_for_context, sort
@@ -164,6 +164,5 @@ class ADSL::Translation::ContextTest < MiniTest::Unit::TestCase
     actual = inside_for_context.before(inside_for_context, a, b, :asd)
     assert_equal expected, actual
   end
-
 
 end
