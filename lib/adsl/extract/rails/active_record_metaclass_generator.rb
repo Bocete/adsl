@@ -251,7 +251,7 @@ module ADSL
               var_name = ASTIdent.new(:text => block.parameters.first[1].to_s)
               var = self.class.new(:adsl_ast => ADSL::Parser::ASTVariable.new(:var_name => var_name))
 
-              substmts = instrumenter.abb.in_stmt_frame var, &block
+              substmts = instrumenter.ex_method.in_stmt_frame var, &block
 
               ASTForEach.new(
                 :objset => self.adsl_ast,
@@ -283,7 +283,7 @@ module ADSL
             def !=(other)
               other = other.adsl_ast if other.respond_to? :adsl_ast
               if other.is_a? ASTNode and other.class.is_expr?
-                ASTNot.new(:subformula => ASTEqual.new(:objsets => [self.adsl_ast, other]))
+                ASTNot.new(:subformula => ASTEqual.new(:exprs => [self.adsl_ast, other]))
               else
                 super
               end
@@ -339,7 +339,6 @@ module ADSL
               )
             end
             alias_method :add, :<<
-
 
             class << self
               include ADSL::Parser
@@ -551,7 +550,6 @@ module ADSL
               ]
             end
           end
-
 
           reflections(:polymorphic => true).each do |assoc|
             @ar_class.new.replace_method assoc.name do

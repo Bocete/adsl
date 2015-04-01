@@ -220,5 +220,27 @@ class ADSL::Util::GeneralTest < MiniTest::Unit::TestCase
     foo2.array << 4
     assert_not_equal foo, foo2
   end
+
+  def test_recursively_select
+    eval <<-ruby
+      class Foo
+        container_for :elem, :array
+      end
+      class Foo2
+        container_for :elem, :array
+      end
+    ruby
+
+    foo = Foo.new :elem => :a, :array => [:b, :c]
+    assert_equal [:a, :b, :c], foo.recursively_select{ true }
+    assert_equal [],           foo.recursively_select{ false }
+    assert_equal [],           foo.recursively_select{ nil }
+
+    foo2 = Foo2.new :elem => foo, :array => [1, 2]
+
+    assert_equal [foo, :a, :b, :c, 1, 2], foo2.recursively_select{ true }
+    assert_equal [1, 2],                  foo2.recursively_select{ |r| !r.is_a? Foo }
+    assert_equal [],                      foo2.recursively_select{ nil }
+  end
   
 end

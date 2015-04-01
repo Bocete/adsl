@@ -23,14 +23,10 @@ module ADSL
         end
 
         def run_action
-
-
           action_root_paths = action_adsl_ast.blocks.map{ |block| [block, false] }
         end
 
         def run_before_filter(higher_root_paths)
-          filter_root_paths = 
-
           filter_root_paths.each do |block, chain_halted|
             block += root_paths_to_stmts(higher_root_paths) unless chain_halted
           end
@@ -39,8 +35,6 @@ module ADSL
         end
 
         def run_after_filter(higher_root_paths)
-          filter_root_paths =
-
           higher_root_paths.each do |block, chain_halted|
             block += root_paths_to_stmts(filter_root_paths) unless chain_halted
           end
@@ -49,7 +43,6 @@ module ADSL
         end
 
         def run_around_filter
-
         end
       end
     end

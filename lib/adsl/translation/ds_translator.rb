@@ -14,6 +14,8 @@ module ADSL
       attr_reader :create_obj_stmts, :all_contexts
       attr_reader :spec
       attr_reader :conjectures, :formulae
+      attr_reader :return_guard_stack
+      attr_reader :branch_conditions
 
       include FOL
 
@@ -39,6 +41,8 @@ module ADSL
         # klass => Set[ [stmt] ]
         @create_obj_stmts = Hash.new{ |hash, klass| hash[klass] = [] }
         @state = @non_state
+        @return_guard_stack = []
+        @branch_conditions = []
       end
 
       def create_sort name
@@ -68,6 +72,27 @@ module ADSL
 
       def pop_formula_frame
         @formulae.pop
+      end
+
+      def push_branch_condition ds_node
+        @branch_conditions << [ds_node, @context.level]
+      end
+
+      def pop_branch_condition
+        @branch_conditions.pop
+      end
+
+      def branch_condition(translation, ps, starting_index = 0)
+        ADSL::FOL::And[
+          *@branch_conditions[starting_index..-1].map{ |formula, level| formula.resolve_expr translation, ps.first(level) }
+        ]
+      end
+
+      def in_branch_condition ds_node
+        push_branch_condition ds_node
+        yield
+      ensure
+        pop_branch_condition
       end
 
       def for_all(*args, &block)
@@ -164,6 +189,14 @@ module ADSL
         name = name.increment_suffix while @registered_names.include? name
         @registered_names << name
         name
+      end
+
+      def with_state(state)
+        old_state = @state
+        @state = state
+        return yield
+      ensure
+        @state = old_state
       end
       
       def to_fol

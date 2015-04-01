@@ -1,3 +1,6 @@
 Gemfile.lock
 *.swp
 *.swo
+.rvmrc
+.ruby-version
+.ruby-gemset

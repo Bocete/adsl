@@ -11,7 +11,7 @@ class ADSL::Extract::Rails::RailsInstrumentationTestCase < MiniTest::Unit::TestC
   end
 
   def teardown
-    unload_class :Asd, :Kme, 'Mod::Blah'
+    unload_class :Asd, :Kme, 'Mod::Blah', :Ability
   end
 
   def initialize_metaclasses
@@ -25,7 +25,9 @@ class ADSL::Extract::Rails::RailsInstrumentationTestCase < MiniTest::Unit::TestC
   end
   
   def ar_class_names
-    ['Asd', 'Kme', 'Mod::Blah']
+    default_class_names = ['Asd', 'Kme', 'Mod::Blah']
+    default_class_names << 'User' if Object.lookup_const('CanCan')
+    default_class_names
   end
 
   def ar_classes

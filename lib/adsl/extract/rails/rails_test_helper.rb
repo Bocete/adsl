@@ -135,6 +135,28 @@ if ENV["RAILS_ENV"] == 'test'
     create_table :blahs do |t|
       t.integer :asd_id
     end
+    create_table :users do |t|
+      t.string :name
+      t.boolean :is_admin
+    end
   end
 end
 
+def define_cancan_suite
+  Object.lookup_or_create_class('::User', ActiveRecord::Base).class_exec do
+    has_many :asds
+  end
+  Object.lookup_or_create_class('::Asd', ActiveRecord::Base).class_exec do
+    belongs_to :user
+  end
+  Object.lookup_or_create_module('::CanCan')
+  Object.lookup_or_create_module('::CanCan::Ability').class_exec do
+    def can(*args); end
+    def cannot(*args); end
+  end
+  Object.lookup_or_create_class('::Ability', Object).class_exec do
+    include ::CanCan::Ability
+
+    def initialize(user); end
+  end
+end

@@ -9,16 +9,16 @@ module ADSL
        
         # returns true or false if the node will render or raise, or will not render or raise
         # returns nil if the node may or may not render or raise
-        def halting_status_of(ast_node, is_action_body = false)
+        def returning_status_of(ast_node, is_action_body = false)
           if ast_node.is_a?(ASTBlock)
             sub_statuses = ast_node.statements.map do |stmt|
               sub_rs = halting_status_of stmt, is_action_body
-              return true if sub_rs
+              return true if sub_rs == true
               sub_rs
             end
             return nil if sub_statuses.include? nil
             return false
-          elsif ast_node.is_a?(ASTEither)
+          elsif ast_node.is_a?(ASTEither) || ast_node.is_a?(ASTIf)
             sub_statuses = ast_node.blocks.map{ |block| halting_status_of block, is_action_body }
             return false if sub_statuses.uniq == [false]
             return true if sub_statuses.uniq == [true]
@@ -45,7 +45,7 @@ module ADSL
 
               paths[:will_halt]     << possibilities[:will_halt]
               paths[:will_not_halt] << possibilities[:will_not_halt]
-            elsif stmt.is_a?(ASTEither) && halting_status_of(stmt, is_action_body).nil?
+            elsif (stmt.is_a?(ASTEither) || stmt.is_a?(ASTIf)) && halting_status_of(stmt, is_action_body).nil?
               rendering_paths     = []
               not_rendering_paths = []
               
@@ -99,31 +99,11 @@ module ADSL
         def interrupt_callback_chain_on_render(root_block, action_name)
           callbacks = split_into_callbacks root_block
 
-          index = action_index = callbacks.index{ |callback_name, block| callback_name == action_name } 
-          return if index.nil?
-           
-          # skip the action and proceed to the most prior before block
-          until index < 0
-            block = callbacks[index][1]
-            render_halts = index != action_index
-
-            case halting_status_of block, !render_halts
-            when true
-              # will halt execution after this callback is done
-              callbacks = callbacks.first(index + 1)
-            when nil
-              # may render
-              paths = split_into_paths_that_will_or_will_not_halt block, !render_halts
-              what_happens_unless_renders = ASTBlock.new(:statements => callbacks[index+1..-1].map{ |c| c[1] })
-              callbacks = callbacks.first(index + 1)
-              callbacks.last[1] = ASTEither.new(:blocks => [
-                paths[:will_halt],
-                ASTBlock.new(:statements => [paths[:will_not_halt], *what_happens_unless_renders])
-              ])
-            else
-              # doesn't render, all good!
+          callbacks.each do |label, block|
+            block.block_replace do |expr|
+              next unless expr.is_a?(ADSL::Parser::ASTDummyStmt) && expr.label == :render
+              label.to_s == action_name.to_s ? ADSL::Parser::ASTDummyStmt.new : ADSL::Parser::ASTRaise.new
             end
-            index -= 1
           end
 
           root_block.statements = callbacks.map{ |name, block| block }

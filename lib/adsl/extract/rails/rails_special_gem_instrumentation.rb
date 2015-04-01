@@ -25,7 +25,7 @@ module ADSL
             end
 
             def build_resource
-              #{ model_class_name }.new
+              nil
             end
 
             def load_collection
@@ -34,7 +34,7 @@ module ADSL
 
             def load_resource
               unless skip?(:load)
-                var_name, objset = if load_instance?
+                var_name, expr = if load_instance?
                   [instance_name.to_s, load_resource_instance]
                 else
                   [instance_name.to_s.pluralize, load_collection]
@@ -42,7 +42,7 @@ module ADSL
                 ins_explore_all 'load_resource' do
                   ins_stmt(ADSL::Parser::ASTAssignment.new(
                     :var_name => ADSL::Parser::ASTIdent.new(:text => "at__\#{var_name}"),
-                    :objset => objset.adsl_ast
+                    :expr => expr.adsl_ast
                   ))
                   nil
                 end
@@ -97,13 +97,33 @@ module ADSL
           Devise.mappings.values.each do |mapping|
             role = mapping.singular
             role_class = mapping.class_name
+
+            if cancan_exists?
+              current_user_code = <<-RUBY.strip
+                #{role_class}.new(:adsl_ast => ADSL::Parser::ASTCurrentUser.new)
+              RUBY
+            else
+              current_user_code = <<-RUBY.strip
+                #{role_class}.find(-1)
+              RUBY
+            end
+
             controller_class.class_eval <<-ruby
               def authenticate_#{role}!(*args); end
               def #{role}_signed_in?(*args); true; end
-              def current_#{role}(*args); #{role_class}.find(-1); end
+              def current_#{role}(*args); #{ current_user_code }; end
               def #{role}_session(*args); ::ADSL::Extract::MetaUnknown.new; end
               def only_render_implemented_actions(*args); end
             ruby
+          end
+        end
+
+        def instrument_gem_paperclip(controller_class, action)
+          return unless Object.lookup_const('Paperclip')
+
+          Paperclip::Attachment.class_exec do
+            def initialize(*args); end
+            def assign(*args); end
           end
         end
 
@@ -112,6 +132,7 @@ module ADSL
           instrument_gem_ransack controller_class, action
           instrument_gem_authlogic controller_class, action
           instrument_gem_devise controller_class, action
+          instrument_gem_paperclip controller_class, action
         end
 
       end

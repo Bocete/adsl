@@ -2,7 +2,7 @@ require 'active_support/core_ext/numeric/time'
 require 'optparse'
 require 'colorize'
 require 'set'
-require 'adsl/parser/adsl_parser'
+require 'adsl/parser/adsl_parser.tab'
 require 'adsl/prover/engine'
 require 'adsl/translation/ds_extensions'
 require 'adsl/util/csv_hash_formatter'
@@ -11,14 +11,13 @@ module ADSL
   module Bin
     class Bin
       DEFAULT_OPTS = {
-        :input => 'stdin'
+        :input => 'stdin',
         :prover => 'all',
         :halt_on_error => true,
-        :check_satisfiability => true,
         :timeout => 1.minute,
         :output => 'text',
         :actions => nil,
-        :invariants => nil,
+        :problems => nil,
         :translate => false
       }
 
@@ -45,27 +44,28 @@ module ADSL
         else
           adsl = STDIN.read
         end
-        
-        @ds = adsl.typecheck_and_resolve
+
+        @ds = ADSL::Parser::ADSLParser.new.parse adsl
         @ds
       end
 
       def filter_list(list, filters)
-        return list if filters.empty?
+        return list if filters.nil? || filters.empty?
         filters.map{ |f| list.select{ |l| l.name =~ /#{f}/} }.map{ |a| Set[*a] }.inject(&:+)
       end
 
-      def gen_tasks
-        actions    = filter_list @ds.actions,    @options[:actions]
-        invariants = filter_list @ds.invariants, @options[:invariants]
-        tasks = []
-        actions.each do |a|
-          if @options[:check_satisfiability]
-            tasks << [a, nil]
-          end
-          tasks += invariants.map{ |i| [a, i] }
+      def gen_problems
+        actions              = filter_list @ds.actions,    @options[:actions]
+        invariants           = filter_list @ds.invariants, @options[:problems]
+        check_access_control = @options[:problems].empty? || @options[:problems].include?('ac')
+
+        problems = []
+
+        actions.each do |action|
+          problems += [action, @ds.generate_problems(action.name, invariants, check_access_control)]
         end
-        tasks
+
+        problems
       end
 
       def output(result, action, invariant)
@@ -114,7 +114,7 @@ module ADSL
       end
 
       def translate
-        tasks = gen_tasks
+        tasks = gen_problems
         
         tasks.each do |action, invariant|
           fol = @ds.translate_action action.name, invariant
@@ -126,11 +126,11 @@ module ADSL
       end
 
       def verify
-        tasks = gen_tasks
+        @ds = input_ds
+        problems = gen_problems
 
-        tasks.each do |action, invariant|
-          inv = invariant.nil? ? false, invariant
-          fol = @ds.translate_action action.name, inv
+        problems.each do |action, problem|
+          fol = @ds.translate_action action.name, problem
           engine = ADSL::Prover::Engine.new *provers, fol, @options
           result = engine.verify
           output result, action, invariant

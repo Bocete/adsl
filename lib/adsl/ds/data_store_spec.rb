@@ -240,6 +240,26 @@ module ADSL
       container_for :objset, :field, :expr
     end
 
+    class DSReturnGuard < DSNode
+      container_for :block, :ret_type_sigs
+    end
+
+    class DSReturn < DSNode
+      container_for :exprs
+    end
+
+    class DSReturned < DSNode
+      container_for :guard, :index
+
+      def type_sig
+        @guard.ret_type_sigs[index]
+      end
+    end
+
+    class DSRaise < DSNode
+      container_for
+    end
+
     class DSEither < DSNode
       container_for :blocks, :lambdas
     end

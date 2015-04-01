@@ -48,6 +48,12 @@ class Time
   end
 end
 
+class Object
+  def deep_dup
+    dup
+  end
+end
+
 class Array
   def each_index_with_elem(&block)
     return each_index_without_elem(&block) if block.nil? or block.arity < 2
@@ -108,6 +114,16 @@ class Array
     self.clear
     array.each{ |e| self << e }
     self
+  end
+
+  def deep_dup
+    self.map &:deep_dup
+  end
+end
+
+class Hash
+  def deep_dup
+    Hash[*self.to_a.flatten(1).deep_dup]
   end
 end
 

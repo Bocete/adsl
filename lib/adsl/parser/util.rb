@@ -48,6 +48,19 @@ module ADSL
 
         return ops, expr
       end
+
+      def self.booleanify(ds_node)
+        if ds_node.type_sig.is_objset_type?
+          # ok, let's allow this for expression purposes only
+          ADSL::DS::DSNot.new(:subformula => ADSL::DS::DSIsEmpty.new(
+            :objset => condition
+          ))
+        elsif ds_node.type_sig.is_bool_type?
+          ds_node
+        else
+          raise ADSLError, "Boolean expression expected (received type #{ds_node.type_sig})"
+        end
+      end
         
     end
   end

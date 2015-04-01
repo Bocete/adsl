@@ -1,6 +1,6 @@
 require 'adsl'
 require 'rails'
-require 'adsl/verification/rails_verification'
+require 'adsl/extract/bin'
 
 module ADSL
   class Railtie < Rails::Railtie
@@ -33,7 +33,7 @@ module ADSL
       end
     end
 
-    include ADSL::Verification::RailsVerification
+    include ADSL::Extract::Bin
 
     railtie_name :adsl
 
@@ -55,12 +55,12 @@ module ADSL
 
       desc 'Translate Rails app into ADSL'
       task :adsl_translate => :environment do
-        verify_options = {}
+        options = {}
         
         actions = extract_actions_param_from_args
-        verify_options[:actions] = actions unless actions.nil?
+        options[:actions] = actions unless actions.nil?
 
-        adsl_translate :verify_options => verify_options
+        adsl_translate :verify_options => options, :extract_options => options
       end
     end
   end

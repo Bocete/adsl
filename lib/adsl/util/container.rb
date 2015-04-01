@@ -1,3 +1,5 @@
+require 'adsl/util/general'
+
 module ADSL
   module Util
     module Container
@@ -41,6 +43,29 @@ module ADSL
         end
         [*result.flatten.compact]
       end
+      
+      # block should return true if this is to be selected
+      # nil if not but the algorithm should descend
+      # false otherwise: neither select or recursively descend further
+      def recursively_select(&block)
+        selection = []
+        self.class.container_for_fields.each do |field_name|
+          field = send field_name
+          subfields = field.is_a?(Array) ? field.flatten : [field]
+          subfields.each do |field|
+            progress = block[field]
+            case progress
+            when true
+              selection << field
+              selection += field.recursively_select &block if field.respond_to? :recursively_select
+            when nil
+              selection += field.recursively_select &block if field.respond_to? :recursively_select
+            else
+            end
+          end
+        end
+        selection
+      end
 
       module ClassMethods
         def recursively_comparable
@@ -77,7 +102,7 @@ module ADSL
           new_values = {}
           self.class.container_for_fields.each do |field_name|
             value = send field_name
-            new_values[field_name] = value.respond_to?(:dup) ? value.dup : value
+            new_values[field_name] = value.deep_dup
           end
           self.class.new new_values
         end

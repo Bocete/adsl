@@ -117,6 +117,12 @@ namespace :test do
         t.test_files = FileList['test/integration/extract/branch_test.rb']
         t.verbose = true
       end
+
+      Rake::TestTask.new(name=:ac) do |t|
+        t.libs += ["lib"]
+        t.test_files = FileList['test/integration/extract/access_control_test.rb']
+        t.verbose = true
+      end
     end
     Rake::TestTask.new(name=:extract) do |t|
       t.libs += ["lib"]

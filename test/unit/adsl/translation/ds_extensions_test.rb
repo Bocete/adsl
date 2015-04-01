@@ -9,7 +9,7 @@ require 'minitest/unit'
 require 'minitest/autorun'
 require 'pp'
 
-class ADSL::Translation::TranslationDSExtensionsTest < MiniTest::Unit::TestCase
+class ADSL::Translation::DSExtensionsTest < MiniTest::Unit::TestCase
   include ADSL::FOL
 
   def setup_class_test

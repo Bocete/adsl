@@ -16,11 +16,10 @@ module ADSL
   module Extract
     class Instrumenter
       
-      attr_reader :stack_depth, :method_locals_stack
+      attr_reader :stack_depth
       attr_accessor :instrumentation_filters
       
       @instance = nil
-      @method_locals_stack = []
 
       def self.get_instance()
         @instance
@@ -34,27 +33,13 @@ module ADSL
         # a dummy method injected into the AST
       end
 
-      def method_locals
-        @method_locals_stack.last
-      end
-
-      def previous_locals
-        @method_locals_stack[-2]
-      end
-
-      def root_locals
-        @method_locals_stack.first
-      end
-
       def exec_within
         Instrumenter.instance_variable_set(:@instance, self) if @stack_depth == 0
         @stack_depth += 1
-        @method_locals_stack << create_locals if respond_to? :create_locals
 
         return yield(self)
       ensure
         @stack_depth -= 1
-        @method_locals_stack.pop
         Instrumenter.instance_variable_set(:@instance, nil) if @stack_depth == 0
       end
 
@@ -64,8 +49,8 @@ module ADSL
         first_stmt = sexp[3]
 
         if first_stmt[0] != :call or
-            first_stmt[1] != Instrumenter.to_sexp or
-            first_stmt[2] != :instrumented
+           first_stmt[1] != Instrumenter.to_sexp or
+           first_stmt[2] != :instrumented
           new_stmt = s(:call, Instrumenter.to_sexp, :instrumented)
           sexp.insert 3, new_stmt
         end
@@ -85,7 +70,6 @@ module ADSL
         @instrument_domain = instrument_domain
         @replacers = []
         @stack_depth = 0
-        @method_locals_stack = []
 
         # mark the instrumentation
         replace :defn, :defs do |sexp|
@@ -110,6 +94,7 @@ module ADSL
         return false if object.is_a?(Numeric) or object.is_a?(Symbol)
        
         method = object.singleton_class.instance_method method_name
+
         return false if method.source_location.nil?
 
         source_full_path = method.source_location.first
@@ -150,7 +135,7 @@ module ADSL
       def execute_instrumented(object, method_name, *args, &block)
         self.exec_within do
           instrument object, method_name
-          return object.send method_name, *args, &block
+          object.send(method_name, *args, &block)
         end
       end
 

@@ -18,10 +18,10 @@ class ADSL::Extract::BranchVerificationTest < ADSL::Extract::Rails::RailsInstrum
     }
   end
   
-  def test_verify_spass__branch_no_return
+  def test__branch_no_return
     AsdsController.class_exec do
       def nothing
-        if true
+        if :something_not_interpretable_as_a_formula
           Asd.new
         else
           Asd.build
@@ -36,10 +36,10 @@ class ADSL::Extract::BranchVerificationTest < ADSL::Extract::Rails::RailsInstrum
     assert_false verify :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing)
   end
   
-  def test_verify_spass__branch_with_return__matters
+  def test__branch_with_return__matters
     AsdsController.class_exec do
       def nothing
-        if true
+        if :something_not_interpretable_as_a_formula
           return Asd.new
         else
           return Asd.build
@@ -55,10 +55,10 @@ class ADSL::Extract::BranchVerificationTest < ADSL::Extract::Rails::RailsInstrum
     assert_false verify :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing)
   end
   
-  def test_verify_spass__branch_with_return__may_create_but_will_delete
+  def test__branch_with_return__may_create_but_will_delete
     AsdsController.class_exec do
       def nothing
-        if true
+        if :something_not_interpretable_as_a_formula
         else
           Asd.build
         end
@@ -72,11 +72,28 @@ class ADSL::Extract::BranchVerificationTest < ADSL::Extract::Rails::RailsInstrum
 
     assert verify :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing)
   end
-  
-  def test_verify_spass__branch_with_return__may_create_or_delete
+   
+  def test__branch_conditions_decide_branch_choice
     AsdsController.class_exec do
       def nothing
         if true
+        else
+          Asd.build
+        end
+      end
+    end
+    
+    ast = create_rails_extractor(<<-ruby).adsl_ast
+      invariant(self.not.exists{ |asd| })
+    ruby
+    
+    assert verify :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing)
+  end
+  
+  def test__branch_with_return__may_create_or_delete
+    AsdsController.class_exec do
+      def nothing
+        if :something_not_interpretable_as_a_formula
         else
           return Asd.build
         end
@@ -91,11 +108,11 @@ class ADSL::Extract::BranchVerificationTest < ADSL::Extract::Rails::RailsInstrum
     assert_false verify :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing)
   end
    
-  def test_verify_spass__variable_assignments
+  def test__variable_assignments
     AsdsController.class_exec do
       def nothing
         a = nil
-        if true
+        if :something_not_interpretable_as_a_formula
           a = Asd.new
         else
           a = Asd.build

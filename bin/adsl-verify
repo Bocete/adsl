@@ -4,6 +4,12 @@ require 'pathname'
 require 'optparse'
 require 'ostruct'
 
+GEM_BIN_PATH = Pathname.new(File.expand_path(__FILE__)).parent
+GEM_LIB_PATH = GEM_BIN_PATH.parent + "lib"
+$LOAD_PATH.unshift GEM_LIB_PATH unless $LOAD_PATH.include? GEM_LIB_PATH
+
+require 'adsl/bin/bin'
+
 options = ADSL::Bin::Bin::DEFAULT_OPTS.dup
 
 OptionParser.new do |opts|
@@ -19,21 +25,15 @@ OptionParser.new do |opts|
   end
 
   opts.on("--translate",
-          "Translate the specification onto the target language, skipping verification." do |translate|
+          "Translate the specification onto the target language, skipping verification.") do |translate|
     options[:translate] = true
   end
   
   opts.on("-h", "--[no-]halt-on-error",
-          "Halt verification on the first error encountered. Default: #{options.halt_on_error}") do |halt|
+          "Halt verification on the first error encountered. Default: #{options[:halt_on_error]}") do |halt|
     options[:halt_on_error] = halt
   end
   
-  opts.on("-c", "--[no-]check-satisfiability",
-          "Before verifying actions individually, check that the data store has a valid state.",
-          "  Default: #{ options[:check_satisfiability] }") do |check|
-    options[:check_satisfiability] = check
-  end
-
   opts.on("-o", "--output-format FORMAT",
           "Sets the output format. Options: text, csv, or silent", 
           "  Default: #{ options[:output] }") do |format|
@@ -54,11 +54,12 @@ OptionParser.new do |opts|
     options[:actions] = actions.split(':').map(&:strip)
   end
 
-  opts.on("-i", "--invariants INVARIANTS",
-          "A colon separated list of invariants to be verified.",
+  opts.on("-r", "--problems PROBLEMS",
+          "A colon separated list of invariant names to be verified,",
+          "  or 'ac' for access control checking.",
           "  Only invariants whose name contains any of the arguments will be vefified",
           "  All invariants are verified by default") do |invs|
-    options[:invariants] = invs.split(':').map(&:strip)
+    options[:problems] = invs.split(':').map(&:strip)
   end
 
   opts.on_tail("--help", "Show this message") do
@@ -71,12 +72,6 @@ unless ARGV.empty?
   raise OptionParser::ParseError "Invalid usage. Run verify-adsl --help for instructions" if ARGV.length != 1
   options[:input] = ARGV.first
 end
-
-GEM_BIN_PATH = Pathname.new(File.expand_path(__FILE__)).parent
-GEM_LIB_PATH = GEM_BIN_PATH.parent + "lib"
-$LOAD_PATH.unshift GEM_LIB_PATH unless $LOAD_PATH.include? GEM_LIB_PATH
-
-require 'adsl/bin/bin'
 
 bin = ADSL::Bin::Bin.new options
 begin

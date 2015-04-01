@@ -41,13 +41,13 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     end
   end
 
-  def test_action_extraction__empty_action
+  def test_extract__empty_action
     extractor = create_rails_extractor
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
     assert ast.block.statements.empty?
   end
   
-  def test_action_extraction__create_action
+  def test_extract__create_action
     AsdsController.class_exec do
       def create
         Asd.new
@@ -65,7 +65,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 'Asd', statements.first.expr.class_name.text
   end
 
-  def test_action_extraction__create_within_expression_action
+  def test_extract__create_within_expression_action
     AsdsController.class_exec do
       def create
         Asd.build
@@ -83,7 +83,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 'Asd', statements.first.expr.class_name.text
   end
 
-  def test_action_extraction__variable_assignment
+  def test_extract__variable_assignment
     AsdsController.class_exec do
       def create
         a = Asd.new
@@ -104,7 +104,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 'Asd',           statements.first.expr.expr.class_name.text
   end
 
-  def test_action_extraction__nil_assignment
+  def test_extract__nil_assignment
     AsdsController.class_exec do
       def nothing
         a = nil
@@ -132,7 +132,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 'Asd',           statements[1].expr.expr.class_name.text
   end
 
-  def test_action_extraction__instance_variable_assignment
+  def test_extract__instance_variable_assignment
     AsdsController.class_exec do
       def create
         @a = Asd.new
@@ -146,26 +146,29 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     extractor = create_rails_extractor
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :create)
     statements = ast.block.statements
-
-    assert_equal 3, statements.length
     
     # all instance variables are initialized to empty
-    assert_equal ASTExprStmt,   statements[0].class
-    assert_equal ASTAssignment,   statements[0].expr.class
-    assert_equal 'at__a',         statements[0].expr.var_name.text
-    assert_equal ASTEmptyObjset,  statements[0].expr.expr.class
+    assert_equal ASTExprStmt,    statements[0].class
+    assert_equal ASTAssignment,  statements[0].expr.class
+    assert_equal 'at__a',        statements[0].expr.var_name.text
+    assert_equal ASTEmptyObjset, statements[0].expr.expr.class
 
-    assert_equal ASTExprStmt,   statements[1].class
+    assert_equal ASTExprStmt,     statements[1].class
     assert_equal ASTAssignment,   statements[1].expr.class
     assert_equal 'at__a',         statements[1].expr.var_name.text
     assert_equal ASTCreateObjset, statements[1].expr.expr.class
     assert_equal 'Asd',           statements[1].expr.expr.class_name.text
 
-    assert_equal ASTDeleteObj, statements[2].class
-    assert_equal 'at__a',      statements[2].objset.var_name.text
+    assert_equal ASTExprStmt,    statements[2].class
+    assert_equal ASTAssignment,  statements[2].expr.class
+    assert_equal 'a',            statements[2].expr.var_name.text
+    assert_equal ASTEmptyObjset, statements[2].expr.expr.class
+    
+    assert_equal ASTDeleteObj, statements[3].class
+    assert_equal 'at__a',      statements[3].objset.var_name.text
   end
   
-  def test_action_extraction__class_variable_assignment
+  def test_extract__class_variable_assignment
     AsdsController.class_exec do
       def create
         @@a = Asd.new
@@ -182,25 +185,35 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     statements = ast.block.statements
 
     assert_false statements.empty?
-    assert_equal 3, statements.length
+    assert_equal 5, statements.length
     
-    assert_equal ASTExprStmt,   statements[0].class
+    assert_equal ASTExprStmt,     statements[0].class
     assert_equal ASTAssignment,   statements[0].expr.class
     assert_equal 'atat__a',       statements[0].expr.var_name.text
     assert_equal ASTEmptyObjset,  statements[0].expr.expr.class
     
-    assert_equal ASTExprStmt,   statements[1].class
+    assert_equal ASTExprStmt,     statements[1].class
     assert_equal ASTAssignment,   statements[1].expr.class
     assert_equal 'atat__a',       statements[1].expr.var_name.text
     assert_equal ASTCreateObjset, statements[1].expr.expr.class
     assert_equal 'Asd',           statements[1].expr.expr.class_name.text
 
-    assert_equal ASTDeleteObj, statements[2].class
-    assert_equal ASTVariable,  statements[2].objset.class
-    assert_equal 'atat__a',    statements[2].objset.var_name.text
+    assert_equal ASTExprStmt,     statements[2].class
+    assert_equal ASTAssignment,   statements[2].expr.class
+    assert_equal 'a',             statements[2].expr.var_name.text
+    assert_equal ASTEmptyObjset,  statements[2].expr.expr.class
+    
+    assert_equal ASTExprStmt,     statements[3].class
+    assert_equal ASTAssignment,   statements[3].expr.class
+    assert_equal 'at__a',         statements[3].expr.var_name.text
+    assert_equal ASTEmptyObjset,  statements[3].expr.expr.class
+    
+    assert_equal ASTDeleteObj, statements[4].class
+    assert_equal ASTVariable,  statements[4].objset.class
+    assert_equal 'atat__a',    statements[4].objset.var_name.text
   end
 
-  def test_action_extraction__assignments_dont_make_values_nil
+  def test_extract__assignments_dont_make_values_nil
     AsdsController.class_exec do
       def nothing
         a = Mod::Blah.new
@@ -238,10 +251,10 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal true, invariants.first.formula.bool_value
   end
 
-  def test_action_extraction__nonreturning_branches
+  def test_extract__nonreturning_branches
     AsdsController.class_exec do
       def nothing
-        if true
+        if :a
           Asd.new
         else
           Asd.find.delete!
@@ -265,10 +278,10 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal ASTDeleteObj, either.blocks.second.statements.first.class
   end
 
-  def test_action_extraction__one_returning_branch
+  def test_extract__one_returning_branch
     AsdsController.class_exec do
       def nothing
-        if true
+        if :not_a_deterministic_condition
           return Asd.new
         else
           Asd.build
@@ -294,10 +307,10 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal ASTDeleteObj,    either.blocks.second.statements.second.class
   end
   
-  def test_action_extraction__one_returning_branch_other_empty
+  def test_extract__one_returning_branch_other_empty
     AsdsController.class_exec do
       def nothing
-        if true
+        if :not_a_deterministic_condition
           return Asd.new
         else
         end
@@ -313,7 +326,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal ASTCreateObjset, statements.first.expr.class
   end
   
-  def test_action_extraction__statements_after_return_are_ignored
+  def test_extract__statements_after_return_are_ignored
     AsdsController.class_exec do
       def nothing
         Asd.new
@@ -331,13 +344,13 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal ASTCreateObjset, statements.first.expr.class
   end
 
-  def test_action_extraction__statements_after_return_in_branches_are_ignored
+  def test_extract__statements_after_return_in_branches_are_ignored
     AsdsController.class_exec do
       def nothing
-        if true
+        if :not_a_deterministic_condition
           return Asd.new
         else
-          return Kme.new
+          return Asd.all
         end
         Asd.new
       end
@@ -348,19 +361,15 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     statements = ast.block.statements
 
     assert_equal 1, statements.length
-    assert_equal ASTEither,       statements.first.class
-    assert_equal 1,               statements.first.blocks[0].statements.length
-    assert_equal ASTCreateObjset, statements.first.blocks[0].statements.first.expr.class
-    assert_equal 'Asd',           statements.first.blocks[0].statements.first.expr.class_name.text
-    assert_equal 1,               statements.first.blocks[1].statements.length
-    assert_equal ASTCreateObjset, statements.first.blocks[1].statements.first.expr.class
-    assert_equal 'Kme',           statements.first.blocks[1].statements.first.expr.class_name.text
+
+    assert_equal ASTCreateObjset, statements[0].expr.class
+    assert_equal 'Asd',           statements[0].expr.class_name.text
   end
   
-  def test_action_extraction__calls_of_method_with_multiple_paths
+  def test_extract__calls_of_method_with_multiple_paths
     AsdsController.class_exec do
       def something
-        if true
+        if :not_a_deterministic_condition
           return Asd.new
         else
           Asd.find.delete!
@@ -390,10 +399,10 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal ASTDeleteObj,    either.blocks.second.statements.first.class
   end
 
-  def test_action_extraction__calls_of_method_with_compatible_return_values_but_sideeffects
+  def test_extract__calls_of_method_with_compatible_return_values_but_sideeffects
     AsdsController.class_exec do
       def something
-        if true
+        if :not_a_deterministic_condition
           Asd.new
         else
           Asd.find
@@ -403,6 +412,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
       def nothing
         something
         Kme.new
+        render :text => 'asd'
       end
     end
 
@@ -421,7 +431,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal ASTCreateObjset, statements.second.expr.class
   end
 
-  def test_action_extraction__deep_call_chain
+  def test_extract__deep_call_chain
     AsdsController.class_exec do
       def some3
         Asd.new
@@ -451,7 +461,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 'Asd',           statements.last.objset.objset.class_name.text
   end
 
-  def test_action_extraction__multiple_return
+  def test_extract__multiple_return
     AsdsController.class_exec do
       def blah
         return Asd.new, Kme.new
@@ -475,7 +485,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 'Kme', statements.second.expr.class_name.text
   end
 
-  def test_action_extraction__multiple_assignment
+  def test_extract__multiple_assignment
     AsdsController.class_exec do
       def nothing
         a, b = Asd.new, Kme.new
@@ -508,7 +518,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 'b', statements[3].objset.var_name.text
   end
 
-  def test_action_extraction__optional_assignment_of_known_nil_variable
+  def test_extract__optional_assignment_of_known_nil_variable
     AsdsController.class_exec do
       def nothing
         a ||= Asd.new
@@ -543,7 +553,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 'Asd',         statements[2].expr.expr.objset.class_name.text
   end
   
-  def test_action_extraction__optional_assignment_of_nonnil_variable
+  def test_extract__optional_assignment_of_nonnil_variable
     AsdsController.class_exec do
       def nothing
         a = Asd.new
@@ -578,7 +588,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 'Asd',         statements[2].blocks[1].statements[0].expr.expr.objset.class_name.text
   end
   
-  def test_action_extraction__multiple_assignment_of_return
+  def test_extract__multiple_assignment_of_return
     AsdsController.class_exec do
       def blah
         return Asd.new, Kme.new
@@ -616,10 +626,10 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 'b', statements[3].objset.var_name.text
   end
   
-  def test_action_extraction__variable_assignment_in_branch
+  def test_extract__variable_assignment_in_branch
     AsdsController.class_exec do
       def nothing
-        if true
+        if :not_a_deterministic_condition
           a = "asd"
         else
           a = "blah"
@@ -685,7 +695,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
   def test_before_callbacks__can_have_branches_normally
     AsdsController.class_exec do
       def before
-        if true
+        if :not_a_deterministic_condition
           return Kme.new
         else
           Asd.new
@@ -693,7 +703,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
       end
       
       def before2
-        if true
+        if :not_a_deterministic_condition
           Kme.new
         else
         end
@@ -739,7 +749,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
       end
       
       def after
-        if true
+        if :not_a_deterministic_condition
           Kme.new
         else
           return Asd.new
@@ -770,7 +780,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
   def test_callbacks__multiple_branched_callbacks
     AsdsController.class_exec do
       def before_nothing
-        if true
+        if :not_a_deterministic_condition
           return Kme.new
         else
           Asd.new
@@ -778,7 +788,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
       end
 
       def nothing
-        if true
+        if :not_a_deterministic_condition
           Kme.new
         else
           return Mod::Blah.new
@@ -786,7 +796,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
       end
 
       def after_nothing
-        if true
+        if :not_a_deterministic_condition
           return Kme.new
         else
           Mod::Blah.new
@@ -839,7 +849,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
   def test_before_callbacks__halt_callback_chain_when_rendering_sometimes
     AsdsController.class_exec do
       def before
-        if true
+        if :not_a_deterministic_condition
           render :text => 'blah'
         end
         Asd.new
@@ -858,27 +868,19 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :before_filter_action)
     statements = ast.block.statements
 
-    assert_equal 1, statements.length
-    assert_equal ASTEither, statements[0].class
-
-    blocks = statements[0].blocks
-    assert_equal 2, blocks.length
-    
-    assert_equal 3, blocks[1].statements.length
+    assert_equal 3, statements.length
+    assert_equal 3, statements.length
     types = ['Asd', 'Kme', 'Mod_Blah']
     3.times do |i|
-      assert_equal ASTExprStmt,    blocks[1].statements[i].class
-      assert_equal types[i],         blocks[1].statements[i].expr.class_name.text
+      assert_equal ASTExprStmt, statements[i].class
+      assert_equal types[i],    statements[i].expr.class_name.text
     end
-
-    assert_equal 1,     blocks[0].statements.length
-    assert_equal 'Asd', blocks[0].statements[0].expr.class_name.text
   end
 
   def test_before_callbacks__affect_after
     AsdsController.class_exec do
       def before_nothing
-        if true
+        if :not_a_deterministic_condition
           render
         end
         Asd.new
@@ -897,27 +899,18 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
     statements = ast.block.statements
 
-    assert_equal 1, statements.length
-    assert_equal ASTEither, statements[0].class
-
-    blocks = statements[0].blocks
-    assert_equal 2, blocks.length
-    
-    assert_equal 3, blocks[1].statements.length
+    assert_equal 3, statements.length
     types = ['Asd', 'Kme', 'Mod_Blah']
     3.times do |i|
-      assert_equal ASTExprStmt, blocks[1].statements[i].class
-      assert_equal types[i],    blocks[1].statements[i].expr.class_name.text
+      assert_equal ASTExprStmt, statements[i].class
+      assert_equal types[i],    statements[i].expr.class_name.text
     end
-
-    assert_equal 1,     blocks[0].statements.length
-    assert_equal 'Asd', blocks[0].statements[0].expr.class_name.text
   end
 
   def test_before_callbacks__render_in_action_does_not_halt_after
     AsdsController.class_exec do
       def before_nothing
-        if true
+        if :not_a_deterministic_condition
           render
         end
         Asd.new
@@ -937,24 +930,15 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
     statements = ast.block.statements
 
-    assert_equal 1, statements.length
-    assert_equal ASTEither, statements[0].class
-
-    blocks = statements[0].blocks
-    assert_equal 2, blocks.length
-    
-    assert_equal 3, blocks[1].statements.length
+    assert_equal 3, statements.length
     types = ['Asd', 'Kme', 'Mod_Blah']
     3.times do |i|
-      assert_equal ASTExprStmt,      blocks[1].statements[i].class
-      assert_equal types[i],         blocks[1].statements[i].expr.class_name.text
+      assert_equal ASTExprStmt,      statements[i].class
+      assert_equal types[i],         statements[i].expr.class_name.text
     end
-
-    assert_equal 1,     blocks[0].statements.length
-    assert_equal 'Asd', blocks[0].statements[0].expr.class_name.text
   end
 
-  def test_extract_action__instrumentation_filters_work
+  def test_extract__instrumentation_filters_work
     AsdsController.class_exec do
       def before_nothing
         Asd.new
@@ -976,7 +960,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 1, statements.length
   end
   
-  def test_extract_action__raise_ignores_the_root_path
+  def test_extract__raise_ignores_the_root_path
     AsdsController.class_exec do
       def nothing
         Kme.new
@@ -991,10 +975,10 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 0, statements.length
   end
 
-  def test_extract_action__raise_ignores_the_root_path_in_branch
+  def test_extract__raise_ignores_the_root_path_in_branch
     AsdsController.class_exec do
       def nothing
-        if true
+        if :not_a_deterministic_condition
           Asd.new
         else
           Kme.new
@@ -1013,7 +997,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 'Asd',           statements[0].expr.class_name.text
   end
   
-  def test_extract_action__exceptions_in_callbacks_stop_the_chain
+  def test_extract__exceptions_in_callbacks_stop_the_chain
     AsdsController.class_exec do
       def before_nothing
         raise
@@ -1031,7 +1015,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 0, statements.length
   end
 
-  def test_extract_action__foreach_basic
+  def test_extract__foreach_basic
     AsdsController.class_exec do
       def nothing
         Kme.all.each do |asd|
@@ -1065,7 +1049,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 'a',           block_stmts[1].objset.var_name.text
   end
 
-  def test_extract_action__association_setter_direct
+  def test_extract__association_setter_direct
     AsdsController.class_exec do
       def nothing
         Kme.new.blah = Mod::Blah.new
@@ -1087,7 +1071,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 'Mod_Blah',      statements[0].expr.class_name.text
   end
 
-  def test_extract_action__association_setter_through
+  def test_extract__association_setter_through
     AsdsController.class_exec do
       def nothing
         Asd.find.kmes = Kme.new
@@ -1154,7 +1138,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert iter_name.is_a? String
   end
 
-  def test_extract_action__nested_foreachs
+  def test_extract__nested_foreachs
     AsdsController.class_exec do
       def nothing
         Asd.all.each do |asd|
@@ -1194,7 +1178,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 'blah',       final_block_stmts.first.objset.var_name.text
   end
 
-  def test_extract_action__assignment_in_branch_condition
+  def test_extract__assignment_in_branch_condition
     AsdsController.class_exec do
       def nothing
         if asd = Asd.new
@@ -1210,29 +1194,61 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
 
     assert_equal 3, statements.length
 
-    assert_equal ASTExprStmt,   statements[0].class
+    assert_equal ASTExprStmt,     statements[0].class
     assert_equal ASTAssignment,   statements[0].expr.class
     assert_equal 'asd',           statements[0].expr.var_name.text
     assert_equal ASTCreateObjset, statements[0].expr.expr.class
     assert_equal 'Asd',           statements[0].expr.expr.class_name.text
 
-    assert_equal ASTEither,       statements[1].class
-    assert_equal 2,               statements[1].blocks.length
-    assert_equal 1,               statements[1].blocks[0].statements.length
-    assert_equal ASTDeleteObj,    statements[1].blocks[0].statements[0].class
-    assert_equal ASTVariable,     statements[1].blocks[0].statements[0].objset.class
-    assert_equal 'asd',           statements[1].blocks[0].statements[0].objset.var_name.text
-    assert_equal 0,               statements[1].blocks[1].statements.length
+    assert_equal ASTIf,       statements[1].class
+    assert_equal ASTVariable, statements[1].condition.class
+    assert_equal 1,           statements[1].then_block.statements.length
+    assert_equal ASTDeleteObj,statements[1].then_block.statements[0].class
+    assert_equal ASTVariable, statements[1].then_block.statements[0].objset.class
+    assert_equal 'asd',       statements[1].then_block.statements[0].objset.var_name.text
+    assert_equal 0,           statements[1].else_block.statements.length
 
-    assert_equal ASTDeleteObj,    statements[2].class
-    assert_equal ASTVariable,     statements[2].objset.class
-    assert_equal 'asd',           statements[2].objset.var_name.text
+    assert_equal ASTDeleteObj, statements[2].class
+    assert_equal ASTVariable,  statements[2].objset.class
+    assert_equal 'asd',        statements[2].objset.var_name.text
   end
 
-  def test_extract_action__assignment_of_branch
+  def test_extract__assignment_of_branch
     AsdsController.class_exec do
       def nothing
-        a = if true; Asd.all; else; nil; end
+        a = if Asd.all.empty?; Asd.all; else; nil; end
+        a.delete
+      end
+    end
+
+    extractor = create_rails_extractor
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    statements = ast.block.statements
+
+    assert_equal 3, statements.length
+
+    assert_equal ASTIf,      statements[0].class
+    assert_equal ASTIsEmpty, statements[0].condition.class
+    assert_equal [],         statements[0].then_block.statements
+    assert_equal [],         statements[0].else_block.statements
+
+    assert_equal ASTExprStmt,    statements[1].class
+    assert_equal ASTAssignment,  statements[1].expr.class
+    assert_equal 'a',            statements[1].expr.var_name.text
+    assert_equal ASTIfExpr,      statements[1].expr.expr.class
+    assert_equal statements[0],  statements[1].expr.expr.if
+    assert_equal ASTAllOf,       statements[1].expr.expr.then_expr.class
+    assert_equal ASTEmptyObjset, statements[1].expr.expr.else_expr.class
+
+    assert_equal ASTDeleteObj, statements[2].class
+    assert_equal ASTVariable,  statements[2].objset.class
+    assert_equal 'a',          statements[2].objset.var_name.text
+  end
+
+  def test_extract__assignment_of_unconditional_branch
+    AsdsController.class_exec do
+      def nothing
+        a = if :unconditional; Asd.all; else; nil; end
         a.delete
       end
     end
@@ -1255,10 +1271,10 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 'a',          statements[1].objset.var_name.text
   end
   
-  def test_extract_action__assignment_of_trinary
+  def test_extract__assignment_of_trinary
     AsdsController.class_exec do
       def nothing
-        a = true ? Asd.all : nil
+        a = Asd.all.empty? ? Asd.all : nil
         a.delete
       end
     end
@@ -1267,21 +1283,26 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
     statements = ast.block.statements
 
-    assert_equal 2, statements.length
+    assert_equal 3, statements.length
 
-    assert_equal ASTExprStmt,      statements[0].class
-    assert_equal ASTAssignment,    statements[0].expr.class
-    assert_equal 'a',              statements[0].expr.var_name.text
-    assert_equal ASTPickOneExpr,   statements[0].expr.expr.class
-    assert_equal ASTAllOf,         statements[0].expr.expr.exprs[0].class
-    assert_equal ASTEmptyObjset,   statements[0].expr.expr.exprs[1].class
+    assert_equal ASTIf,            statements[0].class
+    assert_equal ASTIsEmpty,       statements[0].condition.class
+    assert_equal [],               statements[0].then_block.statements
+    assert_equal [],               statements[0].else_block.statements
 
-    assert_equal ASTDeleteObj, statements[1].class
-    assert_equal ASTVariable,  statements[1].objset.class
-    assert_equal 'a',          statements[1].objset.var_name.text
+    assert_equal ASTExprStmt,      statements[1].class
+    assert_equal ASTAssignment,    statements[1].expr.class
+    assert_equal 'a',              statements[1].expr.var_name.text
+    assert_equal ASTIfExpr,        statements[1].expr.expr.class
+    assert_equal ASTAllOf,         statements[1].expr.expr.then_expr.class
+    assert_equal ASTEmptyObjset,   statements[1].expr.expr.else_expr.class
+
+    assert_equal ASTDeleteObj, statements[2].class
+    assert_equal ASTVariable,  statements[2].objset.class
+    assert_equal 'a',          statements[2].objset.var_name.text
   end
   
-  def test_extract_action__rescue_stmt_modifier
+  def test_extract__rescue_stmt_modifier
     AsdsController.class_exec do
       def nothing
         a = Asd.all rescue nil
@@ -1307,7 +1328,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 'a',          statements[1].objset.var_name.text
   end
 
-  def test_extract_action__action_may_call_action
+  def test_extract__action_may_call_action
     AsdsController.class_exec do
       def nothing
         Asd.new
@@ -1338,7 +1359,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 'Mod_Blah',      statements[2].expr.class_name.text
   end
 
-  def test_extract_action__foreign_key_reads_and_writes_propagate_kinda
+  def test_extract__foreign_key_reads_and_writes_propagate_kinda
     AsdsController.class_exec do
       def nothing
         blah = Mod::Blah.find
@@ -1376,7 +1397,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 'asd',         statements[2].expr.var_name.text
   end
 
-  def test_extract_action__has_many_delete_removes_one
+  def test_extract__has_many_delete_removes_one
     AsdsController.class_exec do
       def nothing
         a = Asd.new

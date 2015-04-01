@@ -271,9 +271,6 @@ class ADSL::Parser::AstNodesTest < MiniTest::Unit::TestCase
 
   def test__block_optimize__removes_last_stmts_without_sideeffects
     action = ASTAction.new(:block => ASTBlock.new(:statements => [
-      ASTExprStmt.new(
-        :expr => ASTAssignment.new(:var_name => ASTIdent.new(:text => 'at_asdf'), :expr => ASTEmptyObjset.new)
-      ),
       ASTEither.new(:blocks => [
         ASTBlock.new(:statements => []),
         ASTBlock.new(:statements => [
@@ -368,4 +365,68 @@ class ADSL::Parser::AstNodesTest < MiniTest::Unit::TestCase
     assert_equal 6, spec.adsl_ast_size
     assert_equal 10, spec.adsl_ast_size(:pre_optimize => true)
   end
+
+  def dummy(flag = nil)
+    ASTDummyStmt.new :label => flag
+  end
+
+  def return_stmt
+    ASTReturn.new
+  end
+
+  def block(*stmts)
+    ASTBlock.new :statements => stmts
+  end
+
+  def either(*blocks)
+    ASTEither.new :blocks => blocks
+  end
+
+  def test_block_returns?
+    assert_equal false, block(dummy, dummy).returns?
+    assert_equal true,  block(dummy, return_stmt, dummy).returns?
+    assert_equal nil,   block(either(block, block(return_stmt))).returns?
+  end
+
+  def test_block__remove_statements_after_return
+    b = block(dummy(1), return_stmt, dummy(2), dummy(3))
+    
+    b.remove_statements_after_returns!
+    
+    assert_equal 2,         b.statements.length
+    assert_equal 1,         b.statements[0].label
+    assert_equal ASTReturn, b.statements[1].class
+  end
+
+  def test_block_not_append_statements_after_return_to_returning_branches
+    b = block(dummy(1), either(block(return_stmt), block(return_stmt, dummy(2))), dummy(3))
+
+    b.remove_statements_after_returns!
+
+    assert_equal 2,         b.statements.length
+    assert_equal 1,         b.statements[0].label
+    assert_equal ASTEither, b.statements[1].class
+    assert_equal 2,         b.statements[1].blocks.count
+    assert_equal 1,         b.statements[1].blocks[0].statements.length
+    assert_equal ASTReturn, b.statements[1].blocks[0].statements.first.class
+    assert_equal 1,         b.statements[1].blocks[1].statements.length
+    assert_equal ASTReturn, b.statements[1].blocks[1].statements.first.class
+  end
+
+  def test_block_append_statements_after_return_to_nonreturning_branches
+    b = block(dummy(1), either(block(return_stmt), block(dummy(2))), dummy(3))
+    
+    b.remove_statements_after_returns!
+
+    assert_equal 2,         b.statements.length
+    assert_equal 1,         b.statements[0].label
+    assert_equal ASTEither, b.statements[1].class
+    assert_equal 2,         b.statements[1].blocks.count
+    assert_equal 1,         b.statements[1].blocks[0].statements.length
+    assert_equal ASTReturn, b.statements[1].blocks[0].statements.first.class
+    assert_equal 2,         b.statements[1].blocks[1].statements.length
+    assert_equal [ASTDummyStmt, ASTDummyStmt], b.statements[1].blocks[1].statements.map(&:class)
+    assert_equal [2, 3],                       b.statements[1].blocks[1].statements.map(&:label)
+  end
+
 end

@@ -490,13 +490,29 @@ class BasicTest < MiniTest::Unit::TestCase
       }
       invariant exists(Child o: not isempty(o.rel))
     ADSL
-    adsl_assert :correct, <<-ADSL
+    adsl_assert :incorrect, <<-ADSL
       class Parent { 0+ Parent rel }
       class Child extends Parent {}
       action blah() {
         delete allof(Child).rel
       }
-      invariant exists(Parent o: not isempty(o.rel)) and not exists(Child o: not isempty(o.rel))
+      invariant exists(Parent o: not isempty(o.rel))
+    ADSL
+    adsl_assert :incorrect, <<-ADSL
+      class Parent { 0+ Parent rel }
+      class Child extends Parent {}
+      action blah() {
+        delete allof(Child).rel
+      }
+      invariant exists(Parent o: not isempty(o.rel))
+    ADSL
+    adsl_assert :incorrect, <<-ADSL
+      class Parent { 0+ Parent rel }
+      class Child extends Parent {}
+      action blah() {
+        delete allof(Child).rel
+      }
+      invariant exists(Child o: not isempty(o.rel))
     ADSL
   end
   
@@ -513,8 +529,8 @@ class BasicTest < MiniTest::Unit::TestCase
     adsl_assert :incorrect, <<-ADSL
       class Class{ 0+ Class rel }
       action blah() {
-        v1 = oneof (allof(Class))
-        v2 = oneof (allof(Class))
+        v1 = oneof(allof(Class))
+        v2 = oneof(allof(Class))
         v1.rel += v2
       }
       invariant forall(Class o: isempty(o.rel))

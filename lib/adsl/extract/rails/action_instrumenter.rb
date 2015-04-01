@@ -4,216 +4,16 @@ require 'adsl/parser/ast_nodes'
 require 'adsl/extract/instrumenter'
 require 'adsl/extract/sexp_utils'
 require 'adsl/extract/rails/other_meta'
-require 'adsl/extract/rails/action_block_builder'
+require 'adsl/extract/rails/kernel_extensions'
+require 'adsl/extract/rails/method'
 require 'adsl/extract/rails/active_record_metaclass_generator'
-
-module Kernel
-  def ins_stmt(expr = nil, options = {})
-    if expr.is_a? Array
-      expr.each do |subexpr|
-        ins_stmt subexpr, options
-      end
-    else
-      stmt = ::ADSL::Extract::Rails::ActionInstrumenter.extract_stmt_from_expr expr
-      if stmt.is_a?(::ADSL::Parser::ASTNode) && stmt.class.is_statement?
-        ::ADSL::Extract::Instrumenter.get_instance.abb.append_stmt stmt, options
-      end
-    end
-    expr
-  end
-
-  def ins_mark_render_statement()
-    ::ADSL::Parser::ASTDummyStmt.new :label => :render
-  end
-
-  def ins_multi_assignment(outer_binding, names, values, operator = '=')
-    values_to_be_returned = []
-    names.length.times do |index|
-      name = names[index]
-      value = values[index]
-
-      adsl_ast_name = if /^@@[^@]+$/ =~ name.to_s
-        "atat__#{ name.to_s[2..-1] }"
-      elsif /^@[^@]+$/ =~ name.to_s
-        "at__#{ name.to_s[1..-1] }"
-      elsif /^\$.*$/ =~ name.to_s
-        "global__#{ name.to_s[1..-1] }"
-      else
-        name.to_s
-      end
-      
-      if value.respond_to?(:adsl_ast) && value.adsl_ast.class.is_expr?
-        assignment = ::ADSL::Parser::ASTExprStmt.new(:expr => ::ADSL::Parser::ASTAssignment.new(
-          :var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name),
-          :expr => value.adsl_ast
-        ))
-        if operator == '||='
-          old_value = outer_binding.eval name rescue nil
-          if old_value.respond_to?(:adsl_ast) &&
-              old_value.adsl_ast.class.is_expr?
-            assignment = [
-              ::ADSL::Parser::ASTDeclareVar.new(:var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name.dup)),
-              ::ADSL::Parser::ASTEither.new(:blocks => [
-                ::ADSL::Parser::ASTBlock.new(:statements => []),
-                ::ADSL::Parser::ASTBlock.new(:statements => [assignment])
-              ])
-            ]
-          end
-        end
-        ins_stmt assignment
-
-        variable = value.nil? ? nil : value.class.new(
-          :adsl_ast => ::ADSL::Parser::ASTVariable.new(:var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name)
-        ))
-        outer_binding.eval "#{name} #{operator} ObjectSpace._id2ref(#{variable.object_id})"
-        
-        values_to_be_returned << variable
-      else
-        outer_binding.eval "#{name} #{operator} ObjectSpace._id2ref(#{value.object_id})"
-        values_to_be_returned << value
-      end
-    end
-    names.length == 1 ? values_to_be_returned.first : values_to_be_returned
-  end
-
-  def ins_do_return(*return_values)
-    ::ADSL::Extract::Instrumenter.get_instance.abb.do_return *return_values
-  end
-
-  def ins_do_raise(*args)
-    ::ADSL::Extract::Instrumenter.get_instance.abb.do_raise *args
-  end
-
-  def ins_branch_choice(condition, branch_id)
-    ins_stmt condition
-    ::ADSL::Extract::Instrumenter.get_instance.abb.branch_choice branch_id 
-  end
-
-  def ins_explore_all(method_name, &block)
-    instrumenter = ::ADSL::Extract::Instrumenter.get_instance
-
-    return_value = instrumenter.abb.explore_all_choices &block
-
-    block_adsl_ast = instrumenter.abb.adsl_ast
-
-    instrumenter.prev_abb << block_adsl_ast
-
-    # are we at the root level? if so, wrap everything around in an action/callback
-    if instrumenter.stack_depth == 2
-      Array.wrap(return_value).each do |final_return|
-        adsl_ast = ::ADSL::Extract::Rails::ActionInstrumenter.extract_stmt_from_expr final_return
-        block_adsl_ast.statements << adsl_ast if !adsl_ast.nil? and adsl_ast.class.is_statement?
-      end
-      instrumenter.prev_abb << ::ADSL::Parser::ASTDummyStmt.new(:label => method_name)
-    end
-    
-    return_value
-  end
-
-  def ins_push_frame
-    instrumenter = ::ADSL::Extract::Instrumenter.get_instance
-    instrumenter.abb.push_frame
-  end
-  
-  def ins_pop_frame
-    instrumenter = ::ADSL::Extract::Instrumenter.get_instance
-    instrumenter.abb.pop_frame
-  end
-
-  def ins_if(condition, arg1, arg2)
-    ins_stmt condition
-    push_frame_expr1, frame1_ret_value, frame1_stmts = arg1
-    push_frame_expr2, frame2_ret_value, frame2_stmts = arg2
-    if frame1_stmts.length <= 1 && frame2_stmts.length <= 1 &&
-        frame1_ret_value.respond_to?(:adsl_ast) && frame1_ret_value.adsl_ast.class.is_expr? &&
-        frame2_ret_value.respond_to?(:adsl_ast) && frame2_ret_value.adsl_ast.class.is_expr? &&
-        !frame1_ret_value.adsl_ast.expr_has_side_effects? && !frame2_ret_value.adsl_ast.expr_has_side_effects?
-
-      return nil if frame1_ret_value.nil? && frame2_ret_value.nil?
-      
-      result_type = if frame1_ret_value.nil?
-        frame2_ret_value.class
-      elsif frame2_ret_value.nil?
-        frame1_ret_value.class
-      elsif frame1_ret_value.class <= frame2_ret_value.class
-        frame2_ret_value.class
-      elsif frame2_ret_value.class <= frame1_ret_value.class
-        frame1_ret_value.class
-      else
-        # objset types are incompatible
-        # but MRI cannot parse return statements inside an if that's being assigned
-        nil
-      end
-
-      if result_type.nil?
-        block1 = ::ADSL::Parser::ASTBlock.new :statements => frame1_stmts
-        block2 = ::ADSL::Parser::ASTBlock.new :statements => frame2_stmts
-        return ::ADSL::Parser::ASTEither.new :blocks => [block1, block2]
-      end
-
-      result_type.new(:adsl_ast => ::ADSL::Parser::ASTPickOneExpr.new(
-        :exprs => [frame1_ret_value.adsl_ast, frame2_ret_value.adsl_ast]
-      ))
-    else
-      block1 = ::ADSL::Parser::ASTBlock.new :statements => frame1_stmts
-      block2 = ::ADSL::Parser::ASTBlock.new :statements => frame2_stmts
-      return ::ADSL::Parser::ASTEither.new :blocks => [block1, block2]
-    end
-  end
-end
 
 module ADSL
   module Extract
     module Rails
 
       class ActionInstrumenter < ::ADSL::Extract::Instrumenter
-        def self.extract_stmt_from_expr(expr, method_name=nil)
-          adsl_ast = expr
-          adsl_ast = expr.adsl_ast if adsl_ast.respond_to? :adsl_ast
-          return nil unless adsl_ast.is_a? ::ADSL::Parser::ASTNode
-          return adsl_ast if adsl_ast.class.is_statement?
-          return ::ADSL::Parser::ASTExprStmt.new :expr => adsl_ast if adsl_ast.class.is_expr?
-          nil
-        end
-
-        attr_accessor :action_block
-
-        def abb
-          method_locals[:abb]
-        end
-
-        def prev_abb
-          previous_locals[:abb]
-        end
-
-        def create_locals
-          { :abb => ActionBlockBuilder.new }
-        end
-
-        def make_returns_explicit(sexp, last_stmt_index = -1)
-          last_stmt = sexp[last_stmt_index]
-          case last_stmt.sexp_type
-          when :block
-            make_returns_explicit last_stmt, -1
-          when :if
-            if last_stmt[2].nil?
-              last_stmt[2] = s(:return)
-            else
-              make_returns_explicit last_stmt, 2
-            end
-            if last_stmt[3].nil?
-              last_stmt[3] = s(:return)
-            else
-              make_returns_explicit last_stmt, 3
-            end
-          when :ensure
-            make_returns_explicit last_stmt, 1
-          when :rescue
-            make_returns_explicit last_stmt, 1
-          else
-            sexp[last_stmt_index] = s(:return, last_stmt) unless last_stmt.sexp_type == :return
-          end
-        end
+        attr_accessor :ex_method, :action_name
 
         def initialize(ar_class_names, instrument_domain = Dir.pwd)
           super instrument_domain
@@ -224,11 +24,11 @@ module ADSL
           render_stmts = [:respond_to, :render, :redirect_to, :respond_with]
           replace :call do |sexp|
             next sexp unless sexp.length >= 3 and sexp[1].nil? and render_stmts.include?(sexp[2])
-            s(:call, nil, :ins_mark_render_statement)
+            s(:call, nil, :ins_do_render)
           end
           replace :iter do |sexp|
             next sexp unless sexp[1].length >= 3 and sexp[1][0] == :call and sexp[1][1].nil? and render_stmts.include?(sexp[1][2])
-            s(:call, nil, :ins_mark_render_statement)
+            s(:call, nil, :ins_do_render)
           end
 
           # surround the entire method with a call to abb.explore_all_choices
@@ -317,46 +117,39 @@ module ADSL
           
           # instrument branches
           replace :if do |sexp|
-            if sexp.may_return_or_raise?
-              sexp[1] = s(:call, nil, :ins_branch_choice, sexp[1], s(:lit, @branch_index += 1))
-              sexp[2] = s(:block, sexp[2]) unless sexp[2].nil? or sexp[2].sexp_type == :block
-              sexp[3] = s(:block, sexp[3]) unless sexp[3].nil? or sexp[3].sexp_type == :block
-              sexp
-            else
-              block1_sexp = sexp[2] || s(:nil)
-              block1 = block1_sexp.sexp_type == :block ? block1_sexp : s(:block, block1_sexp)
-              block2_sexp = sexp[3] || s(:nil)
-              block2 = block2_sexp.sexp_type == :block ? block2_sexp : s(:block, block2_sexp)
-              s(:call, nil, :ins_if,
-                sexp[1],
-                s(:array,
-                  s(:call, nil, :ins_push_frame),
-                  s(:splat, s(:rescue,
-                    s(:array,
-                      block1,
-                      s(:call, nil, :ins_pop_frame)
-                    ),
-                    s(:resbody,
-                      s(:array, s(:const, :Exception)),
-                      s(:array, s(:nil), s(:call, nil, :ins_pop_frame))
-                    )
-                  ))
-                ),
-                s(:array,
-                  s(:call, nil, :ins_push_frame),
-                  s(:splat, s(:rescue,
-                    s(:array, 
-                      block2,
-                      s(:call, nil, :ins_pop_frame)
-                    ),
-                    s(:resbody,
-                      s(:array, s(:const, :Exception)),
-                      s(:array, s(:nil), s(:call, nil, :ins_pop_frame))
-                    )
-                  ))
-                )
+            block1_sexp = sexp[2] || s(:nil)
+            block1 = block1_sexp.sexp_type == :block ? block1_sexp : s(:block, block1_sexp)
+            block2_sexp = sexp[3] || s(:nil)
+            block2 = block2_sexp.sexp_type == :block ? block2_sexp : s(:block, block2_sexp)
+            s(:call, nil, :ins_if,
+              sexp[1],
+              s(:array,
+                s(:call, nil, :ins_push_frame),
+                s(:splat, s(:rescue,
+                  s(:array,
+                    block1,
+                    s(:call, nil, :ins_pop_frame)
+                  ),
+                  s(:resbody,
+                    s(:array, s(:const, :Exception)),
+                    s(:array, s(:nil), s(:call, nil, :ins_pop_frame))
+                  )
+                ))
+              ),
+              s(:array,
+                s(:call, nil, :ins_push_frame),
+                s(:splat, s(:rescue,
+                  s(:array, 
+                    block2,
+                    s(:call, nil, :ins_pop_frame)
+                  ),
+                  s(:resbody,
+                    s(:array, s(:const, :Exception)),
+                    s(:array, s(:nil), s(:call, nil, :ins_pop_frame))
+                  )
+                ))
               )
-            end
+            )
           end
 
           # change rescue into a branch statement
@@ -365,7 +158,7 @@ module ADSL
             exception_type_array = s(:array, *resbody[1].sexp_body)
             res_block = resbody[2..-1]
             res_block = res_block.length > 1 ? s(:block, *res_block) : res_block.first
-            s(:if, s(:nil), res_block, sexp[1])
+            s(:if, s(:lit, :symbols_get_translated_as_star_conditions), res_block, sexp[1])
           end
 
           # change attrasgn into a normal call
@@ -388,6 +181,40 @@ module ADSL
               [:collection_action, :member_action, :page_action].include?(sexp[1][2])
             )
             s(:defn, sexp[1][3][1], sexp[2], sexp[3])
+          end
+        end
+        
+        def self.extract_stmt_from_expr(expr, method_name=nil)
+          adsl_ast = expr
+          adsl_ast = expr.adsl_ast if adsl_ast.respond_to? :adsl_ast
+          return nil unless adsl_ast.is_a? ::ADSL::Parser::ASTNode
+          return adsl_ast if adsl_ast.class.is_statement?
+          return ::ADSL::Parser::ASTExprStmt.new :expr => adsl_ast if adsl_ast.class.is_expr?
+          nil
+        end
+
+        def make_returns_explicit(sexp, last_stmt_index = -1)
+          last_stmt = sexp[last_stmt_index]
+          case last_stmt.sexp_type
+          when :block
+            make_returns_explicit last_stmt, -1
+          when :if
+            if last_stmt[2].nil?
+              last_stmt[2] = s(:return)
+            else
+              make_returns_explicit last_stmt, 2
+            end
+            if last_stmt[3].nil?
+              last_stmt[3] = s(:return)
+            else
+              make_returns_explicit last_stmt, 3
+            end
+          when :ensure
+            make_returns_explicit last_stmt, 1
+          when :rescue
+            make_returns_explicit last_stmt, 1
+          else
+            sexp[last_stmt_index] = s(:return, last_stmt) unless last_stmt.sexp_type == :return
           end
         end
 

@@ -5,43 +5,45 @@ require 'adsl/fol/first_order_logic'
 module ADSL
   module DS
     class DSSpec < DSNode
-      def generate_problems(action_name)
+      def generate_problems(action_name, invariants = nil, access_control = true)
         action = @actions
         problems = []
 
-        problems += @invariants.map{ |inv| ADSL::Translation::InvariantVerificationProblem.new inv }
+        problems += (invariants || @invariants).map{ |inv| ADSL::Translation::InvariantVerificationProblem.new inv }
 
-        action = find_action_by_name action_name
-        if auth_class && action
-          # creates
-          sigs = action.recursively_gather do |elem|
-            elem.klass.to_sig if elem.is_a? DSCreateObj
-          end
-          problems += sigs.uniq.map{ |sig| ADSL::Translation::AccessControlCreateProblem.new sig }
+        if access_control
+          action = find_action_by_name action_name
+          if auth_class && action
+            # creates
+            sigs = action.recursively_gather do |elem|
+              elem.klass.to_sig if elem.is_a? DSCreateObj
+            end
+            problems += sigs.uniq.map{ |sig| ADSL::Translation::AccessControlCreateProblem.new sig }
 
-          # deletes
-          sigs = action.recursively_gather do |elem|
-            elem.objset.type_sig if elem.is_a? DSDeleteObj
-          end
-          problems += sigs.uniq.map{ |sig| ADSL::Translation::AccessControlDeleteProblem.new sig }
-          
-          # reads
-          assignments = action.recursively_gather{ |elem|
-            elem if elem.is_a?(DSAssignment)
-          }.reverse.uniq{ |asgn| asgn.var.name }
-          problems += assignments.map{ |asgn| ADSL::Translation::AccessControlReadProblem.new asgn.expr }
+            # deletes
+            sigs = action.recursively_gather do |elem|
+              elem.objset.type_sig if elem.is_a? DSDeleteObj
+            end
+            problems += sigs.uniq.map{ |sig| ADSL::Translation::AccessControlDeleteProblem.new sig }
+            
+            # reads
+            assignments = action.recursively_gather{ |elem|
+              elem if elem.is_a?(DSAssignment)
+            }.reverse.uniq{ |asgn| asgn.var.name }
+            problems += assignments.map{ |asgn| ADSL::Translation::AccessControlReadProblem.new asgn.expr }
 
-          # assocs
-          rels = action.recursively_gather do |elem|
-            elem.relation if elem.is_a?(DSCreateTup)
+            # assocs
+            rels = action.recursively_gather do |elem|
+              elem.relation if elem.is_a?(DSCreateTup)
+            end
+            problems += rels.uniq.map{ |rel| ADSL::Translation::AccessControlAssocProblem.new rel }
+            
+            # deassocs
+            rels = action.recursively_gather do |elem|
+              elem.relation if elem.is_a?(DSDeleteTup)
+            end
+            problems += rels.uniq.map{ |rel| ADSL::Translation::AccessControlDeassocProblem.new rel }
           end
-          problems += rels.uniq.map{ |rel| ADSL::Translation::AccessControlAssocProblem.new rel }
-          
-          # deassocs
-          rels = action.recursively_gather do |elem|
-            elem.relation if elem.is_a?(DSDeleteTup)
-          end
-          problems += rels.uniq.map{ |rel| ADSL::Translation::AccessControlDeassocProblem.new rel }
         end
 
         problems
@@ -64,6 +66,10 @@ module ADSL
       def generate_conjecture(translation)
         @fol
       end
+
+      def to_adsl
+        "problem(#{ @fol.to_adsl }"
+      end
     end
 
     class InvariantVerificationProblem
@@ -82,6 +88,10 @@ module ADSL
           FOL::And.new(pre_invariants),
           FOL::And.new(post_invariants)
         )
+      end
+
+      def to_adsl
+        "invariantproblem(#{ @listed_invariants.map(&:name).join ', '}"
       end
     end
     
@@ -106,6 +116,10 @@ module ADSL
           ]]
         end
       end
+
+      def to_adsl
+        "ac_create_problem(#{@domain})"
+      end
     end
 
     class AccessControlDeleteProblem
@@ -129,6 +143,10 @@ module ADSL
           ]].optimize
         end
       end
+      
+      def to_adsl
+        "ac_delete_problem(#{@domain})"
+      end
     end
 
     class AccessControlReadProblem
@@ -151,6 +169,10 @@ module ADSL
             ]].optimize
           end
         end
+      end
+      
+      def to_adsl
+        "ac_read_problem(#{@expr.to_adsl})"
       end
     end
 
@@ -176,6 +198,10 @@ module ADSL
           ]].optimize
         end
       end
+
+      def to_adsl
+        "ac_assoc_problem(#{@relation})"
+      end
     end
 
     class AccessControlDeassocProblem
@@ -199,6 +225,10 @@ module ADSL
             permitted_formula
           ]].optimize
         end
+      end
+
+      def to_adsl
+        "ac_deassoc_problem(#{@relation})"
       end
     end
 

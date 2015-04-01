@@ -57,6 +57,10 @@ module ADSL
         recursively_comparable
       end
 
+      def returns?; false; end
+
+      def reaches_view?; false; end
+
       def optimize
         copy = self.dup
         children = self.class.container_for_fields.map{ |field_name| [field_name, copy.send(field_name)] }
@@ -73,7 +77,7 @@ module ADSL
         children.each do |name, value|
           new_value = if value.is_a? Array
             value.map do |e|
-              new_e = e.block_replace(&block)
+              new_e = e.respond_to?(:block_replace) ? e.block_replace(&block) : nil
               new_e.nil? ? e.dup : new_e
             end
           elsif value.is_a? ASTNode
@@ -354,6 +358,14 @@ module ADSL
       def to_adsl
         "DummyStmt(#{ @label })\n"
       end
+
+      def arbitrary?
+        not %i|render|.include? @label
+      end
+
+      def reaches_view?
+        @label == :render
+      end
     end
 
     class ASTSpec < ASTNode
@@ -471,7 +483,7 @@ module ADSL
       end
 
       def to_adsl
-        "#{ @classes.map(&:to_adsl).join }\n#{ @actions.map(&:to_adsl).join }\n#{ @invariants.map(&:to_adsl).join }"
+        [@classes, @usergroups, @rules, @ac_rules, @actions, @invariants].map{ |coll| coll.map(&:to_adsl).join }.join "\n"
       end
 
       def adsl_ast_size(options = {})
@@ -502,6 +514,10 @@ module ADSL
         ug = ADSL::DS::DSUserGroup.new :name => name
         context.usergroups[name] = [self, ug]
       end
+
+      def to_adsl
+        "usergroup #{@name.text}\n"
+      end
     end
     
     class ASTClass < ASTNode
@@ -520,7 +536,7 @@ module ADSL
 
       def to_adsl
         par_names = @parent_names.empty? ? "" : "extends #{@parent_names.map(&:text).join(', ')} "
-        "class #{ @name.text } #{ par_names }{\n#{ @members.map(&:to_adsl).adsl_indent }}\n"
+        "#{authenticable? ? 'authenticable ' : ''}class #{ @name.text } #{ par_names }{\n#{ @members.map(&:to_adsl).adsl_indent }}\n"
       end
     end
     
@@ -640,12 +656,54 @@ module ADSL
 
         copy.block = until_no_change(copy.block) do |block|
           block = block.optimize(true)
+          
+          # update counters of branches that might be necesarry
+          return_counter_map = Hash.new{ |hash, key| hash[key] = 0 }
+          if_counter_map     = Hash.new{ |hash, key| hash[key] = 0 }
+          block.block_replace do |expr|
+            if expr.is_a? ASTReturned
+              return_counter_map[expr.return_guard] += 1
+            elsif expr.is_a? ASTIfExpr
+              if_counter_map[expr.if] += 1
+            end
+            nil
+          end
 
-          variables_read = []
+          block.block_replace do |expr|
+            if expr.is_a?(ASTReturnGuard) && return_counter_map[expr] == 0
+              expr.block.block_replace do |expr|
+                next unless expr.is_a? ASTReturn
+                ASTBlock.new(:statements => expr.exprs.map do |returned|
+                  ASTExprStmt.new :expr => returned
+                end)
+              end
+              expr.block
+            elsif expr.is_a?(ASTIf) && if_counter_map[expr] == 0
+              next ASTDummyStmt.new if expr.blocks.map(&:statements).flatten.empty?
+              if expr.condition.is_a?(ASTBoolean)
+                case expr.condition.bool_value
+                when true;  next expr.then_block
+                when false; next expr.else_block
+                when nil;   next ASTEither.new(:blocks => expr.blocks)
+                end
+              end
+              expr
+            end
+          end
+          
+          block = block.optimize(true)
+
+          variables_read = Set[]
           block.preorder_traverse do |node|
             next unless node.is_a? ASTVariable
             variables_read << node.var_name.text
           end
+          block.preorder_traverse do |node|
+            next unless node.is_a? ASTBlock
+            next unless node.reaches_view?
+            variables_read += node.statements.select{ |s| s.is_a?(ASTExprStmt) && s.expr.is_a?(ASTAssignment) }.map{ |s| s.expr.var_name.text }
+          end
+
           block.block_replace do |node|
             next unless node.is_a? ASTAssignment
             next if node.var_name.nil? || variables_read.include?(node.var_name.text)
@@ -666,6 +724,15 @@ module ADSL
             end
           else
             block
+          end
+        end
+
+        # finally, we can remove all dummy stmts, some of which we used for labels and placeholders and such
+        copy.block = until_no_change(copy.block) do |block|
+          block.block_replace do |block|
+            next unless block.is_a? ASTBlock
+            block.statements.reject!{ |s| s.is_a? ADSL::Parser::ASTDummyStmt }
+            nil
           end
         end
 
@@ -701,7 +768,7 @@ module ADSL
           card_str = card[1] == Float::INFINITY ? "#{card[0]}+" : "#{card[0]}..#{card[1]}"
           args << "#{card_str} #{type} #{name}"
         end
-        "action #{@name.text}(#{ args.join ', ' }) {\n#{ @block.to_adsl.adsl_indent }\n}\n"
+        "action #{@name.text}(#{ args.join ', ' }) {\n#{ @block.to_adsl.adsl_indent }}\n"
       end
     end
 
@@ -723,14 +790,65 @@ module ADSL
         context.pop_frame if open_subcontext
       end
 
+      def returns?
+        vals = @statements.map(&:returns?).uniq
+        return true if vals.include? true
+        return nil if vals.include? nil
+        false
+      end
+
+      def reaches_view?
+        vals = @statements.map(&:reaches_view?).uniq
+        return true if vals.include? true
+        return nil if vals.include? nil
+        false
+      end
+
+      def remove_statements_after_returns!(tail = [])
+        return_statuses = @statements.map &:returns?
+        
+        if return_statuses.include? true
+          first_return_index = return_statuses.index true
+          @statements = @statements.first(first_return_index + 1)
+          case @statements.last
+          when ASTBlock
+            @statements.last.remove_statements_after_returns!
+          when ASTIf, ASTEither
+            @statements.last.blocks.each do |block|
+              block.remove_statements_after_returns!
+            end
+          end
+        end
+
+        if return_statuses.include? nil
+          first_maybe_return_index = return_statuses.index nil
+          stmt = @statements[first_maybe_return_index]
+          tail = @statements[(first_maybe_return_index + 1)..-1] + tail
+          @statements = @statements.first first_maybe_return_index + 1
+          case stmt
+          when ASTBlock
+            stmt.remove_statements_after_returns! tail
+          when ASTIf, ASTEither
+            stmt.blocks.each do |block|
+              block.remove_statements_after_returns! tail
+            end
+          else
+            raise "Cannot remove statements after returns: #{stmt.class}"
+          end
+        end
+
+        @statements += tail if return_statuses.uniq == [false]
+      end
+
       def optimize(last_stmt = false)
         until_no_change super() do |block|
           next block if block.statements.empty?
+          next ASTBlock.new(:statements => []) unless block.statements.select{ |s| s.is_a? ASTRaise }.empty?
 
           statements = block.statements.map(&:optimize).map{ |stmt|
             stmt.is_a?(ASTBlock) ? stmt.statements : [stmt]
           }.flatten(1).reject{ |stmt|
-            stmt.is_a?(ASTDummyStmt)
+            stmt.is_a?(ASTDummyStmt) && stmt.arbitrary?
           }
 
           if last_stmt
@@ -765,6 +883,11 @@ module ADSL
         create_prestmt = ADSL::DS::DSAssignment.new :var => var, :expr => expr
         context.pre_stmts << create_prestmt
         var
+      end
+
+      def optimize
+        @expr = @expr.optimize if @expr.respond_to? :optimize
+        self
       end
 
       def to_adsl
@@ -802,7 +925,8 @@ module ADSL
       end
 
       def optimize(last_stmt = false)
-        @expr.expr_has_side_effects? ? self : ASTDummyStmt.new
+        return ASTDummyStmt.new unless @expr.expr_has_side_effects?
+        ASTExprStmt.new :expr => @expr.optimize
       end
 
       def to_adsl
@@ -941,6 +1065,81 @@ module ADSL
       end
     end
 
+    class ASTReturnGuard < ASTNode
+      node_fields :block
+      node_type :statement
+      attr_reader :guard
+
+      def typecheck_and_resolve(context)
+        block = @block.typecheck_and_resolve context
+
+        returns = recursively_select do |elem|
+          next true if elem.is_a? ADSL::DS::DSReturn
+          # stop at a nested return
+          next false if elem.is_a? ADSL::DS::DSReturnGuard
+        end
+
+        type_sigs = []
+        unless returns.empty?
+          return_lengths = returns.map{ |ret| ret.exprs.length }
+          raise "All return statements need to be the same length" if returns.uniq.length > 1
+
+          length = return_lengths.first
+          length.times do |i|
+            type_sig = ADSL::DS::TypeSig.join *returns.map{ |ret| ret.exprs[i].type_sig }
+            type_sigs << type_sig
+          end
+        end
+          
+        @guard ||= ADSL::DS::DSReturnGuard.new :block => block, :ret_type_sigs => type_sigs
+      end
+
+      def to_adsl
+        "returnguard {\n#{ @block.to_adsl.adsl_indent }}\n"
+      end
+    end
+
+    class ASTReturn < ASTNode
+      node_fields :exprs
+      node_type :statement
+
+      def typecheck_and_resolve(context)
+        ADSL::DS::DSReturn.new :exprs => @exprs.map{ |e| e.typecheck_and_resolve context }
+      end
+
+      def returns?; true; end
+
+      def to_adsl
+        "return #{ @expr.to_adsl }\n"
+      end
+    end
+
+    class ASTReturned < ASTNode
+      node_fields :return_guard, :index
+      node_type :expr
+
+      def typecheck_and_resolve(context)
+        ADSL::DS::DSReturned.new :guard => @return_guard.guard, :index => @index
+      end
+    end
+
+    class ASTRaise < ASTNode
+      node_fields
+      node_type :statement
+
+      def typecheck_and_resolve(context)
+        ADSL::DS::DSRaise.new
+      end
+
+      def returns?; true; end
+      
+      def optimize; self; end
+
+      def to_adsl
+        "raise"
+      end
+    end
+
     class ASTEither < ASTNode
       node_fields :blocks
       node_type :statement
@@ -982,6 +1181,19 @@ module ADSL
         @blocks.map(&:list_entity_classes_written_to).flatten
       end
 
+      def returns?
+        val = blocks.map(&:returns?)
+        return true if val.uniq == [true]
+        return false if val.uniq == [false]
+        nil
+      end
+
+      def merge_to_nonreturning_branch(stmts)
+        @blocks.each do |block|
+          merge_to_nonreturning_branch stmts
+        end
+      end
+
       def optimize
         until_no_change super do |either|
           next either.optimize unless either.is_a?(ASTEither)
@@ -1005,15 +1217,32 @@ module ADSL
     class ASTIf < ASTNode
       node_fields :condition, :then_block, :else_block
       node_type :statement
+      attr_reader :ds_if
 
       def blocks
         [@then_block, @else_block]
+      end
+
+      def returns?
+        val = blocks.map(&:returns?)
+        return true if val == [true, true]
+        return false if val == [false, false]
+        nil
+      end
+
+      def merge_to_nonreturning_branch(stmts)
+        @blocks.each do |block|
+          merge_to_nonreturning_branch stmts
+        end
       end
 
       def typecheck_and_resolve(context)
         context.push_frame
         
         condition = @condition.typecheck_and_resolve(context)
+        if condition.type_sig.is_objset_type?
+          condition = ADSL::DS::DSNot.new(:subformula => ADSL::DS::DSIsEmpty.new(:objset => condition))
+        end
         unless condition.type_sig.is_bool_type?
           raise ADSLError, "If condition is not of boolean type (type provided `#{condition.type_sig}` on line #{ @lineno })"
         end
@@ -1030,13 +1259,13 @@ module ADSL
         ]
         contexts.each{ |c| c.pop_frame; c.pop_frame }
 
-        ds_if = ADSL::DS::DSIf.new :condition => condition, :then_block => blocks[0], :else_block => blocks[1]
+        @ds_if = ADSL::DS::DSIf.new :condition => condition, :then_block => blocks[0], :else_block => blocks[1]
 
         lambdas = []
         ADSL::Parser::Util.context_vars_that_differ(*contexts).each do |var_name, exprs|
           type_sig = ADSL::DS::TypeSig.join exprs.map(&:type_sig)
           var = ADSL::DS::DSVariable.new :name => var_name, :type_sig => type_sig
-          expr = ADSL::DS::DSIfLambdaExpr.new :if => ds_if, :then_expr => exprs[0], :else_expr => exprs[1]
+          expr = ADSL::DS::DSIfLambdaExpr.new :if => @ds_if, :then_expr => exprs[0], :else_expr => exprs[1]
           assignment = ADSL::DS::DSAssignment.new :var => var, :expr => expr
           context.redefine_var var, nil
           lambdas << assignment
@@ -1046,22 +1275,10 @@ module ADSL
       end
 
       def optimize
-        until_no_change super do |if_node|
-          next if_node.optimize unless if_node.is_a?(ASTIf)
-          next ASTDummyStmt.new if blocks.map(&:statements).flatten.empty?
-          if if_node.condition.is_a?(ASTBoolean)
-            case if_node.condition.bool_value
-            when true;  next if_node.then_block.optimize
-            when false; next if_node.else_block.optimize
-            when nil;   next ASTEither.new(:blocks => if_node.blocks).optimize
-            end
-          end
-          ASTIf.new(
-            :condition  => if_node.condition.optimize,
-            :then_block => if_node.then_block.optimize,
-            :else_block => if_node.else_block.optimize
-          )
-        end
+        @condition = @condition.optimize
+        @then_block = @then_block.optimize
+        @else_block = @else_block.optimize
+        self
       end
 
       def list_entity_classes_written_to
@@ -1071,6 +1288,39 @@ module ADSL
       def to_adsl
         else_code = @else_block.statements.empty? ? "" : " else {\n#{ @else_block.to_adsl.adsl_indent }}"
         "if #{@condition.to_adsl} {\n#{ @then_block.to_adsl.adsl_indent }}#{ else_code }\n"
+      end
+    end
+
+    class ASTIfExpr < ASTNode
+      node_fields :if, :then_expr, :else_expr
+      node_type :expr
+
+      def typecheck_and_resolve(context)
+        ADSL::DS::DSIfLambdaExpr.new(:if => @if.ds_if,
+                                     :then_expr => (@then_expr.typecheck_and_resolve context),
+                                     :else_expr => (@else_expr.typecheck_and_resolve context))
+      end
+
+      def optimize
+        @then_expr = @then_expr.optimize
+        @else_expr = @else_expr.optimize
+        if @if.condition.is_a?(ASTBoolean)
+          case @if.condition.bool_value
+          when true;  return @then_expr.optimize
+          when false; return @else_expr.optimize
+          when nil;   return ASTPickOneExpr.new(:exprs => [@then_expr, @else_expr] ).optimize
+          else raise 'Invalid boolean expression value'
+          end
+        end
+        if @then_expr == @else_expr
+          @if.referred_by_if_expr_count -= 1
+          return @then_expr
+        end
+        self
+      end
+
+      def to_adsl
+        "ifexpr(#{ @if.condition.to_adsl }, #{ @then_expr.to_adsl }, #{ @else_expr.to_adsl })"
       end
     end
 
@@ -1183,7 +1433,7 @@ module ADSL
       end
 
       def to_adsl
-        "#{ @objset1.to_adsl }.#{ @rel_name.text } = #{ @objset2.to_adsl }\n"
+        "#{ @objset.to_adsl }.#{ @member_name.text } = #{ @expr.to_adsl }\n"
       end
     end
 
@@ -1230,7 +1480,7 @@ module ADSL
         until_no_change super do |node|
           next node.optimize unless node.is_a?(ASTSubset)
           next node.objset if node.objset.is_a?(ASTSubset) || node.objset.is_a?(ASTOneOf)
-          next ASTOneOf.new :objset => node.objset.objset if node.objset.is_a?(ASTForceOneOf)
+          next ASTOneOf.new :objset => node.objset.objset if node.objset.is_a?(ASTOneOf)
           ASTSubset.new :objset => node.objset.optimize
         end
       end
@@ -1357,37 +1607,32 @@ module ADSL
       end
 
       def typecheck_and_resolve(context)
-        objsets = @objsets.map{ |o| o.typecheck_and_resolve context }
+        exprs = @exprs.map{ |o| o.typecheck_and_resolve context }
         
-        objsets.each do |objset|
-          unless objset.type_sig.is_objset_type?
-            raise ADSLError, "Pick one objset possible only on objset sets (type provided `#{objset.type_sig}` on line #{ @lineno })"
+        exprs.each do |expr|
+          unless expr.type_sig.is_objset_type?
+            raise ADSLError, "Pick one objset possible only on objset sets (type provided `#{expr.type_sig}` on line #{ @lineno })"
           end
         end
         
         # will raise an error if no single common supertype exists
-        ADSL::DS::TypeSig.join objsets.map(&:type_sig)
+        ADSL::DS::TypeSig.join exprs.map(&:type_sig)
         
-        if objsets.length == 0
+        if exprs.length == 0
           ADSL::DS::DSEmptyObjset.new
-        elsif objsets.length == 1
-          objsets.first
+        elsif exprs.length == 1
+          exprs.first
         else
-          ADSL::DS::DSPickOneObjset.new :objsets => objsets
+          ADSL::DS::DSPickOneExpr.new :exprs => exprs
         end
       end
 
       def optimize
         until_no_change super do |o|
-          if !o.is_a?(ASTPickOneObjset)
-            o
-          elsif o.objsets.empty?
-            ASTEmptyObjset.new
-          elsif o.objsets.length == 1
-            o.objsets.first
-          else
-            ASTPickOneObjset.new(:objsets => o.objsets.uniq)
-          end
+          next o if !o.is_a?(ASTPickOneExpr)
+          next ASTEmptyObjset.new if o.exprs.empty?
+          next o.exprs.first if o.exprs.length == 1
+          ASTPickOneExpr.new(:exprs => o.exprs.uniq)
         end
       end
 
@@ -1546,12 +1791,17 @@ module ADSL
 
       def optimize
         until_no_change super do |node|
-          node.objset = onde.objset.optimize
+          node.objset = node.objset.optimize
+          node
         end
       end
 
       def to_adsl
-        @objset.is_a?(ASTCurrentUser) ? "inusergroup(#{groupname.text})" : "inusergroup(#{@objset.to_adsl}, #{@groupname.text})"
+        if @objset.nil? || @objset.is_a?(ASTCurrentUser)
+          "inusergroup(#{groupname.text})"
+        else
+          "inusergroup(#{@objset.to_adsl}, #{@groupname.text})"
+        end
       end
     end
 
@@ -1590,6 +1840,10 @@ module ADSL
         
         ADSL::DS::DSPermittedByType.new :ops => ops, :klass => klass
       end
+
+      def to_adsl
+        "permittedbytype(#{@ops.map(&:to_s).join ', '} #{@class_name.text})"
+      end
     end
 
     class ASTPermitted < ASTNode
@@ -1605,6 +1859,10 @@ module ADSL
         ops, expr = ADSL::Parser::Util.ops_and_expr_from_nodes context, @ops, @expr
         
         ADSL::DS::DSPermitted.new :ops => ops, :expr => expr
+      end
+
+      def to_adsl
+        "permitted(#{@ops.map(&:to_s).join ', '} #{@exor.to_adsl})"
       end
     end
 
@@ -1628,6 +1886,10 @@ module ADSL
         ops, expr = ADSL::Parser::Util.ops_and_expr_from_nodes context, @ops, @expr
 
         ADSL::DS::DSPermit.new :usergroups => groups, :ops => ops, :expr => expr
+      end
+
+      def to_adsl
+        "permit #{@group_names.map(&:text).join ', '} #{ @ops.map(&:to_s).join ', ' } #{@expr.to_adsl}\n"
       end
     end
 
@@ -1713,7 +1975,7 @@ module ADSL
       end
 
       def to_adsl
-        "#{ @bool_value }"
+        @bool_value.nil? ? '*' : "#{ @bool_value }"
       end
     end
 

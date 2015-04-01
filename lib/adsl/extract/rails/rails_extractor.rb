@@ -1,5 +1,6 @@
 require 'adsl/extract/rails/action_instrumenter'
 require 'adsl/extract/rails/invariant_extractor'
+require 'adsl/extract/rails/cancan_extractor'
 require 'adsl/extract/rails/callback_chain_simulator'
 require 'adsl/extract/rails/rails_special_gem_instrumentation'
 require 'adsl/extract/rails/other_meta'
@@ -14,8 +15,9 @@ module ADSL
         
         include ADSL::Extract::Rails::CallbackChainSimulator
         include ADSL::Extract::Rails::RailsSpecialGemInstrumentation
+        include ADSL::Extract::Rails::CanCanExtractor
         
-        attr_accessor :ar_classes, :actions, :invariants, :instrumentation_filters
+        attr_accessor :ar_classes, :actions, :invariants, :rules, :ac_rules, :instrumentation_filters
 
         def cyclic_destroy_dependency?(options)
           classes = options[:ar_classes]
@@ -44,9 +46,10 @@ module ADSL
           options = Hash[
             :ar_classes => default_activerecord_models,
             :invariants => Dir['invariants/**/*_invs.rb'],
-            :instrumentation_filters => []
+            :instrumentation_filters => [],
+            :actions => []
           ].merge options
-
+          
           raise "Cyclic destroy dependency detected. Translation aborted" if cyclic_destroy_dependency?(options)
          
           @ar_classes = options[:ar_classes].map do |ar_class|
@@ -64,13 +67,19 @@ module ADSL
           @action_instrumenter = ADSL::Extract::Rails::ActionInstrumenter.new ar_class_names
           @action_instrumenter.instrumentation_filters = @instrumentation_filters
           @actions = []
-          all_routes.each do |route|
+
+          @rules = []
+          @ac_rules = []
+          prepare_cancan_instrumentation
+          extract_ac_rules
+
+          all_routes(options[:actions]).each do |route|
             translation = action_to_adsl_ast(route)
             @actions << translation unless translation.nil?
           end
         end
 
-        def all_routes
+        def all_routes(action_name_patterns = [])
           ::Rails.application.routes.routes.map{ |route|
             {
               :request_method => request_method_for(route),
@@ -86,6 +95,9 @@ module ADSL
             route[:controller].action_methods.include?(route[:action].to_s)
           }.uniq{ |a|
             [a[:controller], a[:action]]
+          }.select{ |route|
+            next true if action_name_patterns.empty?
+            action_name_patterns.map{ |patt| "#{ route[:controller] }__#{ route[:action] }".include? patt }.include? true
           }.sort{ |a, b| [a[:controller].to_s, a[:action]] <=> [b[:controller].to_s, b[:action]] }
         end
 
@@ -94,7 +106,7 @@ module ADSL
         end
 
         def action_name_for(route)
-          "#{route[:controller]}__#{route[:action]}"
+          "#{ route[:controller].name.gsub '::', '_' }__#{route[:action]}"
         end
 
         def callbacks(controller)
@@ -140,15 +152,20 @@ module ADSL
           ::Rails.application.config.action_dispatch.show_exceptions = false
 
           block = @action_instrumenter.exec_within do
-            @action_instrumenter.exec_within do
+            root_method = ADSL::Extract::Rails::Method.new :name => :root
+            ADSL::Extract::Instrumenter.get_instance.ex_method = root_method
+            ADSL::Extract::Instrumenter.get_instance.action_name = route[:action].to_s
+            statements = root_method.in_stmt_frame do
               request_method = route[:request_method].to_s.downcase.split('|').first
               session.send request_method, route[:url]
             end
-            @action_instrumenter.abb.root_lvl_adsl_ast 
+            ADSL::Extract::Instrumenter.get_instance.ex_method = nil
+            ADSL::Parser::ASTBlock.new :statements => statements
           end
 
-          interrupt_callback_chain_on_render block, route[:action]
+          block.remove_statements_after_returns!
 
+          #interrupt_callback_chain_on_render block, route[:action]
           action = ADSL::Parser::ASTAction.new({
             :name => ADSL::Parser::ASTIdent.new(:text => action_name),
             :arg_cardinalities => [],
@@ -169,12 +186,12 @@ module ADSL
             klass = nil
 
             relative_path = /^#{Regexp.escape models_dir.to_s}\/(.*)\.rb$/.match(path)[1]
-            parts = path.split("/")
-            klass_names = parts.each_index.map{ |index| parts.last(index+1).join '/' }
+            parts = relative_path.split("/")
+            klass_names = parts.each_index.map{ |index| parts.last(index+1).join('/').camelize }
             klass_names.each do |klass_name|
               next unless klass.nil?
               begin
-                klass = klass_name.camelize.constantize
+                klass = klass_name.constantize
               rescue NameError, LoadError
               end
             end
@@ -225,13 +242,22 @@ module ADSL
         end
 
         def adsl_ast
+          klass_nodes = @ar_classes.map &:adsl_ast
+          usergroups = []
+          if authorization_defined?
+            auth_class = self.auth_class
+            klass_nodes.select{ |c| c.name.text == auth_class.name }.each do |auth_node|
+              auth_node.authenticable = true
+            end
+            usergroups = self.usergroups
+          end
           ADSL::Parser::ASTSpec.new(
-            :classes => @ar_classes.map(&:adsl_ast),
+            :classes => klass_nodes,
             :actions => @actions,
             :invariants => @invariants,
-            :usergroups => [],
-            :rules => [],
-            :ac_rules => []
+            :usergroups => usergroups,
+            :rules => @rules,
+            :ac_rules => @ac_rules
           )
         end
       end

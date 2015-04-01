@@ -208,4 +208,17 @@ class ADSL::Util::GeneralTest < MiniTest::Unit::TestCase
     end
     assert_equal "asd(s, k): s", a.resolve_params(:s, :k, :r)
   end
+
+  def test_array_deep_dup
+    a = ['a', 1, 2, true, nil]
+    assert_equal a, a.deep_dup
+    clone = a.deep_dup
+    clone[2] = 123
+    assert_not_equal a, clone
+
+    a = [[[1]]]
+    clone = a.deep_dup
+    clone[0][0][0] = 4
+    assert_not_equal a, clone
+  end
 end
