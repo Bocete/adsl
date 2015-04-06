@@ -670,7 +670,7 @@ module ADSL
         context = translation.context
         @is_trues = []
         @blocks.length.times do |i|
-          is_trues << translation.create_predicate("either_resolution_#{i}_is_true", context.sort_array)
+          @is_trues << translation.create_predicate("either_resolution_#{i}_is_true", context.sort_array)
         end
         @blocks.each do |block|
           block.prepare(translation)
@@ -692,11 +692,13 @@ module ADSL
         pre_states = []
         post_states = []
         @blocks.each_index do |block, i|
-          pre_state = translation.create_state(:pre_of_either)
-          pre_states << pre_state
-          translation.state = pre_state
-          block.migrate_state translation
-          post_states << translation.state
+          translation.in_branch_condition @is_trues[i] do
+            pre_state = translation.create_state(:pre_of_either)
+            pre_states << pre_state
+            translation.state = pre_state
+            block.migrate_state translation
+            post_states << translation.state
+          end
         end
 
         affected_sorts = @blocks.each_index.map{ |i| pre_states[i].sort_difference(post_states[i]) }.flatten.uniq
@@ -760,7 +762,7 @@ module ADSL
         
         blocks = [@then_block, @else_block]
    
-        conditions  = [@condition_pred, ADSL::DS::DSNot.new(:subformula => @condition_pred)]
+        conditions  = [@condition_pred, @condition_pred.negate]
         pre_states  = [translation.create_state(:pre_then), translation.create_state(:pre_else)]
         post_states = []
         
@@ -900,7 +902,7 @@ module ADSL
 
       def migrate_state(translation)
         translation.reserve translation.context.make_ps do |ps|
-          translation.create_formula ADSL::FOL::ForAll.new(ps, o, ADSL::FOL::Not.new(
+          translation.create_formula ADSL::FOL::ForAll.new(ps, ADSL::FOL::Not.new(
             translation.branch_condition translation, ps
           ))
         end

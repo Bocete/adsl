@@ -81,27 +81,14 @@ module ADSL
         end
 
         def define_controller_stuff
-          appController = Object.lookup_const 'ApplicationController'
-          appController.class_eval <<-ruby
-            def current_user; #{auth_class.name}.new(:adsl_ast => ADSL::Parser::ASTCurrentUser.new); end
-            def extract_ops(action)
-              ops = []
-              [action].flatten.each do |op|
-                case op
-                when :manage
-                  ops += [:edit, :read]
-                when :edit
-                  ops << :edit
-                when :read, :create
-                  ops << op
-                when :destroy
-                  ops << :delete
-                end
-              end
-              ops
+          ApplicationController.class_eval <<-ruby, __FILE__, __LINE__ + 1
+            def current_user
+              #{auth_class.name}.new(:adsl_ast => ADSL::Parser::ASTCurrentUser.new)
             end
+          ruby
+          ApplicationController.class_exec do
             def can?(action, subject, *args)
-              ops = extract_ops action
+              ops = ADSL::Extract::Rails::CanCanExtractor.ops_from_action_name action
               if (subject.is_a? Class)
                 ADSL::Parser::ASTPermittedByType.new(
                   :ops => ops,
@@ -114,10 +101,122 @@ module ADSL
                 )
               end
             end
+
             def cannot?(*args)
               not can?(*args)
             end
-          ruby
+
+            def model_class_name
+              self.class.controller_name.singularize.camelize
+            end
+
+            def name_from_controller
+              self.class.controller_name.singularize
+            end
+
+            def namespace
+              [ model_class_name.split('::')[0..-2].map{ |a| "'#{a}'" }.join(', ') ]
+            end
+
+            def instance_name
+              controller_name.gsub('Controller', '').underscore.singularize
+            end
+          end
+
+          CanCanExtractor.define_authorize!
+        end
+
+        def define_controller_resource_stuff
+          CanCan::ControllerResource.class_exec do
+            alias_method :old_load_resource, :load_resource
+            def load_resource
+              ins_explore_all 'load_resource' do
+                old_load_resource
+
+                var_name, value = if load_instance?
+                  if new_actions.include?(@params[:action].to_sym)
+                    [instance_name.to_s]
+                  else
+                    [instance_name.to_s, resource_base.find]
+                  end
+                else
+                  [instance_name.to_s.pluralize, resource_base.where]
+                end
+
+                ins_stmt(ADSL::Parser::ASTAssignment.new(
+                  :var_name => ADSL::Parser::ASTIdent.new(:text => "at__#{var_name}"),
+                  :expr => value.adsl_ast
+                ))
+              end
+            end
+
+            #  unless skip?(:load)
+            #    var_name, expr = if load_instance?
+            #      if 
+            #        # we won't create because actions tend to create another and
+            #        # that is redundant in our translation
+            #        [instance_name, nil]
+            #      else
+            #        [instance_name, resource_base.find]
+            #      end
+            #    else
+            #      [instance_name.pluralize, resource_base.where]
+            #    end
+
+            #    ins_explore_all 'load_resource' do
+            #      ins_stmt(ADSL::Parser::ASTAssignment.new(
+            #        :var_name => ADSL::Parser::ASTIdent.new(:text => "at__#{var_name}"),
+            #        :expr => expr.adsl_ast
+            #      ))
+            #      nil
+            #    end
+
+            #    value = resource_base.new(:adsl_ast => ADSL::Parser::ASTVariable.new(
+            #      :var_name => ADSL::Parser::ASTIdent.new(:text => "at__#{var_name}")
+            #    ))
+            #    
+            #    @controller.instance_variable_set("@#{ var_name }", value)
+            #  end
+            #end
+          end
+        end
+
+        def self.define_authorize!
+          ApplicationController.class_exec do
+            def authorize!(*args)
+              return if respond_to?(:should_authorize?) && (!should_authorize?)
+              ops = ADSL::Extract::Rails::CanCanExtractor.ops_from_action_name action_name
+              return if ops.empty?
+              var_name = [instance_name, instance_name.pluralize].select{ |i| instance_variable_defined? "@#{i}" }.first
+              if var_name.nil?
+                ins_explore_all 'authorize_resource' do
+                  ins_stmt(stmt = ADSL::Parser::ASTIf.new(
+                    :condition => ADSL::Parser::ASTPermittedByType.new(
+                      :ops => ops,
+                      :class_name => ADSL::Parser::ASTIdent.new(:text => model_class_name)
+                    ),
+                    :then_block => ADSL::Parser::ASTBlock.new(:statements => []),
+                    :else_block => ADSL::Parser::ASTBlock.new(:statements => [
+                      ADSL::Parser::ASTRaise.new
+                    ])
+                  ))
+                end
+              else
+                ins_explore_all 'authorize_resource' do
+                  ins_stmt(stmt = ADSL::Parser::ASTIf.new(
+                    :condition => ADSL::Parser::ASTPermitted.new(
+                      :ops => ops,
+                      :expr => ADSL::Parser::ASTVariable.new(:var_name => ADSL::Parser::ASTIdent.new(:text => "at__#{var_name}"))
+                    ),
+                    :then_block => ADSL::Parser::ASTBlock.new(:statements => []),
+                    :else_block => ADSL::Parser::ASTBlock.new(:statements => [
+                      ADSL::Parser::ASTRaise.new
+                    ])
+                  ))
+                end
+              end
+            end
+          end
         end
 
         def define_policy
@@ -126,18 +225,7 @@ module ADSL
               return if ::ADSL::Extract::Instrumenter.get_instance.nil?
               return if ::ADSL::Extract::Instrumenter.get_instance.ex_method.nil?
               
-              ops = []
-              action ||= :manage
-              if action == :manage || action == :update
-                ops << [:edit, :read]
-              elsif action == :create
-                ops << [:create]
-              elsif action == :read || action == :index || action == :view
-                ops << [:read]
-              elsif action == :destroy
-                ops << [:delete]
-              end
-              ops.flatten!.uniq!
+              ops = ADSL::Extract::Rails::CanCanExtractor.ops_from_action_name action || :manage
 
               expr = nil
               unless conditions_hash.nil?
@@ -169,7 +257,48 @@ module ADSL
                 :expr => expr
               }))
             end
+
+            def authorize!(action, subject, *args)
+              ops = ADSL::Extract::Rails::CanCanExtractor.ops_from_action_name action
+              return if ops.empty?
+              if subject.is_a?(ActiveRecord::Base)
+                condition = ADSL::Parser::ASTPermitted.new(
+                  :expr => subject.adsl_ast,
+                  :ops => ops
+                )
+              else
+                condition = ADSL::Parser::ASTPermittedByType.new(
+                  :ops => ops,
+                  :class_name => ADSL::Parser::ASTIdent.new(:text => subject.name)
+                )
+              end
+              ins_stmt(ADSL::Parser::ASTIf.new(
+                :condition => condition, 
+                :then_block => ADSL::Parser::ASTBlock.new(:statements => []),
+                :else_block => ADSL::Parser::ASTBlock.new(:statements => [
+                  ADSL::Parser::ASTRaise.new
+                ])
+              ))
+            end
           end
+        end
+
+        def self.ops_from_action_name(action)
+          ops = case action.to_sym
+          when :manage
+            [:edit, :read]
+          when :manage, :edit
+            [:edit]
+          when :create
+            [:create]
+          when :read, :index, :view, :show
+            [:read]
+          when :destroy
+            [:delete]
+          else
+            []
+          end
+          ops.flatten.uniq
         end
 
         def authorization_defined?
@@ -253,6 +382,7 @@ module ADSL
           define_usergroups
           define_usergroup_getters
           define_controller_stuff
+          define_controller_resource_stuff
           define_policy
         end
 

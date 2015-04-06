@@ -81,8 +81,33 @@ module ADSL
         @sorts.length
       end
 
+      def negate
+        NotPredicate.new(self)
+      end
+
       def to_s
         "#{name}(#{sorts.map(&:to_s).join ', '})"
+      end
+    end
+
+    class NotPredicate
+      container_for :predicate
+      recursively_comparable
+
+      def initialize(predicate)
+        @predicate = predicate
+      end
+
+      def [](*args)
+        Not[@predicate[*args]]
+      end
+
+      def arity
+        @predicate.arity
+      end
+
+      def to_s
+        "not(#{@predicate.to_s})"
       end
     end
 

@@ -223,9 +223,13 @@ module ADSL
         end
         
         def eql?(other)
-          other.is_ambiguous_objset_type?
+          other.is_a?(Common) && other.is_ambiguous_objset_type?
         end
         alias_method :==, :eql?
+
+        def hash
+          self.class.hash
+        end
 
         def to_s
           "[AmbiguousObjset]"
@@ -310,9 +314,15 @@ module ADSL
 
         def eql?(other)
           return false unless other.is_a?(ObjsetType)
+          canonize!
+          other.canonize!
           @classes == other.classes
         end
         alias_method :==, :eql?
+
+        def hash
+          @classes.hash
+        end
 
         def to_s
           "[#{ @classes.map(&:to_s).join ', ' }]"

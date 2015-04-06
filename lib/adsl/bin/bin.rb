@@ -51,54 +51,36 @@ module ADSL
 
       def filter_list(list, filters)
         return list if filters.nil? || filters.empty?
-        filters.map{ |f| list.select{ |l| l.name =~ /#{f}/} }.map{ |a| Set[*a] }.inject(&:+)
+        filters.map{ |f| list.select{ |l| l.name =~ /#{f}/} }.inject(&:+).uniq
       end
 
       def gen_problems
         actions              = filter_list @ds.actions,    @options[:actions]
         invariants           = filter_list @ds.invariants, @options[:problems]
-        check_access_control = @options[:problems].empty? || @options[:problems].include?('ac')
+        check_access_control = @options[:problems].nil? || @options[:problems].include?('ac')
 
         problems = []
 
         actions.each do |action|
-          problems += [action, @ds.generate_problems(action.name, invariants, check_access_control)]
+          problems += @ds.generate_problems(action.name, invariants, check_access_control).map{ |p| [action, p] }
         end
 
         problems
       end
 
-      def output(result, action, invariant)
-        if options[:output] == 'text'
-          if invariant.nil?
-            # sat check, expected to fail
-            result_string = case result[:result]
-            when :correct
-              "failed".red
-            when :incorrect
-              "passed".green
-            when :timeout
-              "timed out".yellow
-            when :inconclusive
-              "inconclusive".yellow
-            else
-              raise "Unknown verification result #{result[:result]}"
-            end
-            puts "Satisfiability check of action #{action.name} #{result_string}"
+      def output(result, action, problem)
+        if @options[:output] == 'text'
+          puts case result[:result]
+          when :correct
+            "Action #{action.name} #{"passes".green} verification for problem #{problem.name}"
+          when :incorrect
+            "Action #{action.name} #{"fails".red} verification for problem #{problem.name}"
+          when :timeout
+            "Verification of action #{action.name} and problem #{problem.name} #{"timed out".yellow}"
+          when :inconclusive
+            "#{"Inconclusive".yellow} result on action #{action.name} and problem #{problem.name}"
           else
-            # sat check, expected to fail
-            puts case result[:result]
-            when :correct
-              "Action #{action.name} #{"preserves".green} invariant #{invariant.name}"
-            when :incorrect
-              "Action #{action.name} #{"may break".red} invariant #{invariant.name}"
-            when :timeout
-              "Verification of action #{action.name} and invariant #{invariant.name} #{"timed out".yellow}"
-            when :inconclusive
-              "#{"Inconclusive".yellow} result on action #{action.name} and invariant #{invariant.name}"
-            else
-              raise "Unknown verification result #{result[:result]}"
-            end
+            raise "Unknown verification result #{result[:result]}"
           end
         elsif options[:output] == 'csv'
           @csv_output ||= ADSL::Util::CSVHashFormatter.new
@@ -130,12 +112,13 @@ module ADSL
         problems = gen_problems
 
         problems.each do |action, problem|
-          fol = @ds.translate_action action.name, problem
-          engine = ADSL::Prover::Engine.new *provers, fol, @options
+          translation = @ds.translate_action action.name, problem
+          fol = translation.to_fol
+          engine = ADSL::Prover::Engine.new provers, fol, @options
           result = engine.verify
-          output result, action, invariant
+          output result, action, problem
           if @options[:halt_on_error]
-            failed = invariant.nil? ? (result[:result] == :correct) : (result[:result] == :incorrect)
+            failed = problem.nil? ? (result[:result] == :correct) : (result[:result] == :incorrect)
             return if failed
           end
         end

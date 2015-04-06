@@ -162,6 +162,7 @@ module ADSL
             ADSL::Extract::Instrumenter.get_instance.ex_method = nil
             ADSL::Parser::ASTBlock.new :statements => statements
           end
+          session.reset!
 
           block.remove_statements_after_returns!
 
@@ -176,7 +177,7 @@ module ADSL
 
           action = action.optimize
           action.prepend_global_variables_by_signatures /^at__.*/, /^atat__.*/
-
+          
           action
         end
 

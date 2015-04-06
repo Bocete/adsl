@@ -39,6 +39,14 @@ def initialize_test_context
       super
     end
 
+    def authorize!; end
+    def should_authorize?; false; end
+    def self.authorize_resource(*args)
+      ApplicationController.class_exec do
+        def should_authorize?; true; end
+      end
+    end
+
     # no templates exist and we do not care
     rescue_from ActionView::MissingTemplate do; end
   end
@@ -47,13 +55,7 @@ def initialize_test_context
     def index;   respond_to; end
     def show;    respond_to; end
     def new;     respond_to; end
-
-    def create
-      a = Asd.new
-      a.save!
-      respond_to
-    end
-
+    def create;  respond_to; end
     def edit;    respond_to; end
     def update;  respond_to; end
     def destroy; respond_to; end
@@ -66,6 +68,8 @@ def initialize_test_context
     before_filter :before_nothing, :only => :nothing
     after_filter  :after_nothing,  :only => :nothing
 
+    before_filter :authorize!, :only => [:index, :show, :new, :create, :edit, :update, :destroy]
+
     def before_filter_action; respond_to; end
     def after_filter_action;  respond_to; end
     
@@ -75,6 +79,15 @@ def initialize_test_context
 
     def before_nothing; end
     def after_nothing; end
+    
+  end
+end
+
+def teardown_test_context
+  unload_class :Asd, :Kme, 'Mod::Blah'
+  ApplicationController.class_exec do
+    def authorize!; end
+    def should_authorize?; true; end
   end
 end
 
@@ -154,9 +167,19 @@ def define_cancan_suite
     def can(*args); end
     def cannot(*args); end
   end
+  Object.lookup_or_create_class('::CanCan::ControllerResource', Object).class_exec do
+    def load_resource
+      if load_instance?
+      end
+    end
+  end
   Object.lookup_or_create_class('::Ability', Object).class_exec do
     include ::CanCan::Ability
 
     def initialize(user); end
   end
+end
+
+def teardown_cancan_suite
+  unload_class :Ability, :User, :CanCan
 end

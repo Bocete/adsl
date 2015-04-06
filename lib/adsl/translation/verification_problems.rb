@@ -29,7 +29,7 @@ module ADSL
             # reads
             assignments = action.recursively_gather{ |elem|
               elem if elem.is_a?(DSAssignment)
-            }.reverse.uniq{ |asgn| asgn.var.name }
+            }.reverse.uniq{ |asgn| asgn.var.name }.select{ |asgn| asgn.expr.type_sig.is_objset_type? && !asgn.expr.type_sig.cardinality.empty? }
             problems += assignments.map{ |asgn| ADSL::Translation::AccessControlReadProblem.new asgn.expr }
 
             # assocs
@@ -45,7 +45,7 @@ module ADSL
             problems += rels.uniq.map{ |rel| ADSL::Translation::AccessControlDeassocProblem.new rel }
           end
         end
-
+        
         problems
       end
 
@@ -59,16 +59,21 @@ module ADSL
     class FOLVerificationProblem
       attr_accessor :fol
 
-      def initialize(fol)
+      def initialize(fol, name = nil)
         @fol = fol
+        @name = name
       end
 
       def generate_conjecture(translation)
         @fol
       end
 
+      def name
+        "custom formula #{@name}".strip
+      end
+
       def to_adsl
-        "problem(#{ @fol.to_adsl }"
+        "problem(#{ @fol.to_adsl })"
       end
     end
 
@@ -88,6 +93,14 @@ module ADSL
           FOL::And.new(pre_invariants),
           FOL::And.new(post_invariants)
         )
+      end
+
+      def name
+        if @listed_invariants.length == 1
+          "invariant #{ @listed_invariants.first.name }"
+        else
+          "invariants #{ @listed_invariants.map(&:name).join ', ' }"
+        end
       end
 
       def to_adsl
@@ -117,6 +130,10 @@ module ADSL
         end
       end
 
+      def name
+        "ac creation #{@domain}"
+      end
+
       def to_adsl
         "ac_create_problem(#{@domain})"
       end
@@ -142,6 +159,10 @@ module ADSL
             permitted_formula
           ]].optimize
         end
+      end
+
+      def name
+        "ac deletion #{@domain}"
       end
       
       def to_adsl
@@ -169,6 +190,10 @@ module ADSL
             ]].optimize
           end
         end
+      end
+
+      def name
+        "ac read #{@expr.type_sig}"
       end
       
       def to_adsl
@@ -199,6 +224,10 @@ module ADSL
         end
       end
 
+      def name
+        "ac assoc #{@relation}"
+      end
+
       def to_adsl
         "ac_assoc_problem(#{@relation})"
       end
@@ -225,6 +254,10 @@ module ADSL
             permitted_formula
           ]].optimize
         end
+      end
+
+      def name
+        "ac deassoc #{@relation}"
       end
 
       def to_adsl

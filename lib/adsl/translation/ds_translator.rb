@@ -84,7 +84,7 @@ module ADSL
 
       def branch_condition(translation, ps, starting_index = 0)
         ADSL::FOL::And[
-          *@branch_conditions[starting_index..-1].map{ |formula, level| formula.resolve_expr translation, ps.first(level) }
+          *@branch_conditions[starting_index..-1].map{ |predicate, level| predicate[ps.first(level)] }
         ]
       end
 

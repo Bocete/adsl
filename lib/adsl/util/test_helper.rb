@@ -47,6 +47,17 @@ class MiniTest::Unit::TestCase
     end
   end
 
+  def unload_method(klass, method_name)
+    unless klass.respond_to? :class_eval
+      const = self.class.lookup_const klass
+      return if const.nil?
+      klass = const
+    end
+    return unless klass.respond_to? method_name
+
+    klass.class_eval "undef :#{ method_name }"
+  end
+
   def class_defined?(*classes)
     classes.each do |klass_name|
       return true unless self.class.lookup_const(klass_name).nil?

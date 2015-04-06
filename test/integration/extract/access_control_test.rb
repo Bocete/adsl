@@ -15,11 +15,16 @@ class ADSL::Extract::AccessControlRailsVerificationTest < ADSL::Extract::Rails::
         if user.is_admin
           can :manage, :all
         else
-          can :manage, Asd, :user_id => user.id
-          can :manage, User, :user_id => user.id
+          can :destroy, Asd, :user_id => user.id
+          can :destroy, User, :user_id => user.id
         end
       end
     end
+  end
+
+  def teardown
+    super
+    teardown_cancan_suite
   end
 
   def verify_options_for(action)
@@ -61,8 +66,8 @@ class ADSL::Extract::AccessControlRailsVerificationTest < ADSL::Extract::Rails::
     AsdsController.class_exec do
       def create
         # this check passes because this is a class-level check
-        raise unless can? :create, Asd
-        Asd.new
+        raise unless can? :destroy, Asd
+        Asd.find.destroy!
       end
     end
     
@@ -83,4 +88,29 @@ class ADSL::Extract::AccessControlRailsVerificationTest < ADSL::Extract::Rails::
     assert verify :ast => ast, :verify_options => verify_options_for('AsdsController__destroy')
   end
 
+  def test_verify_authorize_resource_create
+    AsdsController.class_exec do
+      authorize_resource
+
+      def create
+        a = Asd.new
+      end
+    end
+
+    ast = create_rails_extractor.adsl_ast
+
+    assert verify :ast => ast, :verify_options => verify_options_for('AsdsController__create')
+  end
+  
+  def test_verify__cannot_create_without_authorize_resource
+    AsdsController.class_exec do
+      def create
+        a = Asd.new
+      end
+    end
+
+    ast = create_rails_extractor.adsl_ast
+
+    assert_false verify :ast => ast, :verify_options => verify_options_for('AsdsController__create')
+  end
 end

@@ -6,12 +6,14 @@ require 'adsl/extract/rails/rails_test_helper'
 
 class ADSL::Extract::Rails::RailsInstrumentationTestCase < MiniTest::Unit::TestCase
   def setup
-    assert_false class_defined? :ADSLMetaAsd, :ADSLMetaKme, 'Mod::ADSLMetaBlah'
+    [:Asd, :Kme, 'Mod::Blah', :Ability, :User, :CanCan].each do |k|
+      raise "#{k} was loaded" if class_defined?(k)
+    end
     initialize_test_context
   end
 
   def teardown
-    unload_class :Asd, :Kme, 'Mod::Blah', :Ability
+    teardown_test_context
   end
 
   def initialize_metaclasses

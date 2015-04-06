@@ -58,6 +58,8 @@ module ADSL
       end
 
       def returns?; false; end
+      
+      def raises?; false; end
 
       def reaches_view?; false; end
 
@@ -790,18 +792,23 @@ module ADSL
         context.pop_frame if open_subcontext
       end
 
-      def returns?
-        vals = @statements.map(&:returns?).uniq
+      def stmt_type_inevitable(type)
+        vals = @statements.map{ |s| s.send type }.uniq
         return true if vals.include? true
         return nil if vals.include? nil
         false
       end
 
+      def returns?
+        stmt_type_inevitable :returns?
+      end
+
+      def raises?
+        stmt_type_inevitable :raises?
+      end
+
       def reaches_view?
-        vals = @statements.map(&:reaches_view?).uniq
-        return true if vals.include? true
-        return nil if vals.include? nil
-        false
+        stmt_type_inevitable :reaches_view?
       end
 
       def remove_statements_after_returns!(tail = [])
@@ -820,6 +827,7 @@ module ADSL
           end
         end
 
+        return_statuses = @statements.map &:returns?
         if return_statuses.include? nil
           first_maybe_return_index = return_statuses.index nil
           stmt = @statements[first_maybe_return_index]
@@ -842,8 +850,9 @@ module ADSL
 
       def optimize(last_stmt = false)
         until_no_change super() do |block|
+          next block unless block.is_a? ASTBlock
           next block if block.statements.empty?
-          next ASTBlock.new(:statements => []) unless block.statements.select{ |s| s.is_a? ASTRaise }.empty?
+          next ASTBlock.new :statements => [ASTRaise.new] if block.raises?
 
           statements = block.statements.map(&:optimize).map{ |stmt|
             stmt.is_a?(ASTBlock) ? stmt.statements : [stmt]
@@ -1131,12 +1140,14 @@ module ADSL
         ADSL::DS::DSRaise.new
       end
 
-      def returns?; true; end
+      def returns?; false; end
+
+      def raises?; true; end
       
       def optimize; self; end
 
       def to_adsl
-        "raise"
+        "raise\n"
       end
     end
 
@@ -1181,11 +1192,23 @@ module ADSL
         @blocks.map(&:list_entity_classes_written_to).flatten
       end
 
+      def stmt_type_inevitable(type)
+        vals = @blocks.map{ |b| b.send type }.uniq
+        return true if vals.uniq == [true]
+        return false if vals.uniq == [false]
+        return nil
+      end
+
       def returns?
-        val = blocks.map(&:returns?)
-        return true if val.uniq == [true]
-        return false if val.uniq == [false]
-        nil
+        stmt_type_inevitable :returns?
+      end
+
+      def raises?
+        stmt_type_inevitable :raises?
+      end
+
+      def reaches_view?
+        stmt_type_inevitable :reaches_view?
       end
 
       def merge_to_nonreturning_branch(stmts)
@@ -1197,6 +1220,7 @@ module ADSL
       def optimize
         until_no_change super do |either|
           next either.optimize unless either.is_a?(ASTEither)
+          either.blocks.reject! &:raises?
           next ASTDummyStmt.new if either.blocks.empty?
           next either.blocks.first if either.blocks.length == 1
           ASTEither.new(:blocks => either.blocks.map{ |block|
@@ -1222,12 +1246,24 @@ module ADSL
       def blocks
         [@then_block, @else_block]
       end
+      
+      def stmt_type_inevitable(type)
+        vals = blocks.map{ |b| b.send type }
+        return true if vals.uniq == [true]
+        return false if vals.uniq == [false]
+        return nil
+      end
 
       def returns?
-        val = blocks.map(&:returns?)
-        return true if val == [true, true]
-        return false if val == [false, false]
-        nil
+        stmt_type_inevitable :returns?
+      end
+
+      def raises?
+        stmt_type_inevitable :raises?
+      end
+
+      def reaches_view?
+        stmt_type_inevitable :reaches_view?
       end
 
       def merge_to_nonreturning_branch(stmts)
@@ -1286,6 +1322,9 @@ module ADSL
       end
 
       def to_adsl
+        if @then_block.statements.empty? && !@else_block.statements.empty?
+          return "if not #{@condition.to_adsl} {\n#{ @else_block.to_adsl.adsl_indent }}\n"
+        end
         else_code = @else_block.statements.empty? ? "" : " else {\n#{ @else_block.to_adsl.adsl_indent }}"
         "if #{@condition.to_adsl} {\n#{ @then_block.to_adsl.adsl_indent }}#{ else_code }\n"
       end
@@ -1862,7 +1901,7 @@ module ADSL
       end
 
       def to_adsl
-        "permitted(#{@ops.map(&:to_s).join ', '} #{@exor.to_adsl})"
+        "permitted(#{@ops.map(&:to_s).join ', '} #{@expr.to_adsl})"
       end
     end
 

@@ -234,6 +234,10 @@ module ADSL
               end
             end
 
+            def joins(*args)
+              self
+            end
+
             def apply_finder_options(options)
               options.include?(:conditions) ? self.class.new(:adsl_ast => ASTSubset.new(:objset => self.adsl_ast)) : self
             end
@@ -379,6 +383,10 @@ module ADSL
               alias_method :only,   :where
               alias_method :except, :where
               alias_method :my,     :where
+
+              def joins(*args)
+                self
+              end
 
               def build(*args)
                 new(*args)

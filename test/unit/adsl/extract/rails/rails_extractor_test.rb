@@ -146,6 +146,8 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     extractor = create_rails_extractor
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :create)
     statements = ast.block.statements
+
+    assert_equal 4, statements.length
     
     # all instance variables are initialized to empty
     assert_equal ASTExprStmt,    statements[0].class
@@ -184,7 +186,6 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :create)
     statements = ast.block.statements
 
-    assert_false statements.empty?
     assert_equal 5, statements.length
     
     assert_equal ASTExprStmt,     statements[0].class
@@ -647,7 +648,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
   def test_callback_lookup
     extractor = create_rails_extractor
     assert_set_equal(
-      [:before, :after, :before2, :before_nothing, :after_nothing],
+      [:before, :after, :before2, :before_nothing, :after_nothing, :authorize!],
       extractor.callbacks(AsdsController).map(&:filter)
     )
   end
@@ -843,7 +844,8 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :before_filter_action)
     statements = ast.block.statements
 
-    assert_equal 0, statements.length
+    assert_equal 1,        statements.length
+    assert_equal ASTRaise, statements[0].class
   end
   
   def test_before_callbacks__halt_callback_chain_when_rendering_sometimes
@@ -972,7 +974,8 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
     statements = ast.block.statements
 
-    assert_equal 0, statements.length
+    assert_equal 1,        statements.length
+    assert_equal ASTRaise, statements.first.class
   end
 
   def test_extract__raise_ignores_the_root_path_in_branch
@@ -1012,7 +1015,8 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
     statements = ast.block.statements
 
-    assert_equal 0, statements.length
+    assert_equal 1,        statements.length
+    assert_equal ASTRaise, statements[0].class
   end
 
   def test_extract__foreach_basic
@@ -1342,7 +1346,6 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     end
     
     extractor = create_rails_extractor
-    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :create)
     statements = ast.block.statements
 
