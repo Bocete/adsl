@@ -1,11 +1,8 @@
-require 'minitest/unit'
-
-require 'minitest/autorun'
-require 'pp'
+require 'adsl/util/test_helper'
 require 'adsl/fol/first_order_logic'
 require 'adsl/translation/util'
 
-class ADSL::Translation::UtilTest < MiniTest::Unit::TestCase
+class ADSL::Translation::UtilTest < ActiveSupport::TestCase
 
   def test_translation__gen_unique_arg_formula__integer_args
     sort1 = ADSL::FOL::Sort.new :sort1

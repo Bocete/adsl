@@ -111,6 +111,9 @@ class ADSL::Parser::ADSLParser < Racc::Parser
       when (text = @ss.scan(/allofusergroup\b/))
          action { [:allofusergroup, lineno] }
 
+      when (text = @ss.scan(/raise\b/))
+         action { [:raize, lineno] }
+
       when (text = @ss.scan(/foreach\b/))
          action { [:foreach, lineno] }
 
@@ -128,6 +131,9 @@ class ADSL::Parser::ADSLParser < Racc::Parser
 
       when (text = @ss.scan(/or\b/))
          action { [:or, lineno] }
+
+      when (text = @ss.scan(/xor\b/))
+         action { [:xor, lineno] }
 
       when (text = @ss.scan(/subset\b/))
          action { [:subset, lineno] }
@@ -174,6 +180,9 @@ class ADSL::Parser::ADSLParser < Racc::Parser
       when (text = @ss.scan(/equal\b/))
          action { [:equal, lineno] }
 
+      when (text = @ss.scan(/pickoneexpr\b/))
+         action { [:pickoneexpr, lineno] }
+
       when (text = @ss.scan(/empty\b/))
          action { [:empty, lineno] }
 
@@ -200,12 +209,6 @@ class ADSL::Parser::ADSLParser < Racc::Parser
 
       when (text = @ss.scan(/edit\b/))
          action { [:edit, lineno] }
-
-      when (text = @ss.scan(/assoc\b/))
-         action { [:assoc, lineno] }
-
-      when (text = @ss.scan(/deassoc\b/))
-         action { [:deassoc, lineno] }
 
       when (text = @ss.scan(/\.\./))
          action { [text, lineno] }

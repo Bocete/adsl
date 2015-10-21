@@ -1,11 +1,8 @@
-require 'minitest/unit'
-
-require 'minitest/autorun'
+require 'adsl/util/test_helper'
 require 'adsl/ds/data_store_spec'
 require 'adsl/ds/type_sig'
-require 'pp'
 
-class ADSL::DS::TypeSigTest < MiniTest::Unit::TestCase
+class ADSL::DS::TypeSigTest < ActiveSupport::TestCase
   include ADSL::DS::TypeSig
   
   def test_class__superclass_of

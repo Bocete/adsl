@@ -1,11 +1,8 @@
-require 'minitest/unit'
-require 'minitest/autorun'
-require 'pp'
 require 'adsl/util/test_helper'
 require 'adsl/extract/meta'
 require 'adsl/extract/utils'
 
-class ADSL::Extract::UtilsTest < MiniTest::Unit::TestCase
+class ADSL::Extract::UtilsTest < ActiveSupport::TestCase
   include ADSL::Extract::Utils
 
   def setup

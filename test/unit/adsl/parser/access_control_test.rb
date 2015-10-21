@@ -1,13 +1,9 @@
+require 'adsl/util/test_helper'
 require 'adsl/parser/adsl_parser.tab'
 require 'adsl/ds/data_store_spec'
-require 'adsl/util/test_helper'
-require 'minitest/unit'
-
-require 'minitest/autorun'
-require 'pp'
 
 module ADSL::Parser
-  class AccessControlParserTest < MiniTest::Unit::TestCase
+  class AccessControlParserTest < ActiveSupport::TestCase
     include ADSL::DS
 
     def test_authenticable_class
@@ -327,59 +323,13 @@ module ADSL::Parser
       end
     end
 
-    def test_permit__assoc_deassoc_require_deref_expr
-      parser = ADSLParser.new
-      ["assoc", "deassoc"].each do |op|
-        assert_nothing_raised ADSLError do
-          parser.parse <<-adsl
-            authenticable class User {
-              0+ User friends
-            }
-            permit #{op} allof(User).friends
-          adsl
-        end
-        assert_raises ADSLError do
-          parser.parse <<-adsl
-            authenticable class User {
-              0+ User friends
-            }
-            permit #{op} allof(User)
-          adsl
-        end
-      end
-    end
-
-    def test_permit__create_delete_edit_imply_assoc_deassoc_in_derefs
-      parser = ADSLParser.new
-      expected = {
-        :create => [:assoc],
-        :delete => [:deassoc],
-        :edit => [:assoc, :deassoc]
-      }
-      expected.each do |op, result|
-        assert_nothing_raised ADSLError do
-          spec = parser.parse <<-adsl
-            authenticable class User {
-              0+ User friends
-            }
-            permit #{op} allof(User).friends
-          adsl
-          result.each do |ex_op|
-            assert spec.ac_rules.first.ops.include? ex_op
-          end
-        end
-      end
-    end
-
     def test_permit__unrolling_of_all_meta_ops
       parser = ADSLParser.new
       expected = {
         :read => [:read],
-        :assoc => [:assoc],
-        :deassoc => [:deassoc],
-        :create => [:assoc, :create],
-        :delete => [:deassoc, :delete],
-        :edit => [:create, :delete, :assoc, :deassoc]
+        :create => [:create],
+        :delete => [:delete],
+        :edit => [:create, :delete]
       }
       expected.each do |op, result|
         assert_nothing_raised ADSLError do
@@ -403,28 +353,6 @@ module ADSL::Parser
             a = permittedbytype(create Nonexistent)
           }
         adsl
-      end
-    end
-
-    def test_permitted_by_type__ops_match
-      parser = ADSLParser.new
-      expected = {
-        :read => [:read],
-        :create => [:create],
-        :delete => [:delete],
-        :edit => [:create, :delete]
-      }
-      expected.each do |op, result|
-        assert_nothing_raised ADSLError do
-          spec = parser.parse <<-adsl
-            authenticable class User {}
-            action blah() {
-              a = permittedbytype(#{op} User)
-            }
-          adsl
-          action = spec.actions.first
-          assert_set_equal result, action.block.statements.first.expr.ops
-        end
       end
     end
 

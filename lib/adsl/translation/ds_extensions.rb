@@ -21,15 +21,28 @@ module ADSL
         raise ArgumentError, "Action '#{action_name}' not found" if actions.empty?
         actions.first
       end
+
+      def translate_classes(translation)
+        done_classes = Set[]
+        todo_classes = Set[*@classes]
+        until todo_classes.empty?
+          candidates = todo_classes.select do |klass|
+            Set[*klass.parents].subset? done_classes
+          end
+          todo_classes -= candidates
+          done_classes += candidates
+          candidates.each do |klass|
+            klass.translate translation
+          end
+        end
+      end
       
       def translate_action(action_name, *problems)
         translation = ADSL::Translation::DSTranslator.new self
 
         action = find_action_by_name action_name
 
-        @classes.each do |klass|
-          klass.translate(translation)
-        end
+        translate_classes translation
 
         relations = @classes.map{ |c| c.relations }.flatten
         # translate relations 
@@ -137,6 +150,10 @@ module ADSL
         end
         translation.set_conjecture ADSL::FOL::And[*problem_formulas].optimize
 
+        self.recursively_gather do |elem|
+          elem.cleanup_translation if elem.respond_to? :cleanup_translation
+        end
+
         return translation
       end
 
@@ -147,7 +164,7 @@ module ADSL
 
       def prepare(translation)
         @args.each do |arg|
-          arg.define_predicate translation, arg.type_sig
+          arg.prepare_expr translation
         end
         @block.prepare translation
       end
@@ -361,21 +378,6 @@ module ADSL
       end
     end
 
-    class DSPermittedByType < DSNode
-      def prepare_expr(translation)
-      end
-
-      def resolve_expr(translation, ps, var = nil)
-        permits = translation.spec.ac_rules
-        permits.select!{ |p| p.expr.type_sig >= @klass.to_sig }
-        ADSL::FOL::And[@ops.map do |op|
-          applicable_permits = permits.select{ |p| p.ops.include? op }
-          groups = applicable_permits.map(&:usergroups).flatten
-          ADSL::FOL::Or[*groups.map{ |g| g[translation.current_user[]] }]
-        end]
-      end
-    end
-    
     class DSPermitted < DSNode
       def prepare_expr(translation)
         @expr.prepare_expr translation
@@ -383,26 +385,12 @@ module ADSL
 
       def resolve_expr(translation, ps, var = nil)
         ADSL::FOL::And[*@ops.map do |op|
-          if op == :assoc or op == :deassoc
-            translation.reserve @expr.relation.type_pred_sort, :t do |t|
-              permitted = translation.spec.gen_is_permissible_formula(translation, op, ps, nil, o)
-              ADSL::FOL::ForAll.new t, ADSL::FOL::Implies.new(
-                And[
-                  @expr.objset.resolve_expr(translation, ps, @expr.relation.left_link[t]),
-                  translation.state[t],
-                  translation.state[@expr.relation.right_link[t]]
-                ],
-                permitted
-              )
-            end
-          else
-            translation.reserve @expr.type_sig, :o do |o|
-              permitted = translation.spec.gen_is_permissible_formula(translation, op, ps, @expr.type_sig, o)
-              ADSL::FOL::ForAll.new o, ADSL::FOL::Implies.new(
-                @expr.resolve_expr(translation, ps, o),
-                permitted
-              )
-            end
+          translation.reserve @expr.type_sig, :o do |o|
+            permitted = translation.spec.gen_is_permissible_formula(translation, op, ps, @expr.type_sig, o)
+            ADSL::FOL::ForAll.new o, ADSL::FOL::Implies.new(
+              @expr.resolve_expr(translation, ps, o),
+              permitted
+            )
           end
         end]
       end
@@ -415,25 +403,12 @@ module ADSL
 
       def gen_covers_formula(translation, op, ps, var_type_sig, var)
         return false unless @ops.include? op
-        if op == :assoc or op == :deassoc
-          return false if @expr.relation.type_pred_sort != var.to_sort
-        else
-          return false unless @expr.type_sig >= var_type_sig
-        end
-        group_applicable = ADSL::FOL::Or[*@usergroups.map{ |g| g[translation.current_user[]] }]
-        if op == :assoc or op == :deassoc
-          ADSL::FOL::And[
-            group_applicable,
-            @expr.objset.resolve_expr(translation, ps, @expr.relation.left_link[var]),
-            translation.state[var],
-            translation.state[@expr.relation.right_link[var]]
-          ]
-        else
-          ADSL::FOL::And[
-            group_applicable,
-            @expr.resolve_expr(translation, ps, var)
-          ]
-        end
+        return false unless @expr.type_sig >= var_type_sig
+        
+        ADSL::FOL::And[
+          ADSL::FOL::Or[*@usergroups.map{ |g| g[translation.current_user[]] }],
+          @expr.resolve_expr(translation, ps, var)
+        ]
       end
     end
 
@@ -615,12 +590,13 @@ module ADSL
           # this is needed because the quantification above does not force tuples to exist
           translation.create_formula FOL::ForAll.new(ps, o1, o2, FOL::Implies.new(
             And.new(
-              prev_state[ps, o1], 
-              prev_state[ps, o2]
+              @objset1.resolve_expr(translation, ps, o1), 
+              @objset2.resolve_expr(translation, ps, o2)
             ),
             FOL::Exists.new(r, And.new(
               state[ps, r],
-              links_match
+              Equal.new(@relation.left_link[r], o1),
+              Equal.new(@relation.right_link[r], o2),
             ))
           ))
         end
@@ -685,7 +661,7 @@ module ADSL
         translation.reserve context.make_ps do |ps|
           translation.create_formula FOL::ForAll.new(ps, FOL::Implies.new(
             context.type_pred(ps),
-            FOL::OneOf.new(@is_trues.map{ |pred| pred[ps] })
+            FOL::Xor.new(@is_trues.map{ |pred| pred[ps] })
           ))
         end
 
@@ -724,7 +700,11 @@ module ADSL
     end
 
     class DSEitherLambdaExpr < DSNode
-      def prepare_expr(translation); end
+      def prepare_expr(translation)
+        @exprs.each do |expr|
+          expr.prepare_expr translation
+        end
+      end
 
       def resolve_expr(translation, ps, o = nil)
         FOL::Or.new(@either.blocks.each_index.map do |i|
@@ -813,7 +793,10 @@ module ADSL
     end
 
     class DSIfLambdaExpr < DSNode
-      def prepare_expr(translation); end
+      def prepare_expr(translation)
+        @then_expr.prepare_expr translation
+        @else_expr.prepare_expr translation
+      end
 
       def resolve_expr(translation, ps, o = nil)
         actual_state = translation.state
@@ -888,7 +871,6 @@ module ADSL
 
     class DSReturned < DSNode
       def prepare_expr(translation)
-        # prepared by the return block
       end
 
       def resolve_expr(translation, ps, var)
@@ -981,6 +963,26 @@ module ADSL
       end
     end
 
+    class DSForEachPostLambdaExpr < DSNode
+      def prepare_expr(translation); end
+
+      def resolve_expr(translation, ps, o = nil)
+        raise "Not implemented for flexible arities"
+        # translation.reserve_names :parent, :prev_context do |parent, prev_context|
+        #   return ForAll.new(parent, Implies.new(@context.parent_of_pred[parent, :c],
+        #     IfThenElseEq.new(
+        #       @context.first[parent, c],
+        #       @before_var[c, o],
+        #       Exists.new( prev_context, And.new(
+        #         @context.just_before[prev_context, c],
+        #         @inside_var[prev_context, o]
+        #       ))
+        #     )
+        #   ))
+        # end
+      end
+    end
+
     class DSForEach < DSForEachCommon
       def prepare(translation)
         prepare_with_context(translation, false)
@@ -1037,7 +1039,8 @@ module ADSL
 
       def create_iteration_formulae(translation)
         context = translation.context
-        affected_sorts = @post_iteration_state.sort_difference @pre_iteration_state
+        affected_sorts = @pre_iteration_state.registered_sorts
+        modified_sorts = @post_iteration_state.sort_difference @pre_iteration_state
         translation.reserve context.make_ps do |ps|
           ps_without_last = ps[0..-2]
           translation.create_formula ForAll.new(ps, Implies.new(
@@ -1046,10 +1049,10 @@ module ADSL
           ))
           translation.create_formula ForAll.new(ps_without_last, IfThenElse.new(
             Not.new(Exists.new(ps.last, @context.type_pred(ps))),
-            translation.states_equivalent_formula(affected_sorts, ps_without_last, @pre_state, ps_without_last, @post_state),
+            translation.states_equivalent_formula(modified_sorts, ps_without_last, @pre_state, ps_without_last, @post_state),
             Implies.new(
               @context.parent.type_pred(ps_without_last),
-              And.new(affected_sorts.map do |sort|
+              And.new(modified_sorts.map do |sort|
                 translation.reserve sort, :o do |o|
                   ForAll.new(o, Equiv.new(
                     @post_state[ps_without_last, o],
@@ -1097,7 +1100,8 @@ module ADSL
         return if @expr.type_sig.is_objset_type? && @expr.type_sig.cardinality.empty?
 
         @expr.prepare_expr translation
-        @var.define_predicate translation, @expr.type_sig
+        @var.type_sig ||= @expr.type_sig.dup
+        @var.prepare_expr translation
       end
 
       def migrate_state(translation)
@@ -1118,20 +1122,13 @@ module ADSL
     end
 
     class DSVariable < DSNode
-      attr_accessor :context, :pred
+      attr_accessor :context, :pred, :type_sig
       
-      # The predicate is not defined in prepare_action
-      # as we want the predicate to be defined only when assigning to the variable
-      # not when using it
-      # @pred ||= would not work because it makes the translation non-reusable
       def prepare_expr(translation)
-      end
-
-      def define_predicate(translation, type_sig)
-        @context = translation.context
-        @type_sig = type_sig
-        if @type_sig.is_objset_type?
-          @pred = translation.create_predicate "var_#{@name}", context.sort_array, type_sig.to_sort
+        raise "DSVariable type_sig not set" if @type_sig.nil?
+        @context ||= translation.context
+        if @type_sig.is_objset_type? && !@type_sig.cardinality.empty? && @pred.nil?
+          @pred ||= translation.create_predicate "var_#{@name}", context.sort_array, type_sig.to_sort
         end
       end
 
@@ -1146,6 +1143,10 @@ module ADSL
         else
           @pred[*args]
         end
+      end
+
+      def cleanup_translation
+        @pred = nil
       end
     end
 
@@ -1167,7 +1168,7 @@ module ADSL
           return FOL::Exists.new(r, FOL::And.new(
             translation.state[ps, r],
             @objset.resolve_expr(translation, ps, @relation.left_link[r]),
-            FOL::Equal.new(var, @relation.right_link[r])
+            FOL::Equal.new(@relation.right_link[r], var)
           ))
         end
       end
@@ -1201,22 +1202,39 @@ module ADSL
       end
     end
 
-    class DSSwitchObjset < DSNode
+    class DSPickOneExpr < DSNode
       def prepare_expr(translation)
         context = translation.context
-        @objsets.each{ |objset| objset.prepare_expr translation }
-        @conditions.each{ |condition| condition.prepare_expr translation }
+        @exprs.each{ |expr| expr.prepare_expr translation }
+        if @exprs.length == 2
+          @condition_pred ||= translation.create_predicate('pick_one_choice', translation.context.sort_array)
+        else
+          return unless @condition_preds.nil?
+          @condition_preds = []
+          @exprs.length.times do |i|
+            @condition_preds << translation.create_predicate("pick_one_choice_#{i}", translation.context.sort_array)
+          end
+          translation.reserve context.make_ps do |ps|
+            translation.create_formula FOL::ForAll[ps, FOL::Xor[*condition_preds.map{ |pred| pred[ps] }]]
+          end
+        end
       end
 
       def resolve_expr(translation, ps, var)
         context = translation.context
-        subformulae = @objsets.length.times.map do |index|
-          FOL::And.new(
-            @conditions[index].resolve_expr(translation, ps, var),
-            @objsets[index].resolve_expr(translation, ps, var)
-          )
+        if @exprs.length == 2
+          expr1 = @exprs[0].resolve_expr translation, ps, var
+          expr2 = @exprs[1].resolve_expr translation, ps, var
+          FOL::IfThenElse[@condition_pred[ps], expr1, expr2]
+        else
+          subformulae = @objsets.length.times.map do |index|
+            FOL::And.new(
+              @conditions[index].resolve_expr(translation, ps, var),
+              @objsets[index].resolve_expr(translation, ps, var)
+            )
+          end
+          FOL::Or.new(subformulae)
         end
-        FOL::Or.new(subformulae)
       end
     end
 
@@ -1430,6 +1448,18 @@ module ADSL
             ))
           end
         end
+      end
+    end
+
+    class DSXor < DSNode
+      def prepare_expr(translation)
+        @subformulae.each do |f|
+          f.prepare_expr translation
+        end
+      end
+
+      def resolve_expr(translation, ps)
+        FOL::Xor.new(*@subformulae.map{ |f| f.resolve_expr translation, ps })
       end
     end
 

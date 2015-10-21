@@ -1,6 +1,6 @@
 require 'adsl/prover/util'
 
-class ADSL::Prover::Util::GeneralTest < MiniTest::Unit::TestCase
+class ADSL::Prover::Util::GeneralTest < ActiveSupport::TestCase
   include ADSL::Prover
   
   def test_process_race__1_process

@@ -1,9 +1,7 @@
-require 'minitest/unit'
-require 'minitest/autorun'
-require 'adsl/util/container'
 require 'adsl/util/test_helper'
+require 'adsl/util/container'
 
-class ADSL::Util::GeneralTest < MiniTest::Unit::TestCase
+class ADSL::Util::GeneralTest < ActiveSupport::TestCase
 
   def setup
     assert_false class_defined? :Foo, :Foo2

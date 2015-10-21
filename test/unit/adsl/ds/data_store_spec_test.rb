@@ -1,10 +1,7 @@
-require 'minitest/unit'
-
-require 'minitest/autorun'
+require 'adsl/util/test_helper'
 require 'adsl/ds/data_store_spec'
-require 'pp'
 
-class ADSL::DS::DataStoreSpecTest < MiniTest::Unit::TestCase
+class ADSL::DS::DataStoreSpecTest < ActiveSupport::TestCase
   def test_replace
     assignment = ADSL::DS::DSAssignment.new :var => :kme, :expr => :objset
     for_each = ADSL::DS::DSForEach.new :objset => :kme, :block => ADSL::DS::DSBlock.new

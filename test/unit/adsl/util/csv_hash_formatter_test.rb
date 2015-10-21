@@ -1,9 +1,7 @@
+require 'adsl/util/test_helper'
 require 'adsl/util/csv_hash_formatter'
-require 'minitest/unit'
 
-require 'minitest/autorun'
-
-class ADSL::Util::CSVHashFormatterTest < MiniTest::Unit::TestCase
+class ADSL::Util::CSVHashFormatterTest < ActiveSupport::TestCase
   include ADSL::Util
 
   def wrap(col_count, *content)

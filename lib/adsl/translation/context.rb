@@ -176,7 +176,7 @@ module ADSL
             ],
             ForAll[ps, c, Implies[
               @type_pred[ps, c],
-              OneOf[
+              Xor[
                 @last[ps, c],
                 Exists[c2, @just_before[ps, c, c2]
               ]]

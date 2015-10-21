@@ -16,7 +16,7 @@ module ADSL
 
         @provers.each do |prover|
           require "adsl/prover/#{prover}/engine_extensions"
-          Engine.send :include, ADSL::Prover.const_get("#{prover.to_s.camelize}::EngineExtensions")
+          Engine.send :include, ADSL::Prover.lookup_const("#{prover.to_s.camelize}::EngineExtensions")
         end
       end
 
@@ -30,7 +30,9 @@ module ADSL
       def run
         prepare_prover_commands
         output, index = ADSL::Prover::Util.process_race(*@commands.map(&:first))
-        return self.send "_analyze_#{commands[index][1]}_output", output
+        result = self.send "_analyze_#{commands[index][1]}_output", output
+        result[:prover] = commands[index][1]
+        result
       end
 
       def cleanup

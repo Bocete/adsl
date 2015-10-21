@@ -1,13 +1,10 @@
-require 'minitest/unit'
-
-require 'minitest/autorun'
+require 'adsl/util/test_helper'
 require 'adsl/parser/util'
 require 'adsl/ds/data_store_spec'
 require 'adsl/parser/ast_nodes'
-require 'adsl/util/test_helper'
 require 'set'
 
-class ADSL::Parser::AstNodesTest < MiniTest::Unit::TestCase
+class ADSL::Parser::AstNodesTest < ActiveSupport::TestCase
   include ADSL::Parser
   include ADSL::DS
 

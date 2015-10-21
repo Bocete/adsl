@@ -1,6 +1,25 @@
+require 'adsl/extract/instrumenter'
 require 'adsl/extract/rails/action_instrumenter'
+require 'adsl/extract/rails/basic_type_extensions'
 
 module Kernel
+  alias_method :old_ins_call, :ins_call
+
+  def ins_call(object, method_name, *args, &block)
+    # if the object is a basic type, and either the object or any of the args are unknown basic values,
+    # return an unknown basic value
+    if object.respond_to?(:ds_type) && object.ds_type.is_basic_type?
+      unknowns = ([object] + args).map{ |a| a.is_a? ADSL::Extract::Rails::UnknownOfBasicType }
+      if unknowns.include? true
+        object_example = object.respond_to?(:type_example) ? object.type_example : object
+        arg_examples = args.map{ |a| a.respond_to?(:type_example) ? a.type_example : a }
+        result = old_ins_call object_example, method_name, *arg_examples, &block
+        return ADSL::Extract::Rails::UnknownOfBasicType.new result.ds_type
+      end
+    end
+    old_ins_call object, method_name, *args, &block
+  end
+
   def ins_stmt(expr = nil, options = {})
     if expr.is_a? Array
       expr.each do |subexpr|
@@ -116,8 +135,14 @@ module Kernel
     end
 
     return return_val
+  rescue Exception => e
+    if TEST_ENV
+      raise e
+    else
+      return nil
+    end
   ensure
-    instrumenter.ex_method = old_method
+    instrumenter.ex_method = old_method if instrumenter
   end
 
   def ins_push_frame
@@ -133,6 +158,7 @@ module Kernel
   def ins_if(condition, arg1, arg2)
     ast = condition
     ast = ast.adsl_ast if ast.respond_to?(:adsl_ast)
+    condition_ast = nil
     if ast.is_a? ADSL::Parser::ASTNode
       if ast.class.is_expr?
         condition_ast = ast
@@ -140,17 +166,20 @@ module Kernel
         ins_stmt condition
       end
     end
+
+    # this condition exists because of an error condition in kandan
+    condition_ast = nil if condition_ast.is_a?(ADSL::Parser::ASTString || ADSL::Parser::ASTNumber)
+
     condition_ast ||= ADSL::Parser::ASTBoolean.new(:bool_value => nil)
     
     push_frame_expr1, frame1_ret_value, frame1_stmts = arg1
     push_frame_expr2, frame2_ret_value, frame2_stmts = arg2
 
-    should_return_expression = false
     if (frame1_ret_value != nil || frame2_ret_value != nil) &&
-       frame1_ret_value.respond_to?(:adsl_ast) && frame1_ret_value.adsl_ast.class.is_expr? &&
-       frame2_ret_value.respond_to?(:adsl_ast) && frame2_ret_value.adsl_ast.class.is_expr? &&
-       !frame1_ret_value.adsl_ast.expr_has_side_effects? && !frame2_ret_value.adsl_ast.expr_has_side_effects?
-      
+        frame1_ret_value.respond_to?(:adsl_ast) && frame1_ret_value.adsl_ast.class.is_expr? &&
+        frame2_ret_value.respond_to?(:adsl_ast) && frame2_ret_value.adsl_ast.class.is_expr? &&
+        !frame1_ret_value.adsl_ast.expr_has_side_effects? && !frame2_ret_value.adsl_ast.expr_has_side_effects?
+     
       result_type = if frame1_ret_value.nil?
         frame2_ret_value.class
       elsif frame2_ret_value.nil?
@@ -162,25 +191,33 @@ module Kernel
       else
         nil 
       end
-      should_return_expression = true unless result_type.nil?
+
+      if result_type
+        if result_type < ActiveRecord::Base
+          block1 = ::ADSL::Parser::ASTBlock.new :statements => frame1_stmts
+          block2 = ::ADSL::Parser::ASTBlock.new :statements => frame2_stmts
+          if_stmt = ::ADSL::Parser::ASTIf.new :condition => condition_ast, :then_block => block1, :else_block => block2
+
+          frame1_stmts.pop
+          frame2_stmts.pop
+          ins_stmt if_stmt
+          return result_type.new(:adsl_ast => ::ADSL::Parser::ASTIfExpr.new(
+            :if => if_stmt,
+            :then_expr => frame1_ret_value.adsl_ast,
+            :else_expr => frame2_ret_value.adsl_ast
+          ))
+        else
+          return ADSL::Extract::Rails::UnknownOfBasicType.new frame1_ret_value.ds_type
+        end
+      end
     end
 
     block1 = ::ADSL::Parser::ASTBlock.new :statements => frame1_stmts
     block2 = ::ADSL::Parser::ASTBlock.new :statements => frame2_stmts
     if_stmt = ::ADSL::Parser::ASTIf.new :condition => condition_ast, :then_block => block1, :else_block => block2
 
-    if should_return_expression
-      frame1_stmts.pop
-      frame2_stmts.pop
-      result = result_type.new(:adsl_ast => ::ADSL::Parser::ASTIfExpr.new(
-        :if => if_stmt,
-        :then_expr => frame1_ret_value.adsl_ast,
-        :else_expr => frame2_ret_value.adsl_ast
-      ))
-    end
-
     ins_stmt if_stmt
-    return result
+    return nil
   end
 end
 

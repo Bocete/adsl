@@ -1,10 +1,8 @@
+require 'adsl/util/test_helper'
 require 'adsl/translation/typed_string'
 require 'adsl/fol/first_order_logic'
-require 'minitest/unit'
 
-require 'minitest/autorun'
-
-class ADSL::Translation::TypedStringTest < MiniTest::Unit::TestCase
+class ADSL::Translation::TypedStringTest < ActiveSupport::TestCase
 
   def test_arg_order
     assert_raises ArgumentError do

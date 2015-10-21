@@ -173,7 +173,7 @@ module ADSL
       end
     end
 
-    class DSEitherLambdaObjset < DSNode
+    class DSEitherLambdaExpr < DSNode
       def objset_effect_domain_analysis(context, info)
         types_aggregate, local_aggregate = Set[], true
         @objsets.each do |o|
@@ -193,7 +193,7 @@ module ADSL
       end
     end
 
-    class DSIfLambdaObjset < DSNode
+    class DSIfLambdaExpr < DSNode
       def objset_effect_domain_analysis(context, info)
         then_types, then_local = @then_objset.objset_effect_domain_analysis(context, info)
         else_types, else_local = @else_objset.objset_effect_domain_analysis(context, info)
@@ -217,7 +217,7 @@ module ADSL
       end
     end
 
-    class DSForEachPreLambdaObjset < DSNode
+    class DSForEachPreLambdaExpr < DSNode
       def objset_effect_domain_analysis(context, info)
         before_types, before_local = @before_var.objset_effect_domain_analysis(context, info)
         inside_types, inside_local = @inside_var.objset_effect_domain_analysis(context, info)
@@ -226,7 +226,7 @@ module ADSL
       end
     end
 
-    class DSForEachPostLambdaObjset < DSNode
+    class DSForEachPostLambdaExpr < DSNode
       def objset_effect_domain_analysis(context, info)
         before_types, before_local = @before_var.objset_effect_domain_analysis(context, info)
         inside_types, inside_local = @inside_var.objset_effect_domain_analysis(context, info)

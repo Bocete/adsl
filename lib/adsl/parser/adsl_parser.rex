@@ -21,12 +21,14 @@ rule
   currentuser\b     { [:currentuser, lineno] }
   inusergroup\b     { [:inusergroup, lineno] }
   allofusergroup\b  { [:allofusergroup, lineno] }
+  raise\b           { [:raize, lineno] }
   foreach\b         { [:foreach, lineno] }
   either\b          { [:either, lineno] }
   if\b              { [:if, lineno] }
   else\b            { [:else, lineno] }
   action\b          { [:action, lineno] }
   or\b              { [:or, lineno] }
+  xor\b             { [:xor, lineno] }
   subset\b          { [:subset, lineno] }
   oneof\b           { [:oneof, lineno] }
   tryoneof\b        { [:tryoneof, lineno] }
@@ -42,6 +44,7 @@ rule
   (?:!|not)\b       { [:not, lineno] }
   and\b             { [:and, lineno] }
   equal\b           { [:equal, lineno] }
+  pickoneexpr\b     { [:pickoneexpr, lineno] }
   empty\b           { [:empty, lineno] }
   isempty\b         { [:isempty, lineno] }
   implies\b         { [:implies, lineno] }
@@ -51,8 +54,6 @@ rule
   permittedbytype\b { [:permittedbytype, lineno] }
   read\b            { [:read, lineno] }
   edit\b            { [:edit, lineno] }
-  assoc\b           { [:assoc, lineno] }
-  deassoc\b         { [:deassoc, lineno] }
   \.\.              { [text, lineno] }
   [{}:\(\)\.,]      { [text, lineno] }
   \+=               { [text, lineno] }

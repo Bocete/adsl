@@ -1,6 +1,3 @@
-require 'minitest/unit'
-
-require 'minitest/autorun'
 require 'adsl/util/test_helper'
 require 'adsl/parser/ast_nodes'
 require 'adsl/extract/rails/rails_extractor'
@@ -32,6 +29,11 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_raises ActionController::RoutingError do
       session.get('thisdoesntexist')
     end
+  end
+
+  def test_setup__asds_have_a_string_field
+    assert Asd.columns_hash.keys.include? 'field'
+    assert Asd.columns_hash['field'].type == :string
   end
 
   def test_setup__rails_crashes_actually_crash_tests
@@ -639,18 +641,16 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
       end
     end
     
-    assert_nothing_raised do
-      extractor = create_rails_extractor
-      ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
-    end
+    extractor = create_rails_extractor
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
   end
 
   def test_callback_lookup
     extractor = create_rails_extractor
-    assert_set_equal(
-      [:before, :after, :before2, :before_nothing, :after_nothing, :authorize!],
-      extractor.callbacks(AsdsController).map(&:filter)
-    )
+    actual_callbacks = Set[*extractor.callbacks(AsdsController).map(&:filter)]
+    expected_callbacks = Set[:before, :after, :before2, :before_nothing, :after_nothing]
+
+    assert actual_callbacks >= expected_callbacks
   end
 
   def test_before_callbacks__instrumented
@@ -1414,7 +1414,7 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
 
     assert_equal 2, statements.length
 
-    assert_equal ASTExprStmt,   statements[0].class
+    assert_equal ASTExprStmt,     statements[0].class
     assert_equal ASTAssignment,   statements[0].expr.class
     assert_equal 'a',             statements[0].expr.var_name.text
     assert_equal ASTCreateObjset, statements[0].expr.expr.class
@@ -1429,5 +1429,30 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 'blahs',         statements[1].objset2.objset.member_name.text
     assert_equal ASTVariable,     statements[1].objset2.objset.objset.class
     assert_equal 'a',             statements[1].objset2.objset.objset.var_name.text
+  end
+
+  def test_extract__field_comparison_resolves_to_unknown_branch_condition
+    AsdsController.class_exec do
+      def nothing
+        a = Asd.new
+        if a.field == "something"
+          a.destroy
+        end
+      end
+    end
+
+    extractor = create_rails_extractor
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    statements = ast.block.statements
+
+    assert_equal 2, statements.length
+
+    assert_equal ASTExprStmt,     statements[0].class
+    assert_equal ASTAssignment,   statements[0].expr.class
+    assert_equal 'a',             statements[0].expr.var_name.text
+    assert_equal ASTCreateObjset, statements[0].expr.expr.class
+    assert_equal 'Asd',           statements[0].expr.expr.class_name.text
+
+    assert_equal ASTEither, statements[1].class
   end
 end

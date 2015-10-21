@@ -1,9 +1,7 @@
-require 'minitest/unit'
-require 'minitest/autorun'
-require 'adsl/util/general'
 require 'adsl/util/test_helper'
+require 'adsl/util/general'
 
-class ADSL::Util::GeneralTest < MiniTest::Unit::TestCase
+class ADSL::Util::GeneralTest < ActiveSupport::TestCase
 
   def setup
     assert_false class_defined? :Foo, :Foo2
@@ -18,8 +16,7 @@ class ADSL::Util::GeneralTest < MiniTest::Unit::TestCase
     assert_equal Module, self.class.lookup_const(:Module)
     assert_equal Object, self.class.lookup_const('::Object')
     assert_equal MiniTest::Unit, self.class.lookup_const('MiniTest::Unit')
-    assert_equal MiniTest::Unit::TestCase, self.class.lookup_const('MiniTest::Unit::TestCase')
-    assert_equal MiniTest::Unit::TestCase, MiniTest::Unit.lookup_const('TestCase')
+    assert_equal ActiveSupport::TestCase, self.class.lookup_const('ActiveSupport::TestCase')
   end
 
   def test_module__lookup_or_create_module
@@ -45,7 +42,7 @@ class ADSL::Util::GeneralTest < MiniTest::Unit::TestCase
     assert_equal Foo, foo
     assert_equal Object, foo.superclass
 
-    assert_equal MiniTest::Unit::TestCase, self.class.lookup_or_create_class('MiniTest::Unit::TestCase', MiniTest::Unit::TestCase.superclass)
+    assert_equal ActiveSupport::TestCase, self.class.lookup_or_create_class('ActiveSupport::TestCase', ActiveSupport::TestCase.superclass)
     new_deep = self.class.lookup_or_create_class('MiniTest::Unit::NewDeep', String)
     assert_equal Class, new_deep.class
     assert_equal MiniTest::Unit::NewDeep, new_deep

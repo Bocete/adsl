@@ -69,7 +69,7 @@ OptionParser.new do |opts|
 end.parse!
 
 unless ARGV.empty?
-  raise OptionParser::ParseError "Invalid usage. Run verify-adsl --help for instructions" if ARGV.length != 1
+  raise "Invalid usage. Run verify-adsl --help for instructions" if ARGV.length != 1
   options[:input] = ARGV.first
 end
 

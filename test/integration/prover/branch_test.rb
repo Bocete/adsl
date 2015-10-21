@@ -1,9 +1,6 @@
 require 'adsl/util/test_helper'
-require 'minitest/unit'
 
-require 'minitest/autorun'
-
-class BranchTest < MiniTest::Unit::TestCase
+class BranchTest < ActiveSupport::TestCase
   include ADSL::FOL
   
   def test_either__blank

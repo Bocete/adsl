@@ -1,11 +1,8 @@
-require 'minitest/unit'
-
-require 'minitest/autorun'
-require 'adsl/parser/ast_nodes'
 require 'adsl/util/test_helper'
+require 'adsl/parser/ast_nodes'
 require 'set'
 
-class ADSL::Parser::AstNodesTest < MiniTest::Unit::TestCase
+class ADSL::Parser::AstNodesTest < ActiveSupport::TestCase
   include ADSL::Parser
 
   def test__create_objset_has_transitive_sideeffects
@@ -14,7 +11,7 @@ class ADSL::Parser::AstNodesTest < MiniTest::Unit::TestCase
     assert_false ASTSubset.new.expr_has_side_effects?
     assert ASTSubset.new(:objset => ASTCreateObjset.new).expr_has_side_effects?
 
-    assert_false ASTUnion.new.expr_has_side_effects?
+    assert_false ASTUnion.new(:objsets => []).expr_has_side_effects?
     assert_false ASTUnion.new(:objsets => [
       ASTSubset.new, ASTSubset.new
     ]).expr_has_side_effects?

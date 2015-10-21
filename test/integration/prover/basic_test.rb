@@ -1,9 +1,6 @@
 require 'adsl/util/test_helper'
-require 'minitest/unit'
 
-require 'minitest/autorun'
-
-class BasicTest < MiniTest::Unit::TestCase
+class BasicTest < ActiveSupport::TestCase
   include ADSL::FOL
   
   def test_blank_data_store
@@ -520,8 +517,8 @@ class BasicTest < MiniTest::Unit::TestCase
     adsl_assert :correct, <<-ADSL
       class Class{ 0+ Class rel }
       action blah() {
-        v1 = oneof (allof(Class))
-        v2 = oneof (allof(Class))
+        v1 = oneof(allof(Class))
+        v2 = oneof(allof(Class))
         v1.rel += v2
       }
       invariant exists(Class o: not isempty(o.rel))

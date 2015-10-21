@@ -105,13 +105,15 @@ module ADSL
           return nil
         end
 
-        BOOL = BasicType.new :bool
-        STRING = BasicType.new :string
-        INT = BasicType.new :int
+        UNKNOWN = BasicType.new nil
+        BOOL    = BasicType.new :bool
+        STRING  = BasicType.new :string
+        INT     = BasicType.new :int
         DECIMAL = BasicType.new :decimal, BasicType::INT
-        REAL = BasicType.new :real, BasicType::INT, BasicType::DECIMAL
+        REAL    = BasicType.new :real, BasicType::INT, BasicType::DECIMAL
 
         def self.for_sym(sym)
+          return BasicType::UNKNOWN if sym == :unknown
           return nil unless [:bool, :string, :int, :decimal, :real].include? sym
           BasicType.const_get sym.to_s.upcase
         end

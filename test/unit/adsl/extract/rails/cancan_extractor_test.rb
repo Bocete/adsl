@@ -1,6 +1,3 @@
-require 'minitest/unit'
-
-require 'minitest/autorun'
 require 'adsl/util/test_helper'
 require 'adsl/parser/ast_nodes'
 require 'adsl/extract/rails/cancan_extractor'
@@ -10,12 +7,6 @@ require 'adsl/extract/rails/rails_instrumentation_test_case'
 
 class ADSL::Extract::Rails::CanCanExtractorTest < ADSL::Extract::Rails::RailsInstrumentationTestCase
   include ::ADSL::Parser
-
-  # we enforce the test order here because we're actually testing
-  # for sideeffects later
-  def self.test_order
-    :alpha
-  end
 
   def setup
     super
@@ -33,8 +24,8 @@ class ADSL::Extract::Rails::CanCanExtractorTest < ADSL::Extract::Rails::RailsIns
   end
 
   def teardown
-    super
     teardown_cancan_suite
+    super
   end
 
   def test_setup_and_teardown
@@ -90,18 +81,17 @@ class ADSL::Extract::Rails::CanCanExtractorTest < ADSL::Extract::Rails::RailsIns
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing) 
     statements = ast.block.statements
 
-    assert_equal 2,                  statements.length
-    assert_equal ASTIf,              statements[0].class
-    assert_equal ASTPermittedByType, statements[0].condition.class
-    assert_equal [:create],          statements[0].condition.ops
-    assert_equal 'User',             statements[0].condition.class_name.text
-    assert_equal [],                 statements[0].then_block.statements
-    assert_equal [ASTRaise],         statements[0].else_block.statements.map(&:class)
-    assert_equal ASTExprStmt,        statements[1].class
-    assert_equal ASTAssignment,      statements[1].expr.class
-    assert_equal 'at__user',         statements[1].expr.var_name.text
-    assert_equal ASTCreateObjset,    statements[1].expr.expr.class
-    assert_equal 'User',             statements[1].expr.expr.class_name.text
+    assert_equal 2,               statements.length
+    assert_equal ASTIf,           statements[0].class
+    assert_equal ASTInUserGroup,  statements[0].condition.class
+    assert_equal 'admin',         statements[0].condition.groupname.text
+    assert_equal [],              statements[0].then_block.statements
+    assert_equal [ASTRaise],      statements[0].else_block.statements.map(&:class)
+    assert_equal ASTExprStmt,     statements[1].class
+    assert_equal ASTAssignment,   statements[1].expr.class
+    assert_equal 'at__user',      statements[1].expr.var_name.text
+    assert_equal ASTCreateObjset, statements[1].expr.expr.class
+    assert_equal 'User',          statements[1].expr.expr.class_name.text
   end
 
   def test_can_manage_all_extracted
@@ -133,9 +123,8 @@ class ADSL::Extract::Rails::CanCanExtractorTest < ADSL::Extract::Rails::RailsIns
     assert_equal 2, statements.length
 
     assert_equal ASTIf,              statements[0].class
-    assert_equal ASTPermittedByType, statements[0].condition.class
-    assert_equal [:create],          statements[0].condition.ops
-    assert_equal 'Asd',              statements[0].condition.class_name.text
+    assert_equal ASTInUserGroup,     statements[0].condition.class
+    assert_equal 'admin',            statements[0].condition.groupname.text
     assert_equal [],                 statements[0].then_block.statements
     assert_equal [ASTRaise],         statements[0].else_block.statements.map(&:class)
     assert_equal ASTExprStmt,        statements[1].class
@@ -143,23 +132,13 @@ class ADSL::Extract::Rails::CanCanExtractorTest < ADSL::Extract::Rails::RailsIns
   end
 
   def test_authorize_resource_doesnt_persist_between_tests
-    AsdsController.class_exec do
-      authorize_resource
-
-      def create
-        Asd.new
-        respond_to
-      end
-    end
-    
-    extractor = create_rails_extractor
-    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :create)
-    statements = ast.block.statements
-    assert_equal 2, statements.length
+    # authorize resource and ensure resource is authorized
+    test_authorize_resource_ensures_permissions
 
     teardown
     setup
-    
+
+    # ensure authorize resource does not happen after teardown and setup
     AsdsController.class_exec do
       def create
         Asd.new
@@ -172,21 +151,13 @@ class ADSL::Extract::Rails::CanCanExtractorTest < ADSL::Extract::Rails::RailsIns
 
     statements = ast.block.statements
     assert_equal 1, statements.length
+    assert_equal ASTExprStmt, statements.first.class
+    assert_equal ASTCreateObjset, statements.first.expr.class
+
+    teardown
+    setup
+
+    # ensure authorize resource can be reenabled
+    test_authorize_resource_ensures_permissions
   end
-
-  def test_not_authorizing_resource_after_prior_test
-    AsdsController.class_exec do
-      def create
-        Asd.new
-        respond_to
-      end
-    end
-
-    extractor = create_rails_extractor
-    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :create)
-
-    statements = ast.block.statements
-    assert_equal 1, statements.length
-  end
-
 end

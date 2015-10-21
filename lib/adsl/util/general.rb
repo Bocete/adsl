@@ -5,6 +5,8 @@ require 'active_support'
 require 'active_support/core_ext/module'
 require 'tempfile'
 
+TEST_ENV = false
+
 class String
   def increment_suffix
     suffix = scan(/_(\d+)$/).last

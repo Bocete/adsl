@@ -3,6 +3,7 @@ require 'adsl/extract/rails/invariant_extractor'
 require 'adsl/extract/rails/cancan_extractor'
 require 'adsl/extract/rails/callback_chain_simulator'
 require 'adsl/extract/rails/rails_special_gem_instrumentation'
+require 'adsl/extract/rails/basic_type_extensions'
 require 'adsl/extract/rails/other_meta'
 require 'adsl/parser/ast_nodes'
 require 'adsl/util/general'
@@ -51,11 +52,17 @@ module ADSL
           ].merge options
           
           raise "Cyclic destroy dependency detected. Translation aborted" if cyclic_destroy_dependency?(options)
-         
-          @ar_classes = options[:ar_classes].map do |ar_class|
+
+          @ar_classes = []
+
+          prepare_paper_trail_models
+          
+          options[:ar_classes].each do |ar_class|
             generator = ActiveRecordMetaclassGenerator.new ar_class
-            generator.generate_class
+            @ar_classes << generator.generate_class
           end
+         
+          @ar_classes.sort!{ |a, b| a.name <=> b.name }
           
           ar_class_names = @ar_classes.map(&:adsl_ast_class_name)
           
@@ -70,6 +77,7 @@ module ADSL
 
           @rules = []
           @ac_rules = []
+
           prepare_cancan_instrumentation
           extract_ac_rules
 
@@ -114,6 +122,7 @@ module ADSL
         end
 
         def prepare_instrumentation(controller_class, action)
+          extractor_id = self.object_id
           controller_class.class_eval <<-ruby, __FILE__, __LINE__ + 1
             def default_render(*args); end
             def verify_authenticity_token; end
@@ -122,6 +131,9 @@ module ADSL
                 :controller => '#{ controller_class.controller_name }',
                 :action => '#{ action }'
               )
+            end
+            def rails_extractor
+              ObjectSpace._id2ref #{ extractor_id }
             end
           ruby
 
@@ -177,7 +189,7 @@ module ADSL
 
           action = action.optimize
           action.prepend_global_variables_by_signatures /^at__.*/, /^atat__.*/
-          
+
           action
         end
 
@@ -211,8 +223,8 @@ module ADSL
         def controller_of(route)
           return nil unless route.defaults.include? :controller
           possible_names = [
-            "#{route.defaults[:controller].pluralize}_controller".camelize,
-            "#{route.defaults[:controller]}_controller".camelize, 
+            "#{route.defaults[:controller].singularize}_controller".camelize,
+            "#{route.defaults[:controller].pluralize}_controller".camelize
           ]
           possible_names.each do |name|
             begin
@@ -246,8 +258,8 @@ module ADSL
           klass_nodes = @ar_classes.map &:adsl_ast
           usergroups = []
           if authorization_defined?
-            auth_class = self.auth_class
-            klass_nodes.select{ |c| c.name.text == auth_class.name }.each do |auth_node|
+            login_class = self.login_class
+            klass_nodes.select{ |c| c.name.text == login_class.name }.each do |auth_node|
               auth_node.authenticable = true
             end
             usergroups = self.usergroups
@@ -258,7 +270,7 @@ module ADSL
             :invariants => @invariants,
             :usergroups => usergroups,
             :rules => @rules,
-            :ac_rules => @ac_rules
+            :ac_rules => generate_permits
           )
         end
       end

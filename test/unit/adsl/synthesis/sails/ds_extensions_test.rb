@@ -1,7 +1,5 @@
-require 'minitest/unit'
-require 'minitest/autorun'
-require 'adsl/synthesis/sails/ds_extensions'
 require 'adsl/util/test_helper'
+require 'adsl/synthesis/sails/ds_extensions'
 require 'adsl/ds/data_store_spec'
 require 'adsl/ds/type_sig'
 
@@ -12,7 +10,7 @@ module ADSL
   end
 end
 
-class ADSL::Synthesis::Sails::DSExtensionsTest < Minitest::Unit::TestCase
+class ADSL::Synthesis::Sails::DSExtensionsTest < ActiveSupport::TestCase
   include ADSL::DS
 
   def setup

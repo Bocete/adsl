@@ -37,7 +37,7 @@ module ADSL
               elem.relation if elem.is_a?(DSCreateTup)
             end
             problems += rels.uniq.map{ |rel| ADSL::Translation::AccessControlAssocProblem.new rel }
-            
+
             # deassocs
             rels = action.recursively_gather do |elem|
               elem.relation if elem.is_a?(DSDeleteTup)
@@ -213,13 +213,20 @@ module ADSL
       def generate_conjecture(translation)
         translation.reserve @relation.type_pred_sort, :t do |t|
           translation.state = translation.final_state
-          permitted_formula = translation.spec.gen_is_permissible_formula(translation, :assoc, [], nil, t)
+          from_create_formula = translation.spec.gen_is_permissible_formula translation, :create, [], @relation.from_class.to_sig, @relation.left_link[t]
+          from_read_formula   = translation.spec.gen_is_permissible_formula translation, :read,   [], @relation.from_class.to_sig, @relation.left_link[t]
+          to_create_formula   = translation.spec.gen_is_permissible_formula translation, :create, [], @relation.to_class.to_sig,   @relation.right_link[t]
+          to_read_formula     = translation.spec.gen_is_permissible_formula translation, :read,   [], @relation.to_class.to_sig,   @relation.right_link[t]
           return ForAll[t, Implies[
             And[
               Not[translation.initial_state[t]],
               translation.final_state[t]
             ],
-            permitted_formula
+            Or[
+              And[from_create_formula, to_read_formula],
+              And[from_read_formula,   to_create_formula],
+              And[from_create_formula, to_create_formula]
+            ]
           ]].optimize
         end
       end
@@ -245,13 +252,20 @@ module ADSL
       def generate_conjecture(translation)
         translation.reserve @relation.type_pred_sort, :t do |t|
           translation.state = translation.initial_state
-          permitted_formula = translation.spec.gen_is_permissible_formula(translation, :deassoc, [], nil, t)
+          from_delete_formula = translation.spec.gen_is_permissible_formula translation, :delete, [], @relation.from_class.to_sig, @relation.left_link[t]
+          from_read_formula   = translation.spec.gen_is_permissible_formula translation, :read,   [], @relation.from_class.to_sig, @relation.left_link[t]
+          to_delete_formula   = translation.spec.gen_is_permissible_formula translation, :delete, [], @relation.to_class.to_sig,   @relation.right_link[t]
+          to_read_formula     = translation.spec.gen_is_permissible_formula translation, :read,   [], @relation.to_class.to_sig,   @relation.right_link[t]
           return ForAll[t, Implies[
             And[
               translation.initial_state[t],
               Not[translation.final_state[t]]
             ],
-            permitted_formula
+            Or[
+              And[from_delete_formula, to_read_formula],
+              And[from_read_formula,   to_delete_formula],
+              And[from_delete_formula, to_delete_formula]
+            ]
           ]].optimize
         end
       end

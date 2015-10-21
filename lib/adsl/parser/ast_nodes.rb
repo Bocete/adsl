@@ -362,7 +362,7 @@ module ADSL
       end
 
       def arbitrary?
-        not %i|render|.include? @label
+        @label != :render
       end
 
       def reaches_view?
@@ -646,7 +646,7 @@ module ADSL
         context.actions[action.name] = [self, action]
         return action
       rescue Exception => e
-        #pp @block
+        raise e if TEST_ENV
         new_ex = e.exception("#{e.message} in action #{@name.text}")
         new_ex.set_backtrace e.backtrace
         raise new_ex
@@ -991,6 +991,9 @@ module ADSL
         vars_written_to = Set[]
         vars_read = Set[]
         vars_read_before_being_written_to = Set[]
+        
+        context.push_frame
+        
         context.on_var_write do |name|
           vars_written_to << name
         end
@@ -1001,7 +1004,6 @@ module ADSL
           vars_read << name unless vars_read.include? name
         end
 
-        context.push_frame
         block = @block.typecheck_and_resolve context
         context.pop_frame
 
@@ -1129,6 +1131,10 @@ module ADSL
 
       def typecheck_and_resolve(context)
         ADSL::DS::DSReturned.new :guard => @return_guard.guard, :index => @index
+      end
+
+      def to_adsl
+        "Returned !?!?!?!??!?!"
       end
     end
 
@@ -1599,7 +1605,7 @@ module ADSL
       node_type :expr
       
       def expr_has_side_effects?
-        @objsets.nil? ? false : @objsets.map{ |o| o.expr_has_side_effects? }.include?(true)
+        @objsets.select(&:expr_has_side_effects?).any?
       end
 
       def typecheck_and_resolve(context)
@@ -1668,7 +1674,7 @@ module ADSL
 
       def optimize
         until_no_change super do |o|
-          next o if !o.is_a?(ASTPickOneExpr)
+          next o unless o.is_a? ASTPickOneExpr
           next ASTEmptyObjset.new if o.exprs.empty?
           next o.exprs.first if o.exprs.length == 1
           ASTPickOneExpr.new(:exprs => o.exprs.uniq)
@@ -1676,7 +1682,7 @@ module ADSL
       end
 
       def to_adsl
-        "any_of(#{ @objsets.map(&:to_adsl).join ', ' })"
+        "pickoneexpr(#{ @exprs.map(&:to_adsl).join ', ' })"
       end
     end
     
@@ -1830,14 +1836,14 @@ module ADSL
 
       def optimize
         until_no_change super do |node|
-          node.objset = node.objset.optimize
+          node.objset = node.objset.optimize if node.objset
           node
         end
       end
 
       def to_adsl
         if @objset.nil? || @objset.is_a?(ASTCurrentUser)
-          "inusergroup(#{groupname.text})"
+          "inusergroup(#{@groupname.text})"
         else
           "inusergroup(#{@objset.to_adsl}, #{@groupname.text})"
         end
@@ -1859,29 +1865,6 @@ module ADSL
         end
         type_sig = auth_class.to_sig.with_cardinality(1)
         ADSL::DS::DSAllOfUserGroup.new :usergroup => group[1], :type_sig => type_sig
-      end
-    end
-
-    class ASTPermittedByType < ASTNode
-      node_fields :ops, :class_name
-      node_type :expr
-
-      def typecheck_and_resolve(context)
-        auth_class_node, auth_class = context.auth_class
-        if auth_class.nil?
-          raise ADSLError, "Permissions cannot be checked in a permissionless system (line #{@lineno})"
-        end
-        
-        ops, expr = ADSL::Parser::Util.ops_and_expr_from_nodes context, @ops, nil
-
-        klass_node, klass = context.classes[@class_name.text]
-        raise ADSLError, "Unknown class name #{@class_name.text} on line #{@class_name.lineno}" if klass.nil?
-        
-        ADSL::DS::DSPermittedByType.new :ops => ops, :klass => klass
-      end
-
-      def to_adsl
-        "permittedbytype(#{@ops.map(&:to_s).join ', '} #{@class_name.text})"
       end
     end
 
@@ -1928,7 +1911,7 @@ module ADSL
       end
 
       def to_adsl
-        "permit #{@group_names.map(&:text).join ', '} #{ @ops.map(&:to_s).join ', ' } #{@expr.to_adsl}\n"
+        "permit #{ @group_names.map(&:text).join ', ' } #{ @ops.map(&:to_s).join ', ' } #{@expr.to_adsl}\n".gsub(/ +/, ' ')
       end
     end
 
@@ -2026,6 +2009,10 @@ module ADSL
         type = value.round? ? ADSL::DS::TypeSig::BasicType::INT : ADSL::DS::TypeSig::BasicType::DECIMAL
         return ADSL::DS::DSConstant.new :value => @value, :type_sig => type
       end
+
+      def to_adsl
+        value.to_s
+      end
     end
 
     class ASTString < ASTNode
@@ -2034,6 +2021,10 @@ module ADSL
 
       def typecheck_and_resolve(context)
         ADSL::DS::DSConstant.new :value => @value, :type_sig => ADSL::DS::TypeSig::BasicType::STRING
+      end
+
+      def to_adsl
+        "'#{value}'"
       end
     end
 
@@ -2196,7 +2187,17 @@ module ADSL
       end
 
       def to_adsl
-        "and(#{ @subformulae.map(&:to_adsl).join ", " })"
+        if @subformulae.length == 1
+          @subformulae.first.to_adsl
+        elsif @subformulae.length == 2
+          "(#{ @subformulae.first.to_adsl } and #{@subformulae.last.to_adsl})"
+        else
+          string = @subformulae[0].to_adsl
+          @subformulae[1..-1].each do |f|
+            string = "(#{ string } and #{ f.to_adsl })"
+          end
+          string
+        end
       end
     end
     
@@ -2240,12 +2241,71 @@ module ADSL
           end
           next formulae.first if formulae.length == 1
           next ASTBoolean.new(:bool_value => false) if formulae.empty?
-          ASTAnd.new :subformulae => formulae
+          ASTOr.new :subformulae => formulae
         end
       end
 
       def to_adsl
-        "or(#{ @subformulae.map(&:to_adsl).join ", " })"
+        if @subformulae.length == 1
+          @subformulae.first.to_adsl
+        elsif @subformulae.length == 2
+          "(#{ @subformulae.first.to_adsl } or #{@subformulae.last.to_adsl})"
+        else
+          string = @subformulae[0].to_adsl
+          @subformulae[1..-1].each do |f|
+            string = "(#{ string } or #{ f.to_adsl })"
+          end
+          string
+        end
+      end
+    end
+
+    class ASTXor < ASTNode
+      node_fields :subformulae
+      node_type :expr
+
+      def typecheck_and_resolve(context)
+        subformulae = @subformulae.map{ |o| o.typecheck_and_resolve context }
+        subformulae.each do |subformula|
+          unless subformula.type_sig.is_bool_type?
+            raise ADSLError, "Xor subformula is not boolean (type provided `#{subformula.type_sig}` on line #{ @lineno })"
+          end
+        end
+        return ADSL::DS::DSXor.new :subformulae => subformulae
+      end
+
+      def optimize
+        until_no_change super do |node|
+          next node.optimize unless node.is_a?(ASTXor)
+          formulae = node.subformulae.dup
+          formulae.delete false
+          if formulae.include? true
+            next ASTBoolean.new(:bool_value => false) if formulae.count(true) > 1
+            formulae.delete true
+            next ASTAnd.new(:subformulae => formulae.map{ |f| ASTNot.new(:subformula => f) }).optimize
+          end
+          if formulae.empty
+            next ASTBoolean.new(:bool_value => false)
+          elsif formulae.length == 1
+            next formulae.first
+          else
+            next ASTXor.new :subformulae => formulae
+          end
+        end
+      end
+
+      def to_adsl
+        if @subformulae.length == 1
+          @subformulae.first.to_adsl
+        elsif @subformulae.length == 2
+          "(#{ @subformulae[0].to_adsl } xor #{ @subformulae[1].to_adsl })"
+        else
+          string = @subformulae[0].to_adsl
+          @subformulae[1..-1].each do |f|
+            string = "(#{ string } xor #{ f.to_adsl })"
+          end
+          string
+        end
       end
     end
 
@@ -2346,7 +2406,7 @@ module ADSL
         unless objset.type_sig.is_objset_type?
           raise ADSLError, "IsEmpty possible only on objset sets (type provided `#{objset.type_sig}` on line #{ @lineno })"
         end
-        return ADSL::DS::Boolean::TRUE if objset.type_sig.cardinality.empty?
+        return ADSL::DS::DSConstant::TRUE if objset.type_sig.cardinality.empty?
         return ADSL::DS::DSIsEmpty.new :objset => objset
       end
 

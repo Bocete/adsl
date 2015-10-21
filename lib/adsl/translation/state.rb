@@ -32,8 +32,6 @@ module ADSL
         @name = @translator.register_name name
         @context_sorts = context_sorts
         @pred_map = {}
-        Hash.new do |hash, sort|
-        end
       end
 
       def sorted_predicate(sort, create = true)

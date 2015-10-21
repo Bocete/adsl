@@ -1,9 +1,7 @@
-require 'minitest/unit'
-
-require 'minitest/autorun'
+require 'adsl/util/test_helper'
 require 'adsl/extract/instrumentation_filter'
 
-class ADSL::Extract::InstrumentationFilterTest < MiniTest::Unit::TestCase
+class ADSL::Extract::InstrumentationFilterTest < ActiveSupport::TestCase
   include ADSL::Extract
 
   def asd; end
@@ -27,7 +25,7 @@ class ADSL::Extract::InstrumentationFilterTest < MiniTest::Unit::TestCase
     filter = InstrumentationFilter.new :method_owner => InstrumentationFilterTest
     assert filter.applies_to?(self, :asd)
 
-    filter = InstrumentationFilter.new :method_owner => MiniTest::Unit::TestCase
+    filter = InstrumentationFilter.new :method_owner => ActiveSupport::TestCase
     assert_false filter.applies_to?(self, :asd)
   end
   

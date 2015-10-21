@@ -1,13 +1,11 @@
-require 'minitest/unit'
-require 'minitest/autorun'
+require 'adsl/util/test_helper'
 require 'adsl/synthesis/sails/model_syn'
 require 'adsl/ds/data_store_spec'
 require 'adsl/ds/type_sig'
 require 'adsl/parser/adsl_parser.tab'
-require 'adsl/util/test_helper'
 require 'fileutils'
 
-class ADSL::Synthesis::Sails::ModelSynTest < Minitest::Unit::TestCase
+class ADSL::Synthesis::Sails::ModelSynTest < ActiveSupport::TestCase
   include ADSL::DS
   
   def assert_include_nospace(substring, text)

@@ -1,8 +1,5 @@
-require 'minitest/unit'
-
-require 'minitest/autorun'
-require 'adsl/util/partial_ordered'
 require 'adsl/util/test_helper'
+require 'adsl/util/partial_ordered'
 
 module ADSL::Util
   class ComparableObject
@@ -23,7 +20,7 @@ module ADSL::Util
     end
   end
 
-  class PartialOrderedTest < MiniTest::Unit::TestCase
+  class PartialOrderedTest < ActiveSupport::TestCase
     def partial_order__loaded
       a = ComparableObject.new
       [:<, :<=, :>, :>=].each do |sym|

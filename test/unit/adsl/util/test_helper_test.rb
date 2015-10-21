@@ -1,9 +1,7 @@
-require 'minitest/unit'
-require 'minitest/autorun'
 require 'adsl/util/test_helper'
 require 'adsl/fol/first_order_logic'
 
-class ADSL::Util::TestHelperTest < MiniTest::Unit::TestCase
+class ADSL::Util::TestHelperTest < ActiveSupport::TestCase
   def test_adsl_assert__plain
     adsl_assert :correct, <<-ADSL
       class Class {}

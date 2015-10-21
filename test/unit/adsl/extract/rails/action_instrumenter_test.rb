@@ -1,10 +1,7 @@
-require 'minitest/unit'
-
-require 'minitest/autorun'
+require 'adsl/util/test_helper'
 require 'active_record'
 require 'ruby_parser'
 require 'ruby2ruby'
-require 'adsl/util/test_helper'
 require 'adsl/extract/rails/action_instrumenter'
 require 'adsl/extract/rails/rails_test_helper'
 require 'adsl/extract/rails/method'

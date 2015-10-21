@@ -1,11 +1,8 @@
+require 'adsl/util/test_helper'
 require 'adsl/fol/first_order_logic'
 require 'adsl/translation/typed_string'
-require 'minitest/unit'
 
-require 'minitest/autorun'
-require 'pp'
-
-class ADSL::FOL::FirstOrderLogicTest < MiniTest::Unit::TestCase
+class ADSL::FOL::FirstOrderLogicTest < ActiveSupport::TestCase
   include ADSL::FOL
 
   def teardown
@@ -211,16 +208,16 @@ class ADSL::FOL::FirstOrderLogicTest < MiniTest::Unit::TestCase
     assert_equal true, Equal.new(:a, :a).optimize
   end
 
-  def test_one_of
-    assert_nothing_raised{ OneOf.new }
-    assert_nothing_raised{ OneOf.new :a }
-    assert_nothing_raised{ OneOf.new :a, :b }
-    assert_nothing_raised{ OneOf.new :a, :b, :c }
+  def test_xor
+    assert_nothing_raised{ Xor.new }
+    assert_nothing_raised{ Xor.new :a }
+    assert_nothing_raised{ Xor.new :a, :b }
+    assert_nothing_raised{ Xor.new :a, :b, :c }
   end
 
-  def test_one_of__optimize
-    assert_equal false, OneOf.new.optimize
-    assert_equal :a, OneOf.new(:a).optimize
+  def test_xor__optimize
+    assert_equal false, Xor.new.optimize
+    assert_equal :a, Xor.new(:a).optimize
   end
 
   def test_if_then_else

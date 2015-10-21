@@ -154,14 +154,6 @@ module ADSL
       container_for :usergroup, :type_sig
     end
 
-    class DSPermittedByType < DSNode
-      container_for :ops, :klass
-
-      def type_sig
-        TypeSig::BasicType::BOOL
-      end
-    end
-
     class DSPermitted < DSNode
       container_for :ops, :expr
 
@@ -318,7 +310,7 @@ module ADSL
       container_for :for_each, :before_var, :inside_var
 
       def type_sig
-        DSTypeSig.join @before_var.type_sig, @inside_var.type_sig
+        ADSL::DS::TypeSig.join @before_var.type_sig, @inside_var.type_sig
       end
     end
 
@@ -330,7 +322,7 @@ module ADSL
       container_for
 
       def type_sig
-        DSTypeSig::UNKNOWN
+        ADSL::DS::TypeSig::UNKNOWN
       end
     end
 
@@ -359,11 +351,11 @@ module ADSL
       end
     end
 
-    class DSPickOneObjset < DSNode
-      container_for :objsets
+    class DSPickOneExpr < DSNode
+      container_for :exprs
 
       def type_sig
-        TypeSig.join objsets.map(&:type_sig)
+        TypeSig.join @exprs.map(&:type_sig)
       end
     end
 
@@ -482,6 +474,14 @@ module ADSL
     end
     
     class DSOr < DSNode
+      container_for :subformulae
+
+      def type_sig
+        TypeSig::BasicType::BOOL
+      end
+    end
+
+    class DSXor < DSNode
       container_for :subformulae
 
       def type_sig

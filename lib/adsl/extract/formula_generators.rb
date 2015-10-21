@@ -2,6 +2,7 @@ require 'adsl/parser/ast_nodes'
 require 'adsl/util/general'
 require 'adsl/extract/utils'
 require 'adsl/extract/extraction_error'
+require 'adsl/extract/rails/basic_type_extensions'
 
 module ADSL
   module Extract
@@ -215,22 +216,14 @@ module ADSL
   end
 end
 
+class ADSL::Parser::ASTNode
+  include ADSL::Extract::FormulaGenerators
+end
+
 class TrueClass
   include ADSL::Extract::FormulaGenerators
-
-  def adsl_ast
-    ASTBoolean.new(:bool_value => self)
-  end
 end
 
 class FalseClass
-  include ADSL::Extract::FormulaGenerators
-  
-  def adsl_ast
-    ASTBoolean.new(:bool_value => self)
-  end
-end
-
-class ADSL::Parser::ASTNode
   include ADSL::Extract::FormulaGenerators
 end

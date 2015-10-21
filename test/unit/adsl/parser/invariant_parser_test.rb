@@ -1,11 +1,9 @@
+require 'adsl/util/test_helper'
 require 'adsl/parser/adsl_parser.tab'
 require 'adsl/ds/data_store_spec'
-require 'minitest/unit'
-require 'minitest/autorun'
-require 'pp'
 
 module ADSL::Parser
-  class InvariantParserTest < MiniTest::Unit::TestCase
+  class InvariantParserTest < ActiveSupport::TestCase
     include ADSL::Parser
     include ADSL::DS
     

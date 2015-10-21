@@ -1,12 +1,10 @@
-require 'minitest/unit'
-require 'minitest/autorun'
 require 'adsl/util/test_helper'
 require 'adsl/extract/rails/active_record_metaclass_generator'
 require 'adsl/extract/rails/rails_test_helper'
 
-class ADSL::Extract::Rails::RailsInstrumentationTestCase < MiniTest::Unit::TestCase
+class ADSL::Extract::Rails::RailsInstrumentationTestCase < ActiveSupport::TestCase
   def setup
-    [:Asd, :Kme, 'Mod::Blah', :Ability, :User, :CanCan].each do |k|
+    [:Asd, :Kme, 'Mod::Blah', :Ability].each do |k|
       raise "#{k} was loaded" if class_defined?(k)
     end
     initialize_test_context
@@ -28,7 +26,7 @@ class ADSL::Extract::Rails::RailsInstrumentationTestCase < MiniTest::Unit::TestC
   
   def ar_class_names
     default_class_names = ['Asd', 'Kme', 'Mod::Blah']
-    default_class_names << 'User' if Object.lookup_const('CanCan')
+    default_class_names << 'User' if Object.lookup_const('User')
     default_class_names
   end
 

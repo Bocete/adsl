@@ -2,9 +2,9 @@ require 'active_record'
 require 'active_support'
 require 'adsl/parser/ast_nodes'
 require 'adsl/extract/meta'
-require 'adsl/extract/rails/other_meta'
-require 'adsl/util/test_helper'
 require 'adsl/extract/extraction_error'
+require 'adsl/extract/rails/other_meta'
+require 'adsl/extract/rails/basic_type_extensions'
 
 module ADSL
   module Extract
@@ -58,6 +58,9 @@ module ADSL
           when :belongs_to; nil
           when :has_one, :has_many
             inverse_of_col_name = reflection.has_inverse? ? reflection.inverse_of : reflection.foreign_key
+            unless inverse_of_col_name.is_a?(String) || inverse_of_col_name.is_a?(Symbol)
+              inverse_of_col_name = inverse_of_col_name.foreign_key
+            end
             candidates = target_class.constantize.reflections.values.select do |r|
               r.macro == :belongs_to && r.foreign_key.to_sym == inverse_of_col_name.to_sym
             end
@@ -73,10 +76,13 @@ module ADSL
             candidates = target_class.constantize.reflections.values.select do |r|
               r.macro == :has_and_belongs_to_many && r.options[:join_table] == join_table
             end
-            raise ExtractionError, "No inverse relations found for #{reflection}" if candidates.empty?
-            raise ExtractionError, "Multiple opposite relations found for #{reflection}: #{canditates}" if candidates.length > 1
-            foreign_name = candidates.first.name.to_s
-            assoc_name < foreign_name ? nil : foreign_name
+            if candidates.empty?
+              nil
+            else 
+              raise ExtractionError, "Multiple opposite relations found for #{reflection}: #{canditates}" if candidates.length > 1
+              foreign_name = candidates.first.name.to_s
+              assoc_name < foreign_name ? nil : foreign_name
+            end
           else
             raise ExtractionError, "Unknown association macro `#{reflection.macro}' on #{reflection}"
           end
@@ -247,6 +253,7 @@ module ADSL
             end
 
             def +(other)
+              return self unless other.respond_to?(:adsl_ast)
               self.class.new :adsl_ast => ASTUnion.new(:objsets => [self.adsl_ast, other.adsl_ast])
             end
 
@@ -384,6 +391,10 @@ module ADSL
               alias_method :except, :where
               alias_method :my,     :where
 
+              def select(*args)
+                self
+              end
+
               def joins(*args)
                 self
               end
@@ -410,6 +421,37 @@ module ADSL
           create_destroys @ar_class
 
           @ar_class.send :default_scope, @ar_class.all
+          @ar_class.columns_hash.each do |name, column|
+            next if name.split('_').last == 'id'
+            
+            type = case column.type
+                   when :integer
+                     ADSL::DS::TypeSig::BasicType::INT
+                   when :text, :string
+                     ADSL::DS::TypeSig::BasicType::STRING
+                   when :boolean
+                     ADSL::DS::TypeSig::BasicType::BOOL
+                   when :decimal
+                     ADSL::DS::TypeSig::BasicType::DECIMAL
+                   when :float, :real, :double
+                     ADSL::DS::TypeSig::BasicType::REAL
+                   else
+                     nil
+                   end
+            
+            next if type.nil?
+
+            value = ADSL::Extract::Rails::UnknownOfBasicType.new type
+            if Object.lookup_const('Enumerize::Value')
+              if @ar_class.new.send(name).is_a? Enumerize::Value
+                value = ADSL::Extract::Rails::MetaUnknown.new
+              end
+            end
+
+            @ar_class.new.replace_method name do
+              value
+            end
+          end
 
           reflections(:polymorphic => false, :through => false).each do |assoc|
             @ar_class.new.replace_method assoc.name do
@@ -456,6 +498,19 @@ module ADSL
                     :rel_name => ASTIdent.new(:text => assoc.name.to_s),
                     :objset2 => object.adsl_ast
                   )]
+                end
+              end
+
+              result.singleton_class.class_exec do
+                def <<(param)
+                  target = param.adsl_ast
+                  source = self.adsl_ast.objset
+                  rel_name = self.adsl_ast.member_name.text
+                  ASTCreateTup.new(
+                    :objset1 => source,
+                    :rel_name => ASTIdent.new(:text => rel_name),
+                    :objset2 => target
+                  )
                 end
               end
 

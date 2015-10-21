@@ -125,7 +125,7 @@ class Module
       attr_accessor *all_fields
     end
 
-    self.include ADSL::Util::Container
-    self.extend ADSL::Util::Container::ClassMethods
+    self.send :include, ADSL::Util::Container
+    self.send :extend, ADSL::Util::Container::ClassMethods
   end
 end

@@ -1,14 +1,10 @@
+require 'adsl/util/test_helper'
 require 'adsl/fol/first_order_logic'
 require 'adsl/prover/spass/fol_extensions'
 require 'adsl/ds/data_store_spec'
 require 'adsl/translation/ds_extensions'
-require 'adsl/util/test_helper'
-require 'minitest/unit'
 
-require 'minitest/autorun'
-require 'pp'
-
-class ADSL::Prover::SpassFolExtensionsTest < MiniTest::Unit::TestCase
+class ADSL::Prover::SpassFolExtensionsTest < ActiveSupport::TestCase
   include ADSL::FOL
   
   def test__theorem__spass_wrap
@@ -151,11 +147,11 @@ class ADSL::Prover::SpassFolExtensionsTest < MiniTest::Unit::TestCase
     assert_equal_nospace "and(equal(a, b), equal(b, c))", ADSL::FOL::Equal.new(:a, :b, :c).to_spass_string
   end
 
-  def test_one_of
-    assert_equal         "false", ADSL::FOL::OneOf.new.to_spass_string
-    assert_equal_nospace "a", ADSL::FOL::OneOf.new(:a).to_spass_string
-    assert_equal_nospace "equiv(not(a), b)", ADSL::FOL::OneOf.new(:a, :b).to_spass_string
-    assert_equal_nospace <<-FOL, ADSL::FOL::OneOf.new(:a, :b, :c).to_spass_string
+  def test_xor
+    assert_equal         "false", ADSL::FOL::Xor.new.to_spass_string
+    assert_equal_nospace "a", ADSL::FOL::Xor.new(:a).to_spass_string
+    assert_equal_nospace "equiv(not(a), b)", ADSL::FOL::Xor.new(:a, :b).to_spass_string
+    assert_equal_nospace <<-FOL, ADSL::FOL::Xor.new(:a, :b, :c).to_spass_string
      and(
        or(a, b, c),
        implies(a, and(not(b), not(c))),

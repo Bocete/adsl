@@ -1,15 +1,12 @@
+require 'adsl/util/test_helper'
 require 'adsl/translation/ds_extensions'
 require 'adsl/translation/ds_translator'
 require 'adsl/ds/data_store_spec'
 require 'adsl/ds/type_sig'
 require 'adsl/fol/first_order_logic'
 require 'adsl/parser/adsl_parser.tab'
-require 'minitest/unit'
 
-require 'minitest/autorun'
-require 'pp'
-
-class ADSL::Translation::DSExtensionsTest < MiniTest::Unit::TestCase
+class ADSL::Translation::DSExtensionsTest < ActiveSupport::TestCase
   include ADSL::FOL
 
   def setup_class_test

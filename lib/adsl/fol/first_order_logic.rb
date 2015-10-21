@@ -48,7 +48,7 @@ module ADSL
             arg.to_s
           end
         end
-        @axioms << ForEach.new(undefined_sort, :o, OneOf.new(@sorts.map{ |s| s[:o] }))
+        @axioms << ForEach.new(undefined_sort, :o, Xor.new(@sorts.map{ |s| s[:o] }))
         self
       end
 
@@ -379,7 +379,7 @@ module ADSL
       end
     end
 
-    class OneOf
+    class Xor
       container_for :formulae
       recursively_comparable
       

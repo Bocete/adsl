@@ -1,10 +1,7 @@
-require 'minitest/unit'
-
-require 'minitest/autorun'
-require 'adsl/util/numeric_extensions'
 require 'adsl/util/test_helper'
+require 'adsl/util/numeric_extensions'
 
-class ADSL::Util::NumericExtensionsTest < MiniTest::Unit::TestCase
+class ADSL::Util::NumericExtensionsTest < ActiveSupport::TestCase
   def test_numeric__round?
     assert 3.respond_to? :round?
     assert 3.round?

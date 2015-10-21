@@ -1,12 +1,10 @@
+require 'adsl/util/test_helper'
 require 'adsl/parser/adsl_parser.tab'
 require 'adsl/ds/data_store_spec'
 require 'adsl/fol/first_order_logic'
-require 'minitest/unit'
-require 'minitest/autorun'
-require 'pp'
 
 module ADSL::Parser
-  class RuleParserTest < MiniTest::Unit::TestCase
+  class RuleParserTest < ActiveSupport::TestCase
     include ADSL::Parser
     include ADSL::DS
     include ADSL::FOL

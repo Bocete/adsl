@@ -52,7 +52,7 @@ module ADSL
         axioms = []
               
         if @sorts.size > 1
-          axioms << "formula(forall( [o], #{ FOL::OneOf.new(@sorts.map{ |s| s[:o] }).optimize.to_spass_string } ))."
+          axioms << "formula(forall( [o], #{ FOL::Xor.new(@sorts.map{ |s| s[:o] }).optimize.to_spass_string } ))."
         end
         axioms += @predicates.map do |p|
           next if p.arity == 0
@@ -204,7 +204,7 @@ module ADSL
       end
     end
 
-    class OneOf
+    class Xor
       def to_spass_string
         return 'false' if @formulae.empty?
         return @formulae.first.to_spass_string if @formulae.length == 1

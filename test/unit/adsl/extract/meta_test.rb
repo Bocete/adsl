@@ -1,11 +1,7 @@
-require 'minitest/unit'
-
-require 'minitest/autorun'
-require 'adsl/extract/meta'
-require 'pp'
 require 'adsl/util/test_helper'
+require 'adsl/extract/meta'
 
-class ADSL::Util::MetaTest < MiniTest::Unit::TestCase
+class ADSL::Util::MetaTest < ActiveSupport::TestCase
   def setup
     assert !class_defined?(:Foo, :Bar)
   end

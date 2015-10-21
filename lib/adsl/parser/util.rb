@@ -21,7 +21,7 @@ module ADSL
       def self.ops_and_expr_from_nodes(context, ops_node, expr_node)
         ops = Set[*ops_node.map do |op, line|
           case op
-          when :read, :create, :delete, :assoc, :deassoc
+          when :read, :create, :delete
             op
           when :edit
             [:create, :delete]
@@ -30,21 +30,7 @@ module ADSL
           end
         end.flatten]
         
-        if expr_node
-          expr = expr_node.typecheck_and_resolve context
-          is_deref = expr.is_a?(ADSL::DS::DSDereference)
-        else
-          is_deref = false
-        end
-
-        if is_deref
-          ops << :assoc if ops.include?(:create)
-          ops << :deassoc if ops.include?(:delete)
-        else
-          [:assoc, :deassoc].each do |op|
-            raise ADSLError, "#{op} permission is only applicable to dereferences (line #{@lineno})" if ops.include? op
-          end
-        end
+        expr = expr_node.typecheck_and_resolve context if expr_node
 
         return ops, expr
       end

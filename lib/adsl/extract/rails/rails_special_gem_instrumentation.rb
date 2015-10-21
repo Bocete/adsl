@@ -70,11 +70,84 @@ module ADSL
           end
         end
 
+        def instrument_gem_paper_trail(controller_class, action)
+          return unless Object.lookup_const('PaperTrail')
+        end
+
+        def prepare_paper_trail_models
+          return unless Object.lookup_const('PaperTrail')
+
+          version_class = Object.lookup_or_create_class 'PaperTrail::Version', ActiveRecord::Base
+          version_class.class_exec do
+            belongs_to :item, :polymorphic => true
+          end
+          generator = ActiveRecordMetaclassGenerator.new version_class
+          @ar_classes << generator.generate_class
+
+          ActiveRecord::Base.class_exec do
+            include PaperTrail
+
+            def self.has_paper_trail
+              has_many :versions, :class_name => 'PaperTrail::Version', :as => :item
+            end
+          end
+        end
+
+        def instrument_gem_active_admin(controller_class, action)
+          return unless Object.lookup_const('ActiveAdmin')
+
+          collection_name = controller_class.controller_name
+          instance_name = collection_name.singularize
+          class_name = controller_class.controller_name.singularize.camelize
+          method_pattern = <<-ruby
+            def ${1}
+              ins_explore_all :${1} do
+                ins_stmt(ADSL::Parser::ASTAssignment.new(
+                  :var_name => ADSL::Parser::ASTIdent.new(:text => "at__${2}"),
+                  :expr => ${3}.adsl_ast
+                ))
+              end
+            end
+          ruby
+          case action
+          when :index
+            controller_class.class_eval method_pattern.resolve_params(:index, collection_name, "#{class_name}.where")
+          when :show
+            controller_class.class_eval method_pattern.resolve_params(:show, instance_name, "#{class_name}.find")
+          #when :new
+          #  controller_class.class_eval method_pattern.resolve_params(:new, instance_name, "#{class_name}.new")
+          when :create
+            controller_class.class_eval method_pattern.resolve_params(:create, instance_name, "#{class_name}.new")
+          when :edit
+            controller_class.class_eval method_pattern.resolve_params(:edit, instance_name, "#{class_name}.find")
+          when :update
+            controller_class.class_eval method_pattern.resolve_params(:update, instance_name, "#{class_name}.find")
+          when :destroy
+            controller_class.class_eval <<-ruby, __FILE__, __LINE__
+              def destroy
+                ins_explore_all :destroy do
+                  ins_stmt(ADSL::Parser::ASTAssignment.new(
+                    :var_name => ADSL::Parser::ASTIdent.new(:text => "at__#{collection_name}"),
+                    :expr => #{class_name}.where.adsl_ast
+                  ))
+                  ins_stmt(ADSL::Parser::ASTDeleteObj.new(
+                    :objset => ADSL::Parser::ASTVariable.new(
+                      :var_name => ADSL::Parser::ASTIdent.new(:text => "at__#{collection_name}")
+                    )
+                  ))
+                end
+              end
+            ruby
+          end
+        end
+
         def instrument_gems(controller_class, action)
           instrument_gem_ransack controller_class, action
           instrument_gem_authlogic controller_class, action
           instrument_gem_devise controller_class, action
           instrument_gem_paperclip controller_class, action
+          instrument_gem_paper_trail controller_class, action
+          instrument_gem_active_admin controller_class, action
         end
 
       end

@@ -39,7 +39,7 @@ module ADSL
           commands.each_index do |command, index|
             children_threads << Thread.new do
               begin
-                sleep 0.1
+                #sleep 0.1
                 pid = nil
                 output = IO.popen command, :err=>[:child, :out] do |io|
                   pid = io.pid
@@ -67,7 +67,8 @@ module ADSL
         return result.first 2
       ensure
         children_threads.each do |child|
-          child.raise 'die!'
+          child.terminate
+          #child.raise 'die!'
         end
         #spawned_pids.each do |pid|
         #  Process.kill 'HUP', pid if 

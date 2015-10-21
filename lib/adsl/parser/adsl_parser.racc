@@ -6,12 +6,12 @@ class ADSLParser
     left in
     left '==' '!='
     noassoc NOT
-    left and or
+    left and or xor
     left '<=' '=>'
     left '<=>'
     right '='
   preclow
-  token authenticable usergroup class extends inverseof action foreach flatforeach unflatforeach either or create derefcreate delete if else subset oneof tryoneof allof invariant forall exists in isempty empty true false not and equal implies unknown currentuser inusergroup allofusergroup permit permitted permittedbytype edit read assoc deassoc IDENT NUMBER STRING BASIC_TYPE JS roole
+  token authenticable usergroup class extends inverseof action foreach flatforeach unflatforeach either or xor create derefcreate delete if else subset oneof tryoneof allof invariant forall exists in isempty empty true false not and equal implies unknown currentuser inusergroup allofusergroup permit permitted permittedbytype edit read IDENT NUMBER STRING BASIC_TYPE JS roole raize pickoneexpr
   start adslspec
 rule
   adslspec: root_elems { return ASTSpec.new(:lineno => lineno,
@@ -97,6 +97,7 @@ rule
            | if expr block optelse        { return ASTIf.new(
                :lineno => val[0], :condition => val[1], :then_block => val[2], :else_block => val[3]
              )}
+           | raize                    { return ASTRaise.new :lineno => val[0] }
 
   foreach_stmt: foreach IDENT ':' expr block {
                   return ASTForEach.new :lineno => val[0], :var_name => val[1], :objset => val[3], :block => val[4]
@@ -132,7 +133,7 @@ rule
       | '(' expr ')'   { return val[1] }
       | JS             { return ASTJsExpr.new :lineno => val[0][:lineno], :js    => val[0][:js] }
       | NUMBER         { return ASTNumber.new :lineno => val[0][:lineno], :value => val[0][:value] }
-      | STRING   { return ASTString.new :lineno => val[0][:lineno], :value => val[0][:value].gsub(%q{\'}, %q{'}) }
+      | STRING         { return ASTString.new :lineno => val[0][:lineno], :value => val[0][:value].gsub(%q{\'}, %q{'}) }
       | forall '(' quantifier_parameters_with_commas ':' expr ')'
          { return ASTForAll.new :lineno => val[0], :vars => val[2], :subformula => val[4] }
       | exists '(' quantifier_parameters_with_commas optional_expr ')'
@@ -140,7 +141,8 @@ rule
       | not expr
         { return ASTNot.new :lineno => val[0], :subformula => val[1] } =NOT
       | expr and expr { return ASTAnd.new :lineno => val[0].lineno, :subformulae => [val[0], val[2]] }
-      | expr or expr { return ASTOr.new :lineno => val[0].lineno, :subformulae => [val[0], val[2]] }
+      | expr or  expr { return ASTOr.new  :lineno => val[0].lineno, :subformulae => [val[0], val[2]] }
+      | expr xor expr { return ASTXor.new :lineno => val[0].lineno, :subformulae => [val[0], val[2]] }
       | expr '=>' expr
         { return ASTImplies.new :lineno => val[0].lineno, :subformula1 => val[0], :subformula2 => val[2] }
       | expr '<=' expr
@@ -161,14 +163,13 @@ rule
       | '*'                   { return ASTBoolean.new :lineno => val[0], :bool_value => nil   }
       | isempty '(' expr ')'  { return ASTIsEmpty.new :lineno => val[0], :objset => val[2] }
       | currentuser           { return ASTCurrentUser.new :lineno => val[0] }
+      | pickoneexpr '(' comma_separated_exprs ')' { return ASTPickOneExpr.new :lineno => val[0], :exprs => val[2] }
       | inusergroup '(' IDENT ')'
                { return ASTInUserGroup.new :lineno => val[0], :groupname => val[2] }
       | inusergroup '(' expr ',' IDENT ')'
                { return ASTInUserGroup.new :lineno => val[0], :objset => val[2], :groupname => val[4] }
       | allofusergroup '(' IDENT ')' { return ASTAllOfUserGroup.new :lineno => val[0], :groupname => val[2] }
       | permitted '(' perm_op_list expr ')' { return ASTPermitted.new :lineno => val[0], :ops => val[2], :expr => val[3] }
-      | permittedbytype '(' perm_op_list IDENT ')'
-               { return ASTPermittedByType.new :lineno => val[0], :ops => val[2], :class_name => val[3] }
 
   invariant_decl: invariant expr {
           return ASTInvariant.new :lineno => val[0], :name => nil, :formula => val[1]
@@ -190,8 +191,6 @@ rule
          | edit    { return [:edit, val[0]] }
          | create  { return [:create, val[0]] }
          | delete  { return [:delete, val[0]] }
-         | assoc   { return [:assoc, val[0]] }
-         | deassoc { return [:deassoc, val[0]] }
 
   quantifier_parameters_with_commas: quantifier_parameters_with_commas ',' quantifier_parameter
                                      { val[0] << val[2]; return val[0] }

@@ -1,63 +1,64 @@
 require 'adsl/parser/ast_nodes'
 require 'adsl/extract/instrumenter'
+require 'adsl/extract/rails/cancan_authorization_model'
 
 module ADSL
   module Extract
     module Rails
       module CanCanExtractor
-        include ADSL::Parser
 
-        def self.auth_class
+        include ADSL::Parser
+        include ADSL::Extract::Rails::CancanAuthorizationModel
+
+        def self.default_login_class
           consts = ['User', 'AdminUser']
           consts.each do |const|
             c = Object.lookup_const const
-            return c unless c.nil?
+            return c if c
           end
-          raise "AuthClass not found"
+          raise "Login class not found"
         end
 
-        def auth_class
-          CanCanExtractor.auth_class
+        def login_class
+          return @login_class if @login_class
+          klass = CanCanExtractor.default_login_class
+          raise "Login class #{ klass.name } is not a model class" unless klass < ActiveRecord::Base
+          @login_class = klass
         end
 
-        def ac_auth_class
-          return @auth_class unless @auth_class.nil?
-          klass = auth_class
-          ac_klass = @ar_classes.select{ |c| c.name == klass.name }.first
-          raise "ActiveRecord class for name '#{klass.name}' not found" if ac_klass.nil?
-          @auth_class = ac_klass
-          @auth_class
-        end
-
-        def define_auth_class
-          auth_class
+        def define_login_class
+          login_class
         end
 
         def usergroups
-          return @usergroups unless @usergroups.nil?
-          
+          return @usergroups if @usergroups
+
           # see if roles are defined in the model
-          roles = auth_class.lookup_const 'ROLES'
+          roles = login_class.lookup_const 'ROLES'
           if roles
             @usergroups = roles.map{ |role_name| ASTUserGroup.new :name => ASTIdent.new(:text => role_name) }
           else
             # see if 'admin' is defined somewhere, and if it is, define an admin usergroup
-            method_names = auth_class.instance_methods.map &:to_s
-            column_names = auth_class.column_names
+            method_names = login_class.instance_methods.map &:to_s
+            column_names = login_class.column_names
             things_that_exist = Set[*(method_names + column_names)]
-            unless (things_that_exist & Set['admin', 'admin?', 'is_admin', 'is_admin?']).empty?
+            if (things_that_exist & Set['admin', 'admin?', 'is_admin', 'is_admin?']).any?
               admin    = ADSL::Parser::ASTUserGroup.new(:name => ASTIdent.new(:text => 'admin'))
               nonadmin = ADSL::Parser::ASTUserGroup.new(:name => ASTIdent.new(:text => 'nonadmin'))
               @usergroups = [nonadmin, admin]
-              @rules << ADSL::Parser::ASTRule.new(:formula => ADSL::Parser::ASTEqual.new(:exprs => [
-                ADSL::Parser::ASTInUserGroup.new(:groupname => ASTIdent.new(:text => 'admin')),
-                ADSL::Parser::ASTNot.new(:subformula => ASTInUserGroup.new(:groupname => ASTIdent.new(:text => 'nonadmin')))
-              ]))
             end
           end
-
           @usergroups ||= []
-          return @usergroups
+          
+          if @usergroups.any?
+            @rules << ADSL::Parser::ASTRule.new(:formula => ADSL::Parser::ASTXor.new(
+              :subformulae => @usergroups.map do |ug|
+                ADSL::Parser::ASTInUserGroup.new(:groupname => ASTIdent.new(:text => ug.name.text))
+              end
+            ))
+          end
+
+          @usergroups
         end
 
         def define_usergroups
@@ -66,7 +67,7 @@ module ADSL
 
         def define_usergroup_getters
           usergroups.map(&:name).map(&:text).each do |ug_name|
-            auth_class.class_eval <<-ruby
+            login_class.class_eval <<-ruby
               def #{ug_name}
                 ADSL::Parser::ASTInUserGroup.new(
                   :objset => ADSL::Parser::ASTCurrentUser.new,
@@ -81,33 +82,25 @@ module ADSL
         end
 
         def define_controller_stuff
-          ApplicationController.class_eval <<-ruby, __FILE__, __LINE__ + 1
-            def current_user
-              #{auth_class.name}.new(:adsl_ast => ADSL::Parser::ASTCurrentUser.new)
-            end
-          ruby
           ApplicationController.class_exec do
+            def current_user
+              rails_extractor.login_class.new :adsl_ast => ADSL::Parser::ASTCurrentUser.new
+            end
+
             def can?(action, subject, *args)
-              ops = ADSL::Extract::Rails::CanCanExtractor.ops_from_action_name action
-              if (subject.is_a? Class)
-                ADSL::Parser::ASTPermittedByType.new(
-                  :ops => ops,
-                  :class_name => ADSL::Parser::ASTIdent.new(:text => subject.adsl_ast_class_name)
-                )
-              else
-                ADSL::Parser::ASTPermitted.new(
-                  :ops => ops,
-                  :expr => subject.adsl_ast
-                )
-              end
+              rails_extractor.generate_can_query_formula action, subject
             end
 
             def cannot?(*args)
-              not can?(*args)
+              ADSL::Parser::ASTNot.new :subformula => can?(*args)
             end
 
             def model_class_name
               self.class.controller_name.singularize.camelize
+            end
+
+            def model_class
+              model_class_name.constantize
             end
 
             def name_from_controller
@@ -121,97 +114,52 @@ module ADSL
             def instance_name
               controller_name.gsub('Controller', '').underscore.singularize
             end
-          end
+        
+            def authorize!(*args)
+              return if respond_to?(:should_authorize?) && (!should_authorize?)
 
-          CanCanExtractor.define_authorize!
+              var_name = [instance_name, instance_name.pluralize].select{ |i| instance_variable_defined? "@#{i}" }.first
+
+              if var_name
+                subject = ADSL::Parser::ASTVariable.new(:var_name => ADSL::Parser::ASTIdent.new(:text => "at__#{var_name}"))
+              else
+                subject = controller_name.classify
+              end
+
+              condition = rails_extractor.generate_can_query_formula action_name, subject
+              
+              ins_stmt ADSL::Parser::ASTIf.new(
+                :condition => condition,
+                :then_block => ADSL::Parser::ASTBlock.new(:statements => []),
+                :else_block => ADSL::Parser::ASTBlock.new(:statements => [
+                  ADSL::Parser::ASTRaise.new
+                ])
+              )
+            end
+          end
         end
 
         def define_controller_resource_stuff
-          CanCan::ControllerResource.class_exec do
-            alias_method :old_load_resource, :load_resource
-            def load_resource
-              ins_explore_all 'load_resource' do
-                old_load_resource
+          CanCan::ControllerAdditions::ClassMethods.class_exec do
+            def load_resource(*args)
+              before_filter do
+                ins_explore_all 'load_resource' do
+                  old_load_resource
 
-                var_name, value = if load_instance?
-                  if new_actions.include?(@params[:action].to_sym)
-                    [instance_name.to_s]
+                  if load_instance?
+                    if new_actions.include?(@params[:action].to_sym)
+                      @controller.remove_instance_variable "@#{instance_name.to_s}"
+                      return
+                    else
+                      var_name, value = instance_name.to_s, resource_base.find
+                    end
                   else
-                    [instance_name.to_s, resource_base.find]
+                    var_name, value = instance_name.to_s.pluralize, resource_base.where
                   end
-                else
-                  [instance_name.to_s.pluralize, resource_base.where]
-                end
 
-                ins_stmt(ADSL::Parser::ASTAssignment.new(
-                  :var_name => ADSL::Parser::ASTIdent.new(:text => "at__#{var_name}"),
-                  :expr => value.adsl_ast
-                ))
-              end
-            end
-
-            #  unless skip?(:load)
-            #    var_name, expr = if load_instance?
-            #      if 
-            #        # we won't create because actions tend to create another and
-            #        # that is redundant in our translation
-            #        [instance_name, nil]
-            #      else
-            #        [instance_name, resource_base.find]
-            #      end
-            #    else
-            #      [instance_name.pluralize, resource_base.where]
-            #    end
-
-            #    ins_explore_all 'load_resource' do
-            #      ins_stmt(ADSL::Parser::ASTAssignment.new(
-            #        :var_name => ADSL::Parser::ASTIdent.new(:text => "at__#{var_name}"),
-            #        :expr => expr.adsl_ast
-            #      ))
-            #      nil
-            #    end
-
-            #    value = resource_base.new(:adsl_ast => ADSL::Parser::ASTVariable.new(
-            #      :var_name => ADSL::Parser::ASTIdent.new(:text => "at__#{var_name}")
-            #    ))
-            #    
-            #    @controller.instance_variable_set("@#{ var_name }", value)
-            #  end
-            #end
-          end
-        end
-
-        def self.define_authorize!
-          ApplicationController.class_exec do
-            def authorize!(*args)
-              return if respond_to?(:should_authorize?) && (!should_authorize?)
-              ops = ADSL::Extract::Rails::CanCanExtractor.ops_from_action_name action_name
-              return if ops.empty?
-              var_name = [instance_name, instance_name.pluralize].select{ |i| instance_variable_defined? "@#{i}" }.first
-              if var_name.nil?
-                ins_explore_all 'authorize_resource' do
-                  ins_stmt(stmt = ADSL::Parser::ASTIf.new(
-                    :condition => ADSL::Parser::ASTPermittedByType.new(
-                      :ops => ops,
-                      :class_name => ADSL::Parser::ASTIdent.new(:text => model_class_name)
-                    ),
-                    :then_block => ADSL::Parser::ASTBlock.new(:statements => []),
-                    :else_block => ADSL::Parser::ASTBlock.new(:statements => [
-                      ADSL::Parser::ASTRaise.new
-                    ])
-                  ))
-                end
-              else
-                ins_explore_all 'authorize_resource' do
-                  ins_stmt(stmt = ADSL::Parser::ASTIf.new(
-                    :condition => ADSL::Parser::ASTPermitted.new(
-                      :ops => ops,
-                      :expr => ADSL::Parser::ASTVariable.new(:var_name => ADSL::Parser::ASTIdent.new(:text => "at__#{var_name}"))
-                    ),
-                    :then_block => ADSL::Parser::ASTBlock.new(:statements => []),
-                    :else_block => ADSL::Parser::ASTBlock.new(:statements => [
-                      ADSL::Parser::ASTRaise.new
-                    ])
+                  ins_stmt(ADSL::Parser::ASTAssignment.new(
+                    :var_name => ADSL::Parser::ASTIdent.new(:text => "at__#{var_name}"),
+                    :expr => value.adsl_ast
                   ))
                 end
               end
@@ -219,32 +167,27 @@ module ADSL
           end
         end
 
-        def define_policy
+        def instrument_ability
           CanCan::Ability.class_exec do
-            def can(action = nil, subject = nil, conditions_hash = nil, &block)
+            def can(actions = nil, subject = nil, conditions_hash = nil, &block)
               return if ::ADSL::Extract::Instrumenter.get_instance.nil?
               return if ::ADSL::Extract::Instrumenter.get_instance.ex_method.nil?
               
-              ops = ADSL::Extract::Rails::CanCanExtractor.ops_from_action_name action || :manage
-
               expr = nil
               unless conditions_hash.nil?
                 conditions_hash.each do |key, val|
-                  auth_class = CanCanExtractor.auth_class
-                  if val.is_a?(auth_class) && val.adsl_ast.is_a?(ASTCurrentUser)
+                  login_class = CanCanExtractor.default_login_class
+                  if val.is_a?(login_class) && val.adsl_ast.is_a?(ASTCurrentUser)
                     # either we're talking about the User class or some class that relates to User
-                    if subject == auth_class
-                      expr = ADSL::Parser::ASTCurrentUser.new
+                    if subject == login_class
+                      expr = login_class.new(:adsl_ast => ASTCurrentUser.new)
                     else
                       # we need an inverse of that dereference
-                      candidates = auth_class.reflections.values.select do |refl|
+                      candidates = login_class.reflections.values.select do |refl|
                         refl.foreign_key.to_sym == key.to_sym && refl.class_name.constantize == subject
                       end
                       if candidates.length == 1
-                        expr = ADSL::Parser::ASTMemberAccess.new(
-                          :objset => ADSL::Parser::ASTCurrentUser.new,
-                          :member_name => ADSL::Parser::ASTIdent.new(:text => candidates.first.name.to_s)
-                        )
+                        expr = login_class.new(:adsl_ast => ASTCurrentUser.new).send candidates.first.name
                       end
                     end
                   end
@@ -252,53 +195,12 @@ module ADSL
               end
               
               ins_stmt(ADSL::Parser::ASTDummyStmt.new(:label => {
-                :ops => ops,
+                :actions => actions,
                 :domain => subject,
                 :expr => expr
               }))
             end
-
-            def authorize!(action, subject, *args)
-              ops = ADSL::Extract::Rails::CanCanExtractor.ops_from_action_name action
-              return if ops.empty?
-              if subject.is_a?(ActiveRecord::Base)
-                condition = ADSL::Parser::ASTPermitted.new(
-                  :expr => subject.adsl_ast,
-                  :ops => ops
-                )
-              else
-                condition = ADSL::Parser::ASTPermittedByType.new(
-                  :ops => ops,
-                  :class_name => ADSL::Parser::ASTIdent.new(:text => subject.name)
-                )
-              end
-              ins_stmt(ADSL::Parser::ASTIf.new(
-                :condition => condition, 
-                :then_block => ADSL::Parser::ASTBlock.new(:statements => []),
-                :else_block => ADSL::Parser::ASTBlock.new(:statements => [
-                  ADSL::Parser::ASTRaise.new
-                ])
-              ))
-            end
           end
-        end
-
-        def self.ops_from_action_name(action)
-          ops = case action.to_sym
-          when :manage
-            [:edit, :read]
-          when :manage, :edit
-            [:edit]
-          when :create
-            [:create]
-          when :read, :index, :view, :show
-            [:read]
-          when :destroy
-            [:delete]
-          else
-            []
-          end
-          ops.flatten.uniq
         end
 
         def authorization_defined?
@@ -310,45 +212,46 @@ module ADSL
         end
 
         def extract_rules_from_block(block, group = nil)
-          block.statements.map do |stmt|
+          block.statements.each do |stmt|
             if stmt.is_a?(ADSL::Parser::ASTBlock)
               extract_rules_from_block stmt
-            elsif stmt.is_a?(ADSL::Parser::ASTIf) && stmt.condition.is_a?(ADSL::Parser::ASTInUserGroup)
-              is_group = stmt.condition
-              group = usergroups.select{ |g| stmt.condition.groupname.text.downcase == g.name.text.downcase }.first
-              raise "Group by name #{stmt.condition.groupname.text} not found" if group.nil?
-              othergroup = usergroups.select{ |g| g != group }.first if usergroups.length == 2
-              [
-                extract_rules_from_block(stmt.then_block, group), 
-                extract_rules_from_block(stmt.else_block, othergroup)
-              ]
+            elsif stmt.is_a?(ADSL::Parser::ASTIf)
+              then_group, else_group = nil, nil
+              if stmt.condition.is_a?(ADSL::Parser::ASTInUserGroup)
+                is_group = stmt.condition
+                then_group = @usergroups.select{ |g| stmt.condition.groupname.text.downcase == g.name.text.downcase }.first
+                raise "Group by name #{stmt.condition.groupname.text} not found" if then_group.nil?
+                else_group = usergroups.select{ |g| g != then_group }.first if usergroups.length == 2
+              end
+              extract_rules_from_block stmt.then_block, then_group 
+              extract_rules_from_block stmt.else_block, else_group
             elsif stmt.is_a?(ADSL::Parser::ASTDummyStmt) && stmt.label.is_a?(Hash)
               info = stmt.label
 
-              if info[:domain] == :all
-                domains = @ar_classes.map(&:adsl_ast).map{ |c| [c] + ([c] * c.members.length).zip(c.members) }.flatten(1)
-              else
-                domains = [info[:domain].adsl_ast]
-              end
+              actions = [info[:actions]].flatten
+              next if actions.empty?
               
-              ops = info[:ops]
+              if info[:domain] == :all
+                klasses = @ar_classes
+              else
+                klasses = [info[:domain]].flatten
+              end
+              next if klasses.empty?
 
-              domains.map do |domain|
+              groups = group ? [group] : @usergroups
+
+              klasses.each do |klass|
                 if info[:expr]
                   expr = info[:expr]
-                elsif domain.is_a? ADSL::Parser::ASTClass
-                  expr = ADSL::Parser::ASTAllOf.new(:class_name => ADSL::Parser::ASTIdent.new(:text => domain.name.text))
                 else
-                  expr = ADSL::Parser::ASTMemberAccess.new(
-                    :objset => ADSL::Parser::ASTAllOf.new(:class_name => ADSL::Parser::ASTIdent.new(:text => domain[0].name.text)),
-                    :member_name => ADSL::Parser::ASTIdent.new(:text => domain[1].name.text)
-                  )
+                  expr = klass.all
                 end
-                ADSL::Parser::ASTPermit.new(
-                  :group_names => (group.nil? ? [] : [ADSL::Parser::ASTIdent.new(:text => group.name.text)]),
-                  :ops => ops,
-                  :expr => expr
-                )
+
+                groups.each do |group|
+                  actions.each do |action|
+                    permit group, action, expr
+                  end
+                end
               end
             end
           end
@@ -357,7 +260,7 @@ module ADSL
         def extract_ac_rules
           return unless cancan_exists?
 
-          current_user = auth_class.new :adsl_ast => ADSL::Parser::ASTCurrentUser.new
+          current_user = login_class.new :adsl_ast => ADSL::Parser::ASTCurrentUser.new
           @action_instrumenter.instrument Ability.new(current_user), :initialize
 
           block = @action_instrumenter.exec_within do
@@ -371,19 +274,18 @@ module ADSL
             ADSL::Parser::ASTBlock.new :statements => statements
           end
 
-          @ac_rules << extract_rules_from_block(block)
-          @ac_rules.flatten!.compact!
+          extract_rules_from_block(block)
         end
 
         def prepare_cancan_instrumentation
           return unless cancan_exists?
 
-          define_auth_class
+          define_login_class
           define_usergroups
           define_usergroup_getters
           define_controller_stuff
           define_controller_resource_stuff
-          define_policy
+          instrument_ability
         end
 
       end

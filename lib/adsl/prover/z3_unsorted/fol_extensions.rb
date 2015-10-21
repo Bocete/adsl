@@ -42,7 +42,7 @@ module ADSL
         output << "(declare-sort Sort 0)"
         output += @sorts.map{ |s| "(declare-fun #{s.name} (Sort) Bool)" }
         output << "(declare-fun SMT2Unsorted (Sort) Bool)"
-        output << "(assert (forall ((x Sort)) #{ OneOf.new("(SMT2Unsorted x)", *@sorts.map{ |s| "(#{s.name} x)" }).to_smt2_unsorted_string }))"
+        output << "(assert (forall ((x Sort)) #{ Xor.new("(SMT2Unsorted x)", *@sorts.map{ |s| "(#{s.name} x)" }).to_smt2_unsorted_string }))"
         output += @functions.map(&:to_smt2_unsorted_string).flatten
         output += @predicates.map(&:to_smt2_unsorted_string).flatten
 
@@ -194,7 +194,7 @@ module ADSL
       end
     end
 
-    class OneOf
+    class Xor
       def to_smt2_unsorted_string
         return 'false' if @formulae.empty?
         return @formulae.first.to_smt2_unsorted_string if @formulae.length == 1

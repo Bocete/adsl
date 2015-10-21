@@ -38,7 +38,7 @@ def initialize_test_context
       options[:nothing] = true
       super
     end
-
+    
     def authorize!; end
     def should_authorize?; false; end
     def self.authorize_resource(*args)
@@ -68,8 +68,6 @@ def initialize_test_context
     before_filter :before_nothing, :only => :nothing
     after_filter  :after_nothing,  :only => :nothing
 
-    before_filter :authorize!, :only => [:index, :show, :new, :create, :edit, :update, :destroy]
-
     def before_filter_action; respond_to; end
     def after_filter_action;  respond_to; end
     
@@ -79,16 +77,13 @@ def initialize_test_context
 
     def before_nothing; end
     def after_nothing; end
-    
+
+    before_filter :authorize!
   end
 end
 
 def teardown_test_context
   unload_class :Asd, :Kme, 'Mod::Blah'
-  ApplicationController.class_exec do
-    def authorize!; end
-    def should_authorize?; true; end
-  end
 end
 
 # Only the parts of rails we want to use
@@ -96,7 +91,6 @@ end
 require "action_controller/railtie"
 
 if ENV["RAILS_ENV"] == 'test'
-
   # Define the application and configuration
   class ADSLRailsTestApplication < ::Rails::Application
     # configuration here if needed
@@ -143,7 +137,7 @@ if ENV["RAILS_ENV"] == 'test'
   ActiveRecord::Migration.verbose = false
   ActiveRecord::Schema.define do
     create_table :asds do |t|
-      t.string :type
+      t.string :field
     end
     create_table :blahs do |t|
       t.integer :asd_id
@@ -156,30 +150,30 @@ if ENV["RAILS_ENV"] == 'test'
 end
 
 def define_cancan_suite
+  require 'cancan'
   Object.lookup_or_create_class('::User', ActiveRecord::Base).class_exec do
     has_many :asds
   end
   Object.lookup_or_create_class('::Asd', ActiveRecord::Base).class_exec do
     belongs_to :user
   end
-  Object.lookup_or_create_module('::CanCan')
-  Object.lookup_or_create_module('::CanCan::Ability').class_exec do
-    def can(*args); end
-    def cannot(*args); end
-  end
-  Object.lookup_or_create_class('::CanCan::ControllerResource', Object).class_exec do
-    def load_resource
-      if load_instance?
-      end
-    end
-  end
   Object.lookup_or_create_class('::Ability', Object).class_exec do
     include ::CanCan::Ability
-
-    def initialize(user); end
+  end
+  AsdsController.class_exec do
+    #def self.authorize_resource(*args)
+    #  if AsdsController.instance_methods(false).include? :should_authorize?
+    #    AsdsController.send :remove_method, :should_authorize?
+    #  end
+    #  before_filter :authorize!, *args
+    #end
   end
 end
 
 def teardown_cancan_suite
-  unload_class :Ability, :User, :CanCan
+  unload_class :Ability, :User
+
+  AsdsController.class_exec do
+    #def should_authorize?; false; end
+  end
 end

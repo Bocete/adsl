@@ -1,6 +1,8 @@
-require 'active_support/core_ext/numeric/time'
-require 'minitest/unit'
+require 'active_support/all'
+require 'pp'
 require 'minitest/autorun'
+require 'minitest/reporters'
+
 require 'adsl/parser/adsl_parser.tab'
 require 'adsl/prover/engine'
 require 'adsl/util/general'
@@ -8,9 +10,18 @@ require 'adsl/ds/data_store_spec'
 require 'adsl/translation/ds_extensions'
 require 'adsl/translation/verification_problems'
 
-class MiniTest::Unit::TestCase
+Minitest::Reporters.use!
+
+class ActiveSupport::TestCase
   TESTING_TIMEOUT = 5.seconds
-  
+
+  setup do
+    if !TEST_ENV
+      Object.send :remove_const, :TEST_ENV
+      Object.const_set :TEST_ENV, true
+    end
+  end
+
   def adsl_assert(expected_result, input, options={})
     options[:timeout] ||= TESTING_TIMEOUT
 

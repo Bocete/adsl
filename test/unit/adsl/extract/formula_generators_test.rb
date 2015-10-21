@@ -1,6 +1,3 @@
-require 'minitest/unit'
-require 'minitest/autorun'
-require 'pp'
 require 'adsl/util/test_helper'
 require 'adsl/extract/meta'
 require 'adsl/extract/formula_generators'
@@ -37,7 +34,7 @@ class ADSL::Extract::FormulaGeneratorsTest < ADSL::Extract::Rails::RailsInstrume
     end
     assert_raises ADSL::Extract::ExtractionError do
       fg.forall do |asd|
-        'blah!'
+        :blah!
       end
     end
   end

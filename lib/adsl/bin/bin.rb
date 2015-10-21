@@ -13,7 +13,7 @@ module ADSL
       DEFAULT_OPTS = {
         :input => 'stdin',
         :prover => 'all',
-        :halt_on_error => true,
+        :halt_on_error => false,
         :timeout => 1.minute,
         :output => 'text',
         :actions => nil,
@@ -25,7 +25,7 @@ module ADSL
 
       def initialize(options={})
         @options = Bin::DEFAULT_OPTS.merge options
-        if Set[*options.keys] > Set[*Bin::DEFAULT_OPTS.keys]
+        unless Set[*options.keys].subset? Set[*Bin::DEFAULT_OPTS.keys]
           raise OptionParser::InvalidArgument, "Unknown option(s) #{Set[*options.keys] - Set[*Bin::DEFAULT_OPTS.keys]}"
         end
       end
@@ -82,12 +82,17 @@ module ADSL
           else
             raise "Unknown verification result #{result[:result]}"
           end
-        elsif options[:output] == 'csv'
-          @csv_output ||= ADSL::Util::CSVHashFormatter.new
-          @csv_output << result
-        elsif options[:output] == 'silent'
+        elsif @options[:output] == 'csv'
+          @csv_output ||= ADSL::Util::CSVHashFormatter.new(:action, :problem, :prover)
+
+          result.reject!{ |key, val| [:input, :output].include? key }
+          result[:action] = action.name
+          result[:problem] = problem.name
+
+          @csv_output << result 
+        elsif @options[:output] == 'silent'
         else
-          raise "Unknown verification output #{options[:output]}"
+          raise "Unknown verification output #{ @options[:output] }"
         end
       end
 

@@ -21,6 +21,9 @@ Gem::Specification.new do |s|
   s.add_development_dependency 'rake'
   s.add_development_dependency 'rails', '~> 3.2'
   s.add_development_dependency 'sqlite3'
+  s.add_development_dependency 'minitest', '~> 4'
+  s.add_development_dependency 'minitest-reporters'
+  s.add_development_dependency 'cancan'
 
   s.add_dependency 'rexical'
   s.add_dependency 'racc'
@@ -34,5 +37,6 @@ Gem::Specification.new do |s|
   s.add_dependency 'activerecord', '~> 3.2' # used for code extraction only
   s.add_dependency 'activerecord-tableless'
 #  s.add_dependency 'test-unit' # not a development dependency as there is an issue with test-unit vs minitest gem inclusion
+  
 end
 

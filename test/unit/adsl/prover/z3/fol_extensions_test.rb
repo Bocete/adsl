@@ -1,14 +1,10 @@
+require 'adsl/util/test_helper'
 require 'adsl/fol/first_order_logic'
 require 'adsl/prover/z3/fol_extensions'
 require 'adsl/ds/data_store_spec'
 require 'adsl/translation/ds_extensions'
-require 'adsl/util/test_helper'
-require 'minitest/unit'
 
-require 'minitest/autorun'
-require 'pp'
-
-class ADSL::Prover::Z3FolExtensionsTest < MiniTest::Unit::TestCase
+class ADSL::Prover::Z3FolExtensionsTest < ActiveSupport::TestCase
   include ADSL::FOL
   
   def test_literals
@@ -111,11 +107,11 @@ class ADSL::Prover::Z3FolExtensionsTest < MiniTest::Unit::TestCase
     assert_equal_nospace "(= a b c)", ADSL::FOL::Equal.new(:a, :b, :c).to_smt2_string
   end
 
-  def test_one_of
-    assert_equal         "false", ADSL::FOL::OneOf.new.to_smt2_string
-    assert_equal_nospace "a", ADSL::FOL::OneOf.new(:a).to_smt2_string
-    assert_equal_nospace "(xor a b)", ADSL::FOL::OneOf.new(:a, :b).to_smt2_string
-    assert_equal_nospace "(xor a b c)", ADSL::FOL::OneOf.new(:a, :b, :c).to_smt2_string
+  def test_xor
+    assert_equal         "false", ADSL::FOL::Xor.new.to_smt2_string
+    assert_equal_nospace "a", ADSL::FOL::Xor.new(:a).to_smt2_string
+    assert_equal_nospace "(xor a b)", ADSL::FOL::Xor.new(:a, :b).to_smt2_string
+    assert_equal_nospace "(xor a b c)", ADSL::FOL::Xor.new(:a, :b, :c).to_smt2_string
   end
 
   def test_if_then_else

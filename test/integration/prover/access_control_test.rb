@@ -1,9 +1,6 @@
 require 'adsl/util/test_helper'
-require 'minitest/unit'
 
-require 'minitest/autorun'
-
-class IntegrationsAccessControlTest < MiniTest::Unit::TestCase
+class IntegrationsAccessControlTest < ActiveSupport::TestCase
   include ADSL::FOL
   
   def test_blank_data_store
@@ -149,7 +146,7 @@ class IntegrationsAccessControlTest < MiniTest::Unit::TestCase
     ADSL
   end
 
-  def test_create_assoc__without_assoc_permit
+  def test_create_assoc__without_permit
     adsl_assert :incorrect, <<-ADSL
       authenticable class User {
         0+ User friends
@@ -158,9 +155,6 @@ class IntegrationsAccessControlTest < MiniTest::Unit::TestCase
         currentuser.friends += oneof(allof(User))
       }
     ADSL
-  end
-
-  def test_create_assoc__with_assoc_permit
     adsl_assert :correct, <<-ADSL
       authenticable class User {
         0+ User friends
@@ -168,11 +162,34 @@ class IntegrationsAccessControlTest < MiniTest::Unit::TestCase
       action blah() {
         currentuser.friends += oneof(allof(User))
       }
-      permit assoc currentuser.friends
+      permit create currentuser.friends
     ADSL
   end
 
-  def test_delete_assoc__without_deassoc_permit
+  def test_create_assoc__with_permit
+    adsl_assert :correct, <<-ADSL
+      authenticable class User {
+        0+ User friends
+      }
+      action blah() {
+        currentuser.friends += oneof(allof(User))
+      }
+      permit read currentuser
+      permit create currentuser.friends
+    ADSL
+    adsl_assert :correct, <<-ADSL
+      authenticable class User {
+        0+ User friends
+      }
+      action blah() {
+        currentuser.friends += oneof(allof(User))
+      }
+      permit create currentuser
+      permit create currentuser.friends
+    ADSL
+  end
+
+  def test_delete_assoc__without_permit
     adsl_assert :incorrect, <<-ADSL
       authenticable class User {
         0+ User friends
@@ -181,9 +198,18 @@ class IntegrationsAccessControlTest < MiniTest::Unit::TestCase
         currentuser.friends -= oneof(allof(User))
       }
     ADSL
+    adsl_assert :incorrect, <<-ADSL
+      authenticable class User {
+        0+ User friends
+      }
+      action blah() {
+        currentuser.friends -= oneof(allof(User))
+      }
+      permit delete currentuser.friends
+    ADSL
   end
 
-  def test_delete_assoc__with_deassoc_permit
+  def test_delete_assoc__with_permit
     adsl_assert :correct, <<-ADSL
       authenticable class User {
         0+ User friends
@@ -191,7 +217,18 @@ class IntegrationsAccessControlTest < MiniTest::Unit::TestCase
       action blah() {
         currentuser.friends -= oneof(allof(User))
       }
-      permit deassoc currentuser.friends
+      permit delete currentuser
+      permit delete currentuser.friends
+    ADSL
+    adsl_assert :correct, <<-ADSL
+      authenticable class User {
+        0+ User friends
+      }
+      action blah() {
+        currentuser.friends -= oneof(allof(User))
+      }
+      permit read currentuser
+      permit delete currentuser.friends
     ADSL
   end
 
@@ -310,33 +347,6 @@ class IntegrationsAccessControlTest < MiniTest::Unit::TestCase
     ADSL
   end
 
-  def test_permitted_might_pass_if_right_usergroup
-    # this action may create an object
-    # if the currentuser happens to be a mod
-    adsl_assert :correct, <<-ADSL
-      authenticable class User {}
-      class Stuff {}
-      usergroup Mod
-      action blah() {
-        if permittedbytype(create User) {
-          create(Stuff)
-        }
-      }
-      invariant exists(Stuff s)
-    ADSL
-    adsl_assert :correct, <<-ADSL
-      authenticable class User {}
-      class Stuff {}
-      usergroup Mod
-      action blah() {
-        if permittedbytype(create User) {
-          create(Stuff)
-        }
-      }
-      invariant not exists(Stuff s)
-    ADSL
-  end
-  
   def test_permitted_create
     adsl_assert :incorrect, <<-ADSL
       authenticable class User {}
@@ -369,7 +379,7 @@ class IntegrationsAccessControlTest < MiniTest::Unit::TestCase
       }
     ADSL
   end
-  
+
   def test_permitted_create_deref
     adsl_assert :incorrect, <<-ADSL
       authenticable class User {
@@ -451,33 +461,6 @@ class IntegrationsAccessControlTest < MiniTest::Unit::TestCase
         currentuser.others = create(Other)
       }
       permit edit currentuser.others
-    ADSL
-  end
-
-  def test__permitted_by_type_is_dumb
-    adsl_assert :correct, <<-ADSL
-      authenticable class User {
-        1 Other others
-      }
-      class Other {}
-      action blah() {
-        if permitted(delete allof(Other)) {
-          delete allof(Other)
-        }
-      }
-      permit delete currentuser.others
-    ADSL
-    adsl_assert :incorrect, <<-ADSL
-      authenticable class User {
-        1 Other others
-      }
-      class Other {}
-      action blah() {
-        if permittedbytype(delete Other) {
-          delete allof(Other)
-        }
-      }
-      permit delete currentuser.others
     ADSL
   end
 end

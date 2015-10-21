@@ -16,56 +16,56 @@ namespace :test do
     desc "Test Lexer & Parser"
     task :parser => ["build:parser"]
     Rake::TestTask.new(name=:parser) do |t|
-      t.libs += ["lib"]
+      t.libs += ['lib', 'test']
       t.test_files = FileList['test/unit/adsl/parser/**/*_test.rb']
       t.verbose = true
     end
 
     desc "Test Util"
     Rake::TestTask.new(name=:util) do |t|
-      t.libs += ["lib"]
+      t.libs += ['lib', 'test']
       t.test_files = FileList['test/unit/adsl/util/**/*_test.rb']
       t.verbose = true
     end
     
     desc "Test First Order Logic"
     Rake::TestTask.new(name=:fol) do |t|
-      t.libs += ["lib"]
+      t.libs += ['lib', 'test']
       t.test_files = FileList['test/unit/adsl/fol/**/*_test.rb']
       t.verbose = true
     end
     
     desc "Test The Prover Engine"
     Rake::TestTask.new(name=:prover) do |t|
-      t.libs += ["lib"]
+      t.libs += ['lib', 'test']
       t.test_files = FileList['test/unit/adsl/prover/**/*_test.rb']
       t.verbose = true
     end
     
     desc "Test DataStoreSpec"
     Rake::TestTask.new(name=:ds) do |t|
-      t.libs += ["lib"]
+      t.libs += ['lib', 'test']
       t.test_files = FileList['test/unit/adsl/ds/**/*_test.rb']
       t.verbose = true
     end
 
     desc "Test Synthesis"
     Rake::TestTask.new(name=:synthesis) do |t|
-      t.libs += ["lib"]
+      t.libs += ['lib', 'test']
       t.test_files = FileList['test/unit/adsl/synthesis/**/*_test.rb']
       t.verbose = true
     end
     
     desc "Test Extract"
     Rake::TestTask.new(name=:extract) do |t|
-      t.libs += ["lib"]
+      t.libs += ['lib', 'test']
       t.test_files = FileList['test/unit/adsl/extract/**/*_test.rb']
       t.verbose = true
     end
     
     desc "Test Translation"
     Rake::TestTask.new(name=:translation) do |t|
-      t.libs += ["lib"]
+      t.libs += ['lib', 'test']
       t.test_files = FileList['test/unit/adsl/translation/**/*_test.rb']
       t.verbose = true
     end
@@ -73,59 +73,58 @@ namespace :test do
 
   desc "Test All Units"
   Rake::TestTask.new(name=:units) do |t|
-    t.libs += ["lib"]
+    t.libs += ['lib', 'test']
     t.test_files = FileList['test/unit/adsl/**/*_test.rb']
     t.verbose = true
   end
- 
 
   namespace :integrations do
     namespace :prover do
       Rake::TestTask.new(name=:basic) do |t|
-        t.libs += ["lib"]
+        t.libs += ['lib', 'test']
         t.test_files = FileList['test/integration/prover/basic_test.rb']
         t.verbose = true
       end
 
       Rake::TestTask.new(name=:branch) do |t|
-        t.libs += ["lib"]
+        t.libs += ['lib', 'test']
         t.test_files = FileList['test/integration/prover/branch_test.rb']
         t.verbose = true
       end
       
       Rake::TestTask.new(name=:ac) do |t|
-        t.libs += ["lib"]
+        t.libs += ['lib', 'test']
         t.test_files = FileList['test/integration/prover/access_control_test.rb']
         t.verbose = true
       end
     end
     Rake::TestTask.new(name=:prover) do |t|
-      t.libs += ["lib"]
+      t.libs += ['lib', 'test']
       t.test_files = FileList['test/integration/prover/**/*_test.rb']
       t.verbose = true
     end
    
     namespace :extract do
       Rake::TestTask.new(name=:basic) do |t|
-        t.libs += ["lib"]
+        t.libs += ['lib', 'test']
         t.test_files = FileList['test/integration/extract/basic_test.rb']
         t.verbose = true
       end
 
       Rake::TestTask.new(name=:branch) do |t|
-        t.libs += ["lib"]
+        t.libs += ['lib', 'test']
         t.test_files = FileList['test/integration/extract/branch_test.rb']
         t.verbose = true
       end
 
       Rake::TestTask.new(name=:ac) do |t|
-        t.libs += ["lib"]
+        t.libs += ['lib', 'test']
         t.test_files = FileList['test/integration/extract/access_control_test.rb']
         t.verbose = true
       end
     end
     Rake::TestTask.new(name=:extract) do |t|
-      t.libs += ["lib"]
+      t.libs += ['lib', 'test']
       t.test_files = FileList['test/integration/extract/**/*_test.rb']
       t.verbose = true
     end
@@ -146,7 +145,7 @@ namespace :test do
 #      desc 'test whether tests work in general'
 #      task :basic => ["integrations:sails:setup"]
 #      Rake::TestTask.new(name=:basic) do |t|
-#        t.libs += ["lib"]
+#        t.libs += ['lib', 'test']
 #        t.test_files = FileList['test/integration/sails/basic/**/*_test.rb']
 #        t.verbose = true
 #      end
@@ -154,7 +153,7 @@ namespace :test do
 #      desc 'association generation and dereferencing'
 #      task :schema => ["integrations:sails:setup"]
 #      Rake::TestTask.new(name=:schema) do |t|
-#        t.libs += ["lib"]
+#        t.libs += ['lib', 'test']
 #        t.test_files = FileList['test/integration/sails/schema/**/*_test.rb']
 #        t.verbose = true
 #      end
@@ -162,7 +161,7 @@ namespace :test do
 #
 #    task :sails => ["integrations:sails:setup"]
 #    Rake::TestTask.new(name=:sails) do |t|
-#      t.libs += ["lib"]
+#      t.libs += ['lib', 'test']
 #      t.test_files = FileList['test/integration/sails/**/*_test.rb']
 #      t.verbose = true
 #    end
@@ -170,7 +169,7 @@ namespace :test do
   
   desc "Test All Integrations"
   Rake::TestTask.new(name=:integrations) do |t|
-    t.libs += ["lib"]
+    t.libs += ['lib', 'test']
     t.test_files = FileList['test/integration/**/*_test.rb']
     t.verbose = true
   end

@@ -62,6 +62,12 @@ module ADSL
       end
     end
     
+    class FunctionCall
+      def to_smt2_string
+        @function.arity == 0 ? @function.name : "(#{@function.name} #{@args.map(&:to_smt2_string).join ' '})"
+      end
+    end
+    
     class Predicate
       def to_smt2_string
         if @sorts.empty?
@@ -75,12 +81,6 @@ module ADSL
     class PredicateCall
       def to_smt2_string
         @predicate.arity == 0 ? @predicate.name : "(#{@predicate.name} #{@args.map(&:to_smt2_string).join ' '})"
-      end
-    end
-    
-    class FunctionCall
-      def to_smt2_string
-        @function.arity == 0 ? @function.name : "(#{@function.name} #{@args.map(&:to_smt2_string).join ' '})"
       end
     end
 
@@ -169,7 +169,7 @@ module ADSL
       end
     end
 
-    class OneOf
+    class Xor
       def to_smt2_string
         return 'false' if @formulae.empty?
         return @formulae.first.to_smt2_string if @formulae.length == 1

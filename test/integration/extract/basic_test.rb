@@ -1,9 +1,6 @@
-require 'minitest/unit'
-require 'minitest/autorun'
-
+require 'adsl/util/test_helper'
 require 'adsl/extract/bin'
 require 'adsl/extract/rails/rails_instrumentation_test_case'
-require 'adsl/util/test_helper'
 
 class ADSL::Extract::BasicRailsVerificationTest < ADSL::Extract::Rails::RailsInstrumentationTestCase
   include ADSL::Extract::Bin

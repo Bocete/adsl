@@ -1,13 +1,10 @@
+require 'adsl/util/test_helper'
 require 'adsl/parser/adsl_parser.tab'
 require 'adsl/parser/ast_nodes'
-require 'minitest/unit'
-
-require 'minitest/autorun'
-require 'pp'
 require 'set'
 
 module ADSL::Parser
-  class ClassParserTest < MiniTest::Unit::TestCase
+  class ClassParserTest < ActiveSupport::TestCase
     include ADSL::Parser
 
     def test_class__empty
