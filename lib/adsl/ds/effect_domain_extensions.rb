@@ -195,8 +195,8 @@ module ADSL
 
     class DSIfLambdaExpr < DSNode
       def objset_effect_domain_analysis(context, info)
-        then_types, then_local = @then_objset.objset_effect_domain_analysis(context, info)
-        else_types, else_local = @else_objset.objset_effect_domain_analysis(context, info)
+        then_types, then_local = @then_expr.objset_effect_domain_analysis(context, info)
+        else_types, else_local = @else_expr.objset_effect_domain_analysis(context, info)
         
         return Set[*(then_types + else_types)], then_local && else_local
       end
@@ -242,6 +242,12 @@ module ADSL
         @assigned_types ||= type_sig.all_children(true)
         @assigned_local = false if @assigned_local.nil?
         return @assigned_types, @assigned_local
+      end
+    end
+
+    class DSVariableRead < DSNode
+      def objset_effect_domain_analysis(context, info)
+        @variable.objset_effect_domain_analysis context, info
       end
     end
 

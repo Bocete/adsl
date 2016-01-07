@@ -676,7 +676,7 @@ module ADSL
     end
 
     class ASTAction < ASTNode
-      node_fields :name, :arg_cardinalities, :arg_names, :arg_types, :block
+      node_fields :name, :block
 
       def typecheck_and_resolve(context)
         old_action_node, old_action = context.actions[@name.text]
@@ -685,34 +685,14 @@ module ADSL
         cardinalities = []
         block = nil
         context.in_stack_frame do
-          @arg_names.length.times do |i|
-            cardinality = @arg_cardinalities[i]
-            if cardinality[0] > cardinality[1]
-              raise ADSLError, "Invalid cardinality of argument #{@arg_names[i].text} of action #{@name.text} on line #{cardinality[2]}: minimum cardinality #{cardinality[0]} must not be greater than the maximum cardinality #{cardinality[1]}"
-            end
-            if cardinality[1] == 0
-              raise ADSLError, "Invalid cardinality of relation #{@arg_names[i].text} of action #{@name.text} on line #{cardinality[2]}: maximum cardinality #{cardinality[1]} must be positive"
-            end
-            cardinality = cardinality.first 2
-
-            klass_node, klass = context.classes[@arg_types[i].text]
-            raise ADSLError, "Unknown class #{@arg_types[i].text} on line #{@arg_types[i].lineno}" if klass.nil?
-            type_sig = klass.to_sig.with_cardinality(cardinality[0], cardinality[1])
-            var = ADSL::DS::DSVariable.new :name => @arg_names[i].text, :type_sig => type_sig
-            context.define_var var, @arg_types[i]
-            arguments << var
-            cardinalities << cardinality
-          end
           block = @block.typecheck_and_resolve context, false
         end
-        action = ADSL::DS::DSAction.new :name => @name.text, :args => arguments, :cardinalities => cardinalities, :block => block
+        action = ADSL::DS::DSAction.new(
+          :name => @name.text,
+          :block => block
+        )
         context.actions[action.name] = [self, action]
-        return action
-      rescue Exception => e
-        raise e if TEST_ENV
-        new_ex = e.exception("#{e.message} in action #{@name.text}")
-        new_ex.set_backtrace e.backtrace
-        raise new_ex
+        action
       end
 
       def variable_read_by_view(var_name)
@@ -835,15 +815,7 @@ module ADSL
 
       def to_adsl
         args = []
-        @arg_cardinalities.length.times do |index|
-          card = @arg_cardinalities[index]
-          type = @arg_types[index].text
-          name = @arg_names[index].text
-
-          card_str = card[1] == Float::INFINITY ? "#{card[0]}+" : "#{card[0]}..#{card[1]}"
-          args << "#{card_str} #{type} #{name}"
-        end
-        "action #{@name.text}(#{ args.join ', ' }) {\n#{ @block.to_adsl.adsl_indent }}\n"
+        "action #{@name.text} {\n#{ @block.to_adsl.adsl_indent }}\n"
       end
     end
 
@@ -1315,10 +1287,11 @@ module ADSL
 
         lambdas = []
 
-        ADSL::Parser::Util.context_vars_that_differ(*contexts).each do |var_name, exprs|
-          type_sig = ADSL::DS::TypeSig.join exprs.map(&:type_sig)
+        ADSL::Parser::Util.context_vars_that_differ(*contexts).each do |var_name, variables|
+          variables = variables.map{ |v| ADSL::DS::DSVariableRead.new :variable => v }
+          type_sig = ADSL::DS::TypeSig.join variables.map(&:type_sig)
           var = ADSL::DS::DSVariable.new :name => var_name, :type_sig => type_sig
-          expr = ADSL::DS::DSEitherLambdaExpr.new :either => either, :exprs => exprs
+          expr = ADSL::DS::DSEitherLambdaExpr.new :either => either, :exprs => variables
           assignment = ADSL::DS::DSAssignment.new :var => var, :expr => expr
           context.redefine_var var, nil
           lambdas << assignment
@@ -1437,10 +1410,11 @@ module ADSL
         @ds_if = ADSL::DS::DSIf.new :condition => condition, :then_block => blocks[0], :else_block => blocks[1]
 
         lambdas = []
-        ADSL::Parser::Util.context_vars_that_differ(*contexts).each do |var_name, exprs|
-          type_sig = ADSL::DS::TypeSig.join exprs.map(&:type_sig)
+        ADSL::Parser::Util.context_vars_that_differ(*contexts).each do |var_name, variables|
+          variables = variables.map{ |v| ADSL::DS::DSVariableRead.new :variable => v }
+          type_sig = ADSL::DS::TypeSig.join variables.map(&:type_sig)
           var = ADSL::DS::DSVariable.new :name => var_name, :type_sig => type_sig
-          expr = ADSL::DS::DSIfLambdaExpr.new :if => @ds_if, :then_expr => exprs[0], :else_expr => exprs[1]
+          expr = ADSL::DS::DSIfLambdaExpr.new :if => @ds_if, :then_expr => variables[0], :else_expr => variables[1]
           assignment = ADSL::DS::DSAssignment.new :var => var, :expr => expr
           context.redefine_var var, nil
           lambdas << assignment
@@ -1768,6 +1742,7 @@ module ADSL
           next union.objsets.first if union.objsets.length == 1
           flat_objsets = union.objsets.map{ |objset| objset.is_a?(ASTUnion) ? objset.objsets : [objset] }.flatten(1)
           flat_objsets.reject!{ |o| o.is_a? ASTEmptyObjset }
+          flat_objsets.uniq!{ |o| o.expr_has_side_effects? ? o.object_id : o }
           ASTUnion.new(:objsets => flat_objsets)
         end
       end
@@ -1827,7 +1802,7 @@ module ADSL
       def typecheck_and_resolve(context)
         var_node, var = context.lookup_var @var_name.text
         raise ADSLError, "Undefined variable #{@var_name.text} on line #{@var_name.lineno}" if var.nil?
-        var
+        ADSL::DS::DSVariableRead.new(:variable => var)
       end
 
       def to_adsl

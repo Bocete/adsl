@@ -182,9 +182,6 @@ module ADSL
           #interrupt_callback_chain_on_render block, route[:action]
           action = ADSL::Parser::ASTAction.new({
             :name => ADSL::Parser::ASTIdent.new(:text => action_name),
-            :arg_cardinalities => [],
-            :arg_names => [],
-            :arg_types => [],
             :block => block
           })
 

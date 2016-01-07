@@ -5,7 +5,7 @@ class ADSL::Util::TestHelperTest < ActiveSupport::TestCase
   def test_adsl_assert__plain
     adsl_assert :correct, <<-ADSL
       class Class {}
-      action Action() {}
+      action Action {}
       invariant true
     ADSL
   end
@@ -13,16 +13,16 @@ class ADSL::Util::TestHelperTest < ActiveSupport::TestCase
   def test_adsl_assert__custom_conjecture
     adsl_assert :correct, <<-ADSL
       class Class {}
-      action Action() {}
+      action Action {}
       invariant true
     ADSL
     adsl_assert :correct, <<-ADSL, :conjecture => true
       class Class {}
-      action Action() {}
+      action Action {}
     ADSL
     adsl_assert :incorrect, <<-ADSL, :conjecture => false
       class Class {}
-      action Action() {}
+      action Action {}
     ADSL
   end
 

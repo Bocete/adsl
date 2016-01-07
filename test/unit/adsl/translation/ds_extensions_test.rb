@@ -60,7 +60,7 @@ class ADSL::Translation::DSExtensionsTest < ActiveSupport::TestCase
       authenticable class Class1 {}
       usergroup UG
       class Class2 extends Class1 {}
-      action blah() {
+      action blah {
         create(Class1)
         delete allof(Class2)
       }
@@ -75,7 +75,7 @@ class ADSL::Translation::DSExtensionsTest < ActiveSupport::TestCase
   def test_generate_problems_invariant_simple
     spec = ADSL::Parser::ADSLParser.new.parse <<-adsl
       class Class {}
-      action blah() {
+      action blah {
         create(Class)
       }
       invariant true
@@ -87,7 +87,7 @@ class ADSL::Translation::DSExtensionsTest < ActiveSupport::TestCase
   def test_generate_problems_simple_reads
     spec = ADSL::Parser::ADSLParser.new.parse <<-adsl
       authenticable class Class {}
-      action blah() {
+      action blah {
         x = allof(Class)
       }
     adsl
@@ -99,7 +99,7 @@ class ADSL::Translation::DSExtensionsTest < ActiveSupport::TestCase
     spec = ADSL::Parser::ADSLParser.new.parse <<-adsl
       authenticable class Class {}
       class Class2 {}
-      action blah() {
+      action blah {
         foreach v: allof(Class) {
           y = allof(Class2)
         }

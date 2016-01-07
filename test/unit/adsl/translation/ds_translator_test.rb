@@ -209,7 +209,7 @@ class ADSL::Translation::DSTranslatorTest < ActiveSupport::TestCase
     a_klass.translate translation
     b_klass.translate translation
     translation.state = translation.create_state :initial
-    block.prepare translation
+    block.migrate_state translation
     
     assert_equal [a_klass, b_klass], translation.create_obj_stmts.keys.sort_by{ |a| a.name }
     assert_equal [a_stmt], translation.create_obj_stmts[a_klass]

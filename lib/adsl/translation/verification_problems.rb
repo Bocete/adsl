@@ -30,7 +30,9 @@ module ADSL
             assignments = action.recursively_gather{ |elem|
               elem if elem.is_a?(DSAssignment)
             }.reverse.uniq{ |asgn| asgn.var.name }.select{ |asgn| asgn.expr.type_sig.is_objset_type? && !asgn.expr.type_sig.cardinality.empty? }
-            problems += assignments.map{ |asgn| ADSL::Translation::AccessControlReadProblem.new asgn.expr }
+            problems += assignments.map do |asgn|
+              ADSL::Translation::AccessControlReadProblem.new ADSL::DS::DSVariableRead.new(:variable => asgn.var)
+            end
 
             # assocs
             # rels = action.recursively_gather do |elem|
@@ -85,13 +87,11 @@ module ADSL
       def generate_conjecture(translation)
         translation.state = translation.initial_state
         pre_invariants = translation.spec.invariants.map do |invariant|
-          invariant.prepare translation
           invariant.formula.resolve_expr(translation, [])
         end
         
         translation.state = translation.final_state
         post_invariants = @listed_invariants.map do |invariant|
-          invariant.prepare translation
           invariant.formula.resolve_expr(translation, [])
         end
         

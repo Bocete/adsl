@@ -117,7 +117,8 @@ module ADSL
           def to_s
             subject_objset = self.objset
             subject_text = subject_objset.respond_to?(:adsl_ast) ? subject_objset.adsl_ast.to_adsl : subject_objset
-            "#{ @usergroup.name.text } can #{ @action } #{ subject_text }"
+            ug_text = @usergroups.map(&:name).map(&:text).join ', '
+            "#{ ug_text } can #{ @action } #{ subject_text }".strip
           end
 
           def generate_permit

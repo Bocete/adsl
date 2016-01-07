@@ -93,8 +93,7 @@ class ActiveSupport::TestCase
 
   def assert_nothing_raised(failure_msg = nil)
     yield
-  rescue StandardError => e
-    flunk "Exception raised: #{ e.message }"
+    pass
   end
 
   def assert_set_equal(expected, actual, failure_msg = nil)
@@ -119,8 +118,7 @@ class ActiveSupport::TestCase
   end
 
   def assert_block(msg = nil)
-    val = yield
-    assert val, msg
+    assert yield, msg
   end
 
   def assert_equal_nospace(s1, s2)

@@ -61,20 +61,7 @@ rule
   opt_inverse: inverseof IDENT { return val[1] }
              |                 { return nil }
 
-  action_decl: action IDENT '(' action_args ')' block { return ASTAction.new(
-                 :lineno => val[0], :name => val[1], :arg_cardinalities => val[3][0],
-                 :arg_types => val[3][1], :arg_names => val[3][2], :block => val[5]
-               )}
-
-  action_args: additional_args cardinality IDENT IDENT {
-                 val[0][0] << val[1]; val[0][1] << val[2]; val[0][2] << val[3]; return val[0]
-               }
-             |                                         { return [[], [], []] }
-             
-  additional_args: additional_args cardinality IDENT IDENT ',' {
-                     val[0][0] << val[1]; val[0][1] << val[2]; val[0][2] << val[3]; return val[0]
-                   }
-                 |   { return [[], [], []] }
+  action_decl: action IDENT block { return ASTAction.new :lineno => val[0], :name => val[1], :block => val[2] }
 
   block: '{' statements '}' { return ASTBlock.new :lineno => val[0], :statements => val[1] }
 

@@ -15,7 +15,7 @@ module ADSL::Parser
         spec = parser.parse <<-ADSL
           class Class {}
           rule true
-          action blah() {}
+          action blah {}
         ADSL
         assert_equal 1, spec.rules.length
         assert_equal ADSL::DS::DSConstant, spec.rules.first.formula.class

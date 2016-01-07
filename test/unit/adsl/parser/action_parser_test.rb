@@ -20,7 +20,7 @@ module ADSL::Parser
       spec = nil
       assert_nothing_raised ADSLError do
         spec = parser.parse <<-adsl
-          action do_something() {
+          action do_something {
           }
         adsl
       end
@@ -35,17 +35,18 @@ module ADSL::Parser
       assert_nothing_raised ADSLError do
         spec = parser.parse <<-adsl
           class Class {}
-          action do_something() {
+          action do_something {
             var = allof(Class)
             var = var
           }
         adsl
       end
       assert_equal 1, spec.actions.length
-      assert_equal 2, spec.actions.first.block.statements.length
-      var1 = spec.actions.first.statements.first.var
-      assert_equal var1, spec.actions.first.statements.last.expr
-      var2 = spec.actions.first.statements.last.var
+      action = spec.actions.first
+      assert_equal 2, action.statements.length
+      var1 = action.statements.first.var
+      assert_equal var1, action.statements.last.expr.variable
+      var2 = action.statements.last.var
       assert var1 != var2
     end
 
@@ -55,7 +56,7 @@ module ADSL::Parser
       assert_nothing_raised ADSLError do
         spec = parser.parse <<-adsl
           class Class { 0+ Class relation }
-          action do_something() {
+          action do_something {
             var = create(Class)
             create(Class)
             delete var
@@ -78,14 +79,14 @@ module ADSL::Parser
       
       assert_equal spec.classes.first, statements[2].klass
       
-      assert_equal var, statements[3].objset
+      assert_equal var, statements[3].objset.variable
 
-      assert_equal var, statements[4].objset1
-      assert_equal var, statements[4].objset2
+      assert_equal var, statements[4].objset1.variable
+      assert_equal var, statements[4].objset2.variable
       assert_equal relation, statements[4].relation
    
-      assert_equal var, statements[5].objset1
-      assert_equal var, statements[5].objset2
+      assert_equal var, statements[5].objset1.variable
+      assert_equal var, statements[5].objset2.variable
       assert_equal relation, statements[5].relation
     end
 
@@ -95,7 +96,7 @@ module ADSL::Parser
       assert_nothing_raised ADSLError do
         spec = parser.parse <<-adsl
           class Class { 0+ Class relation}
-          action do_something() {
+          action do_something {
             create(Class).relation += create(Class)
           }
         adsl
@@ -105,44 +106,6 @@ module ADSL::Parser
       assert_equal spec.classes.first, statements[0].klass
       assert_equal spec.classes.first, statements[1].klass
     end
-
-    def test_action__args_typecheck
-      parser = ADSLParser.new
-      spec = nil
-      assert_nothing_raised ADSLError do
-        spec = parser.parse <<-adsl
-          class Class {}
-          action do_something(0+ Class var1) {
-            var2 = var1
-          }
-        adsl
-      end
-      
-      klass = spec.classes.first
-      var1 = spec.actions.first.args.first
-      var2 = spec.actions.first.statements.first.var
-
-      assert_equal Set[klass], klass.to_sig.classes
-      assert_equal klass.to_sig, var1.type_sig
-      assert_equal klass.to_sig, var2.type_sig
-    end
-
-    def test_action__args_multiple
-      parser = ADSLParser.new
-      spec = nil
-      assert_nothing_raised ADSLError do
-        spec = parser.parse <<-adsl
-          class Class1 {}
-          class Class2 {}
-          class Class3 {}
-          action do_something(0..1 Class1 var1, 1 Class2 var2, 1+ Class3 var3) {
-          }
-        adsl
-      end
-      assert_equal ['var1', 'var2', 'var3'], spec.actions.first.args.map{ |v| v.name }
-      assert_equal spec.classes.map(&:to_sig), spec.actions.first.args.map(&:type_sig)
-      assert_equal [[0, 1], [1, 1], [1, 1.0/0.0]], spec.actions.first.cardinalities
-    end
     
     def test_action__createtup_deletetup_typecheck
       ['+=', '-='].each do |operator|
@@ -151,7 +114,7 @@ module ADSL::Parser
         assert_nothing_raised ADSLError do
           spec = parser.parse <<-adsl
             class Class { 1 Class rel }
-            action blah() {
+            action blah {
               allof(Class).rel #{operator} allof(Class)
             }
           adsl
@@ -165,7 +128,7 @@ module ADSL::Parser
           parser.parse <<-adsl
             class Class1 { 1 Class1 rel }
             class Class2 {}
-            action blah() {
+            action blah {
               allof(Class2).rel #{operator} allof(Class1)
             }
           adsl
@@ -175,7 +138,7 @@ module ADSL::Parser
           parser.parse <<-adsl
             class Class1 { 1 Class1 rel }
             class Class2 {}
-            action blah() {
+            action blah {
               allof(Class1).rel #{operator} allof(Class2)
             }
           adsl
@@ -191,7 +154,7 @@ module ADSL::Parser
           spec = parser.parse <<-adsl
             class Super { 1 Super rel }
             class Sub extends Super {}
-            action blah() {
+            action blah {
               allof(Super).rel #{operator} allof(Sub)
             }
           adsl
@@ -205,7 +168,7 @@ module ADSL::Parser
           spec = parser.parse <<-adsl
             class Super { 1 Super rel }
             class Sub extends Super {}
-            action blah() {
+            action blah {
               allof(Sub).rel #{operator} allof(Sub)
             }
           adsl
@@ -219,7 +182,7 @@ module ADSL::Parser
           spec = parser.parse <<-adsl
             class Super {}
             class Sub extends Super { 1 Super rel }
-            action blah() {
+            action blah {
               allof(Sub).rel #{operator} allof(Sub)
             }
           adsl
@@ -233,7 +196,7 @@ module ADSL::Parser
           parser.parse <<-adsl
             class Super {}
             class Sub extends Super { 1 Sub rel }
-            action blah() {
+            action blah {
               allof(Super).rel #{operator} allof(Super)
             }
           adsl
@@ -243,7 +206,7 @@ module ADSL::Parser
           parser.parse <<-adsl
             class Super {}
             class Sub extends Super { 1 Sub rel }
-            action blah() {
+            action blah {
               allof(Sub).rel #{operator} allof(Super)
             }
           adsl
@@ -259,7 +222,7 @@ module ADSL::Parser
         spec = parser.parse <<-adsl
           class Super { 1 Super rel }
           class Sub extends Super {}
-          action blah() {
+          action blah {
             allof(Super).rel = allof(Sub)
           }
         adsl
@@ -277,7 +240,7 @@ module ADSL::Parser
         spec = parser.parse <<-adsl
           class Super { 1 Super rel }
           class Sub extends Super {}
-          action blah() {
+          action blah {
             allof(Sub).rel = allof(Sub)
           }
         adsl
@@ -295,7 +258,7 @@ module ADSL::Parser
         spec = parser.parse <<-adsl
           class Super {}
           class Sub extends Super { 1 Super rel }
-          action blah() {
+          action blah {
             allof(Sub).rel = allof(Sub)
           }
         adsl
@@ -313,7 +276,7 @@ module ADSL::Parser
         parser.parse <<-adsl
           class Super {}
           class Sub extends Super { 1 Sub rel }
-          action blah() {
+          action blah {
             allof(Super).rel = allof(Super)
           }
         adsl
@@ -323,58 +286,9 @@ module ADSL::Parser
         parser.parse <<-adsl
           class Super {}
           class Sub extends Super { 1 Sub rel }
-          action blah() {
+          action blah {
             allof(Sub).rel = allof(Super)
           }
-        adsl
-      end
-    end
-
-    def test_action__args_cardinality
-      parser = ADSLParser.new
-      assert_nothing_raised ADSLError do
-        spec = parser.parse <<-adsl
-          class Class {}
-          action do_something(0..1 Class var1) {
-          }
-        adsl
-        spec = parser.parse <<-adsl
-          class Class {}
-          action do_something(1 Class var1) {
-          }
-        adsl
-        spec = parser.parse <<-adsl
-          class Class {}
-          action do_something(1..1 Class var1) {
-          }
-        adsl
-        spec = parser.parse <<-adsl
-          class Class {}
-          action do_something(0+ Class var1) {
-          }
-        adsl
-        spec = parser.parse <<-adsl
-          class Class {}
-          action do_something(1+ Class var1) {
-          }
-        adsl
-      end
-      assert_raises ADSLError do
-        parser.parse <<-adsl
-          class Class{}
-          action do_something(1..0)
-        adsl
-      end
-      assert_raises ADSLError do
-        parser.parse <<-adsl
-          class Class{}
-          action do_something(0)
-        adsl
-      end
-      assert_raises ADSLError do
-        parser.parse <<-adsl
-          class Class{}
-          action do_something(0..0)
         adsl
       end
     end
@@ -385,18 +299,18 @@ module ADSL::Parser
       assert_nothing_raised ADSLError do
         spec = parser.parse <<-adsl
           class Class {}
-          action do_something(0+ Class var1, 0+ Class var2) {
-            var2 = var1
+          action do_something {
+            var1 = allof(Class)
+            var1 = var1
           }
         adsl
       end
 
-      arg1 = spec.actions.first.args.first
-      arg2 = spec.actions.first.args.last
-      redefined = spec.actions.first.statements.first.var
+      action = spec.actions.first
+      var1, var2 = action.statements.map(&:var)
       
-      assert arg1 != arg2
-      assert arg2 != redefined
+      assert var1 != var2
+      assert var1 == action.statements.last.expr.variable
     end
 
     def test_action__allof_typecheck
@@ -405,7 +319,7 @@ module ADSL::Parser
       assert_nothing_raised ADSLError do
         spec = parser.parse <<-adsl
           class Class { 0+ Class relation }
-          action do_something() {
+          action do_something {
             var = allof(Class)
             var.relation -= var
           }
@@ -422,7 +336,7 @@ module ADSL::Parser
         parser.parse <<-adsl
           class Class { 0+ Class relation }
           class Class2 {}
-          action do_something() {
+          action do_something {
             var1 = allof(Class)
             var2 = allof(Class2)
             var1.relation -= var2
@@ -437,7 +351,7 @@ module ADSL::Parser
       assert_nothing_raised ADSLError do
         spec = parser.parse <<-adsl
           class Class { 0+ Class relation }
-          action do_something() {
+          action do_something {
             var = subset(allof(Class))
             var.relation -= var
           }
@@ -454,7 +368,7 @@ module ADSL::Parser
         parser.parse <<-adsl
           class Class { 0+ Class relation }
           class Class2 {}
-          action do_something() {
+          action do_something {
             var1 = allof(Class)
             var2 = subset(allof(Class2))
             var1.relation -= var2
@@ -470,7 +384,7 @@ module ADSL::Parser
         assert_nothing_raised ADSLError do
           spec = parser.parse <<-adsl
             class Class { 0+ Class relation }
-            action do_something() {
+            action do_something {
               var = #{ op }(allof(Class))
               var.relation -= var
             }
@@ -487,7 +401,7 @@ module ADSL::Parser
           parser.parse <<-adsl
             class Class { 0+ Class relation }
             class Class2 {}
-            action do_something() {
+            action do_something {
               var1 = allof(Class)
               var2 = #{ op }(allof(Class2))
               var1.relation -= var2
@@ -504,7 +418,7 @@ module ADSL::Parser
         spec = parser.parse <<-adsl
           class Class1 { 0+ Class2 relation }
           class Class2 { 0+ Class2 other_relation }
-          action do_something() {
+          action do_something {
             allof(Class1).relation.other_relation -= allof(Class2)
           }
         adsl
@@ -522,7 +436,7 @@ module ADSL::Parser
         parser.parse <<-adsl
           class Class1 { 0+ Class2 relation }
           class Class2 { 0+ Class2 other_relation }
-          action do_something() {
+          action do_something {
             allof(Class1).relation.relation -= allof(Class2)
           }
         adsl
@@ -537,7 +451,7 @@ module ADSL::Parser
         spec = parser.parse <<-adsl
           class Class1 { 0+ Class2 relation }
           class Class2 extends Class1 { 0+ Class2 other_relation }
-          action do_something() {
+          action do_something {
             allof(Class1).relation.other_relation -= allof(Class2)
           }
         adsl
@@ -552,7 +466,7 @@ module ADSL::Parser
         spec = parser.parse <<-adsl
           class Class1 { 0+ Class2 relation }
           class Class2 extends Class1 { 0+ Class2 other_relation }
-          action do_something() {
+          action do_something {
             allof(Class2).relation.other_relation -= allof(Class2)
           }
         adsl
@@ -568,7 +482,7 @@ module ADSL::Parser
       parser = ADSLParser.new
       spec = parser.parse <<-adsl
         class Class { 0+ Class relation }
-        action do_something() {
+        action do_something {
           var = allof(Class)
           foreach subvar: var {
             var.relation -= subvar
@@ -587,9 +501,9 @@ module ADSL::Parser
       var = stmts[0].var
       klass = spec.classes.first
       
-      assert_equal var, stmts[1].objset
+      assert_equal var, stmts[1].objset.variable
 
-      assert_equal var, stmts[2].blocks[0].statements.first.objset
+      assert_equal var, stmts[2].blocks[0].statements.first.objset.variable
 
       assert_equal klass, stmts[2].blocks[1].statements.first.klass
     end
@@ -599,7 +513,7 @@ module ADSL::Parser
       assert_nothing_raised ADSLError do
         parser.parse <<-adsl
           class Class {}
-          action do_something() {
+          action do_something {
             var = allof(Class)
             either {
               var = allof(Class)
@@ -617,7 +531,7 @@ module ADSL::Parser
         parser.parse <<-adsl
           class Class {}
           class Class2 {}
-          action do_something() {
+          action do_something {
             var = allof(Class)
             var = allof(Class2)
           }
@@ -630,14 +544,14 @@ module ADSL::Parser
       assert_raises ADSLError do
         parser.parse <<-adsl
           class Class {}
-          action do_something() {
+          action do_something {
             either {}
           }
         adsl
       end 
       spec = parser.parse <<-adsl
         class Class {}
-        action do_something() {
+        action do_something {
           either {
           } or {
             create(Class)
@@ -651,7 +565,7 @@ module ADSL::Parser
 
       spec = parser.parse <<-adsl
         class Class {}
-        action do_something() {
+        action do_something {
           either {
           } or {
             create(Class)
@@ -674,7 +588,7 @@ module ADSL::Parser
         parser.parse <<-adsl
           class Class {}
           class Class2 {}
-          action do_something() {
+          action do_something {
             var = allof(Class)
             either {
               var = allof(Class)
@@ -692,7 +606,7 @@ module ADSL::Parser
         parser.parse <<-adsl
           class Class {}
           class Class2 {}
-          action do_something() {
+          action do_something {
             either {
               var = allof(Class2)
             } or {
@@ -708,7 +622,7 @@ module ADSL::Parser
       assert_nothing_raised ADSLError do
         parser.parse <<-adsl
           class Class { 0+ Class relation }
-          action do_something() {
+          action do_something {
             foreach var: allof(Class) {
               var.relation -= allof(Class)
             }
@@ -719,7 +633,7 @@ module ADSL::Parser
         parser.parse <<-adsl
           class Class {}
           class Class2 { 0+ Class2 relation }
-          action do_something() {
+          action do_something {
             foreach var: allof(Class) {
               var.relation -= allof(Class)
             }
@@ -733,7 +647,8 @@ module ADSL::Parser
       assert_nothing_raised ADSLError do
         spec = parser.parse <<-adsl
           class Class { 0+ Class relation }
-          action do_something(0+ Class var) {
+          action do_something {
+            var = subset(allof(Class))
             foreach var: var {
             }
           }
@@ -745,7 +660,7 @@ module ADSL::Parser
       parser = ADSLParser.new
       spec = parser.parse <<-adsl
         class Class { 0+ Class relation }
-        action do_something() {
+        action do_something {
           foreach o: allof(Class) {
           }
         }
@@ -759,7 +674,7 @@ module ADSL::Parser
       assert_nothing_raised ADSLError do
         spec = parser.parse <<-adsl
           class Class { 0+ Class relation }
-          action do_something() {
+          action do_something {
             var = allof(Class)
             either {
               var = subset(var)
@@ -790,8 +705,8 @@ module ADSL::Parser
         :final_def   => final_def.var
       )
 
-      assert_equal lambda_def.expr.exprs[0], inside_def1.var
-      assert_equal lambda_def.expr.exprs[1], inside_def2.var
+      assert_equal lambda_def.expr.exprs[0].variable, inside_def1.var
+      assert_equal lambda_def.expr.exprs[1].variable, inside_def2.var
     end
     
     def test_action__if_lambda_works
@@ -800,7 +715,7 @@ module ADSL::Parser
       assert_nothing_raised ADSLError do
         spec = parser.parse <<-adsl
           class Class { 0+ Class relation }
-          action do_something() {
+          action do_something {
             var = allof(Class)
             if isempty(var) {
               var = subset(var)
@@ -831,8 +746,8 @@ module ADSL::Parser
         :final_def  => final_def.var
       )
 
-      assert_equal lambda_def.expr.then_expr, then_def.var
-      assert_equal lambda_def.expr.else_expr, else_def.var
+      assert_equal lambda_def.expr.then_expr.variable, then_def.var
+      assert_equal lambda_def.expr.else_expr.variable, else_def.var
     end
 
     def test_action__if_condition_var_definition
@@ -841,7 +756,7 @@ module ADSL::Parser
       assert_raises ADSLError do
         spec = parser.parse <<-adsl
           class Class {}
-          action blah() {
+          action blah {
             if isempty(var = allof(Class)) {
               a = var
             } else {
@@ -854,7 +769,7 @@ module ADSL::Parser
       assert_nothing_raised ADSLError do
         spec = parser.parse <<-adsl
           class Class {}
-          action blah() {
+          action blah {
             if isempty(var = allof(Class)) {
               a = var
             } else {
@@ -882,7 +797,7 @@ module ADSL::Parser
       parser = ADSLParser.new
       spec = parser.parse <<-adsl
         class Class {}
-        action do_something() {
+        action do_something {
           foreach var: allof(Class) {}
         }
       adsl
@@ -890,7 +805,7 @@ module ADSL::Parser
 
       spec = parser.parse <<-adsl
         class Class {}
-        action do_something() {
+        action do_something {
           foreach var: allof(Class) {
             var = allof(Class)
           }
@@ -900,7 +815,7 @@ module ADSL::Parser
 
       spec = parser.parse <<-adsl
         class Class {}
-        action do_something() {
+        action do_something {
           var = allof(Class)
           foreach a: allof(Class) {
             var = subset(var)
@@ -916,7 +831,7 @@ module ADSL::Parser
 
       spec = parser.parse <<-adsl
         class Class {}
-        action do_something() {
+        action do_something {
           var = allof(Class)
           foreach var: allof(Class) {
             var = allof(Class)
@@ -937,7 +852,7 @@ module ADSL::Parser
           class Class2 {
             1 Class2 klass2
           }
-          action do_something() {
+          action do_something {
             allof(Class).klass += empty
             allof(Class2).klass2 += empty
           }
@@ -946,7 +861,7 @@ module ADSL::Parser
 
       assert_raises ADSLError do
         parser.parse <<-adsl
-          action do_something() {
+          action do_something {
             empty.some_relation += empty
           }
         adsl
@@ -957,7 +872,7 @@ module ADSL::Parser
           class Class {
             1 Class klass
           }
-          action do_something() {
+          action do_something {
             c = empty 
             allof(Class).klass += c
           }
@@ -969,7 +884,7 @@ module ADSL::Parser
           class Class {
             1 Class klass
           }
-          action do_something() {
+          action do_something {
             c = empty
             c.klass += allof(Class)
           }
@@ -985,7 +900,7 @@ module ADSL::Parser
           class Class {
             1 Class klass
           }
-          action do_something() {
+          action do_something {
             a = empty
             a = allof(Class)
             a.klass += a
@@ -997,7 +912,7 @@ module ADSL::Parser
           class Class {
             1 Class klass
           }
-          action do_something() {
+          action do_something {
             a = empty
             a = allof(Class)
             a.klass += a
@@ -1009,7 +924,7 @@ module ADSL::Parser
           class Class {
             1 Class klass
           }
-          action do_something() {
+          action do_something {
             a = allof(Class)
             a = empty
             a.klass += a
@@ -1021,7 +936,7 @@ module ADSL::Parser
           class Class {
             1 Class klass
           }
-          action do_something() {
+          action do_something {
             a = allof(Class)
             a = empty
             b = a
@@ -1037,7 +952,7 @@ module ADSL::Parser
       assert_nothing_raised ADSLError do
         spec = parser.parse <<-ADSL
           class Class {}
-          action blah() {
+          action blah {
             a = b = create(Class)
             delete a
             delete b
@@ -1054,8 +969,8 @@ module ADSL::Parser
       assert_equal 'b',   statements[1].var.name
       assert_equal 'a',   statements[2].var.name
       assert_equal 'b',   statements[2].expr.name
-      assert_equal 'a',   statements[3].objset.name
-      assert_equal 'b',   statements[4].objset.name
+      assert_equal 'a',   statements[3].objset.variable.name
+      assert_equal 'b',   statements[4].objset.variable.name
     end
 
     def test_action__conditional_branches
@@ -1064,7 +979,7 @@ module ADSL::Parser
       assert_nothing_raised ADSLError do
         spec = parser.parse <<-ADSL
           class Class {}
-          action blah() {
+          action blah {
             if isempty(allof(Class)) {
               delete allof(Class)
             }
@@ -1095,7 +1010,7 @@ module ADSL::Parser
       assert_nothing_raised ADSLError do
         spec = parser.parse <<-ADSL
           class Class {}
-          action blah() {
+          action blah {
             flatforeach a: allof(Class) {
             }
           }
@@ -1106,7 +1021,7 @@ module ADSL::Parser
       assert_nothing_raised ADSLError do
         spec = parser.parse <<-ADSL
           class Class {}
-          action blah() {
+          action blah {
             unflatforeach a: allof(Class) {
             }
           }
@@ -1117,7 +1032,7 @@ module ADSL::Parser
       assert_nothing_raised ADSLError do
         spec = parser.parse <<-ADSL
           class Class {}
-          action blah() {
+          action blah {
             foreach a: allof(Class) {
             }
           }
@@ -1140,7 +1055,7 @@ module ADSL::Parser
           string strfield
           bool boolfield
         }
-        action blah() {
+        action blah {
           o = oneof(allof(Class))
           o.intfield = 3
           o.realfield = 5.425
@@ -1162,8 +1077,8 @@ module ADSL::Parser
     assert_nothing_raised ADSLError do
       spec = parser.parse %q{
         class Class { string s }
-        action blah(1 Class o) {
-          o.s = 'asd'
+        action blah {
+          oneof(allof(Class)).s = 'asd'
         }
       }
     end
@@ -1173,8 +1088,8 @@ module ADSL::Parser
     assert_raises ADSLError do
       spec = parser.parse %q{
         class Class { string s }
-        action blah(1 Class o) {
-          o.s = 'asd'kme'
+        action blah {
+          oneof(allof(Class)).s = 'asd'kme'
         }
       }
     end
@@ -1182,8 +1097,8 @@ module ADSL::Parser
     assert_nothing_raised ADSLError do
       spec = parser.parse %q{
         class Class { string s }
-        action blah(1 Class o) {
-          o.s = 'asd\\'kme'
+        action blah {
+          oneof(allof(Class)).s = 'asd\\'kme'
         }
       }
     end
@@ -1193,8 +1108,8 @@ module ADSL::Parser
     assert_nothing_raised ADSLError do
       spec = parser.parse %q{
         class Class { string s }
-        action blah(1 Class o) {
-          o.s = 'asd\\\\'kme'
+        action blah {
+          oneof(allof(Class)).s = 'asd\\\\'kme'
         }
       }
     end
@@ -1204,8 +1119,8 @@ module ADSL::Parser
     assert_nothing_raised ADSLError do
       spec = parser.parse %q{
         class Class { string s }
-        action blah(1 Class o) {
-          o.s = 'asd\\\\\\'kme'
+        action blah {
+          oneof(allof(Class)).s = 'asd\\\\\\'kme'
         }
       }
     end
@@ -1222,7 +1137,7 @@ module ADSL::Parser
         class Class {
           int field
         }
-        action blah() {
+        action blah {
           o = oneof(allof(Class))
           o.field = 5
         }
@@ -1233,7 +1148,7 @@ module ADSL::Parser
         class Class {
           int field
         }
-        action blah() {
+        action blah {
           o = oneof(allof(Class))
           o2 = oneof(allof(Class))
           o.field = o2.field
@@ -1247,7 +1162,7 @@ module ADSL::Parser
           int field
           string other_type
         }
-        action blah() {
+        action blah {
           o = oneof(allof(Class))
           o.field = o.other_type
         }
@@ -1264,7 +1179,7 @@ module ADSL::Parser
         class Class {
           int field
         }
-        action blah() {
+        action blah {
           allof(Class).field = oneof(allof(Class)).field
         }
       ADSL
@@ -1275,7 +1190,7 @@ module ADSL::Parser
         class Class {
           int field
         }
-        action blah() {
+        action blah {
           allof(Class).field = allof(Class).field
         }
       ADSL

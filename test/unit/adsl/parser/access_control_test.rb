@@ -106,7 +106,7 @@ module ADSL::Parser
       assert_nothing_raised ADSLError do
         parser.parse <<-adsl
           authenticable class User {}
-          action blah() {
+          action blah {
             delete currentuser
           }
         adsl
@@ -114,7 +114,7 @@ module ADSL::Parser
       assert_raises ADSLError do
         parser.parse <<-adsl
           class User {}
-          action blah() {
+          action blah {
             delete currentuser
           }
         adsl
@@ -126,7 +126,7 @@ module ADSL::Parser
       assert_nothing_raised ADSLError do
         parser.parse <<-adsl
           authenticable class User {}
-          action blah() {
+          action blah {
             u = allof(User)
             u = currentuser
           }
@@ -136,7 +136,7 @@ module ADSL::Parser
         parser.parse <<-adsl
           authenticable class User {}
           class User2
-          action blah() {
+          action blah {
             u = allof(User2)
             u = currentuser
           }
@@ -150,7 +150,7 @@ module ADSL::Parser
         parser.parse <<-adsl
           authenticable class User {}
           usergroup UG
-          action blah() {
+          action blah {
             a = inusergroup(UG)
           }
         adsl
@@ -159,7 +159,7 @@ module ADSL::Parser
         parser.parse <<-adsl
           authenticable class User {}
           usergroup UG
-          action blah() {
+          action blah {
             a = inusergroup(UGa)
           }
         adsl
@@ -172,7 +172,7 @@ module ADSL::Parser
         parser.parse <<-adsl
           authenticable class User {}
           usergroup UG
-          action blah() {
+          action blah {
             a = inusergroup(UG)
           }
         adsl
@@ -181,7 +181,7 @@ module ADSL::Parser
         parser.parse <<-adsl
           class User {}
           usergroup UG
-          action blah() {
+          action blah {
             a = inusergroup(UG)
           }
         adsl
@@ -194,7 +194,7 @@ module ADSL::Parser
         parser.parse <<-adsl
           authenticable class User {}
           usergroup UG
-          action blah() {
+          action blah {
             a = inusergroup(UG)
           }
           invariant not inusergroup(UG)
@@ -208,7 +208,7 @@ module ADSL::Parser
         parser.parse <<-adsl
           authenticable class User {}
           usergroup UG
-          action blah() {
+          action blah {
             a = inusergroup(UG)
           }
           invariant not inusergroup(allof(User), UG)
@@ -222,7 +222,7 @@ module ADSL::Parser
         parser.parse <<-adsl
           authenticable class User {}
           usergroup UG
-          action blah() {
+          action blah {
             a = allofusergroup(UG)
           }
         adsl
@@ -230,7 +230,7 @@ module ADSL::Parser
       assert_raises ADSLError do
         parser.parse <<-adsl
           class User {}
-          action blah() {
+          action blah {
             a = allofusergroup(UG)
           }
         adsl
@@ -243,7 +243,7 @@ module ADSL::Parser
         parser.parse <<-adsl
           authenticable class User {}
           usergroup UG
-          action blah() {
+          action blah {
             a = allofusergroup(UG)
           }
         adsl
@@ -252,7 +252,7 @@ module ADSL::Parser
         parser.parse <<-adsl
           authenticable class User {}
           usergroup UG
-          action blah() {
+          action blah {
             a = allofusergroup(UG2)
           }
         adsl
@@ -265,7 +265,7 @@ module ADSL::Parser
         parser.parse <<-adsl
           authenticable class User {}
           usergroup UG
-          action blah() {
+          action blah {
             a = allofusergroup(UG)
             a = create(User)
           }
@@ -349,7 +349,7 @@ module ADSL::Parser
       assert_raises ADSLError do
         parser.parse <<-adsl
           authenticable class User {}
-          action blah() {
+          action blah {
             a = permittedbytype(create Nonexistent)
           }
         adsl

@@ -322,6 +322,14 @@ module ADSL
       container_for :name, :type_sig
     end
 
+    class DSVariableRead < DSNode
+      container_for :variable
+
+      def type_sig
+        @variable.type_sig
+      end
+    end
+
     class DSAnythingExpr < DSNode
       container_for
 

@@ -6,19 +6,19 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
   def test_blank_data_store
     adsl_assert :correct, <<-ADSL
       authenticable class User {}
-      action blah() {}
+      action blah {}
     ADSL
   end
 
   def test_auth_test_triggered_if_auth_class_exists
     adsl_assert :correct, <<-ADSL
       authenticable class User {}
-      action blah() {
+      action blah {
       }
     ADSL
     adsl_assert :incorrect, <<-ADSL
       authenticable class User {}
-      action blah() {
+      action blah {
         create(User)
       }
     ADSL
@@ -29,24 +29,24 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
     pred = Predicate.new "User", sort
     adsl_assert :incorrect, <<-ADSL, :conjecture => Exists[sort, :o, pred[:o]]
       class User {}
-      action blah() {}
+      action blah {}
     ADSL
     adsl_assert :correct, <<-ADSL, :conjecture => Exists[sort, :o, pred[:o]]
       authenticable class User {}
-      action blah() {}
+      action blah {}
     ADSL
   end
 
   def test_create_needs_permission
     adsl_assert :incorrect, <<-ADSL
       authenticable class User {}
-      action blah() {
+      action blah {
         create(User)
       }
     ADSL
     adsl_assert :correct, <<-ADSL
       authenticable class User {}
-      action blah() {
+      action blah {
         create(User)
       }
       permit create allof(User)
@@ -56,13 +56,13 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
   def test_delete_needs_permission
     adsl_assert :incorrect, <<-ADSL
       authenticable class User {}
-      action blah() {
+      action blah {
         delete allof(User)
       }
     ADSL
     adsl_assert :correct, <<-ADSL
       authenticable class User {}
-      action blah() {
+      action blah {
         delete allof(User)
       }
       permit delete allof(User)
@@ -72,7 +72,7 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
   def test_strange_result_with_creating_and_subeq_deleting_not_being_an_op
     adsl_assert :correct, <<-ADSL
       authenticable class User {}
-      action blah() {
+      action blah {
         delete create(User)
       }
     ADSL
@@ -81,7 +81,7 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
   def test_edit_implies_create_or_delete
     adsl_assert :incorrect, <<-ADSL
       authenticable class User {}
-      action blah() {
+      action blah {
         create(User)
         delete oneof(allof(User))
       }
@@ -89,7 +89,7 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
     ADSL
     adsl_assert :incorrect, <<-ADSL
       authenticable class User {}
-      action blah() {
+      action blah {
         create(User)
         delete oneof(allof(User))
       }
@@ -97,7 +97,7 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
     ADSL
     adsl_assert :correct, <<-ADSL
       authenticable class User {}
-      action blah() {
+      action blah {
         create(User)
         delete oneof(allof(User))
       }
@@ -110,7 +110,7 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
       authenticable class User {}
       usergroup ug
       rule inusergroup(currentuser, ug)
-      action blah() {
+      action blah {
         create(User)
       }
       permit ug create allof(User)
@@ -119,7 +119,7 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
       authenticable class User {}
       usergroup ug1, ug2
       rule not inusergroup(currentuser, ug1)
-      action blah() {
+      action blah {
         create(User)
       }
       permit ug1 create allof(User)
@@ -127,7 +127,7 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
     adsl_assert :incorrect, <<-ADSL
       authenticable class User {}
       usergroup ug1
-      action blah() {
+      action blah {
         create(User)
       }
       permit ug1 create allof(User)
@@ -139,7 +139,7 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
       authenticable class User {
         0+ User friends
       }
-      action blah() {
+      action blah {
         currentuser.friends += create(User)
       }
       permit edit currentuser.friends
@@ -151,7 +151,7 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
       authenticable class User {
         0+ User friends
       }
-      action blah() {
+      action blah {
         currentuser.friends += oneof(allof(User))
       }
       permit read currentuser
@@ -161,7 +161,7 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
       authenticable class User {
         0+ User friends
       }
-      action blah() {
+      action blah {
         currentuser.friends += oneof(allof(User))
       }
       permit create currentuser
@@ -174,7 +174,7 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
       authenticable class User {
         0+ User friends
       }
-      action blah() {
+      action blah {
         currentuser.friends -= oneof(allof(User))
       }
       permit delete currentuser
@@ -184,7 +184,7 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
       authenticable class User {
         0+ User friends
       }
-      action blah() {
+      action blah {
         currentuser.friends -= oneof(allof(User))
       }
       permit read currentuser
@@ -195,13 +195,13 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
   def test_read__basic
     adsl_assert :incorrect, <<-ADSL
       authenticable class User {}
-      action blah() {
+      action blah {
         v = allof(User)
       }
     ADSL
     adsl_assert :correct, <<-ADSL
       authenticable class User {}
-      action blah() {
+      action blah {
         v = allof(User)
       }
       permit read allof(User)
@@ -211,28 +211,28 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
   def test_read__some
     adsl_assert :correct, <<-ADSL
       authenticable class User {}
-      action blah() {
+      action blah {
         v = allof(User)
       }
       permit read allof(User)
     ADSL
     adsl_assert :correct, <<-ADSL
       authenticable class User {}
-      action blah() {
+      action blah {
         v = oneof(allof(User))
       }
       permit read allof(User)
     ADSL
     adsl_assert :incorrect, <<-ADSL
       authenticable class User {}
-      action blah() {
+      action blah {
         v = allof(User)
       }
       permit read oneof(allof(User))
     ADSL
     adsl_assert :incorrect, <<-ADSL
       authenticable class User {}
-      action blah() {
+      action blah {
         v = oneof(allof(User))
       }
       permit read oneof(allof(User))
@@ -244,7 +244,7 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
       authenticable class User{
         0+ User friends
       }
-      action blah() {
+      action blah {
         delete subset(currentuser.friends)
       }
       permit edit currentuser.friends
@@ -256,7 +256,7 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
       authenticable class User {}
       class Stuff {}
       usergroup Mod
-      action blah() {
+      action blah {
         create(Stuff)
       }
       permit Mod edit allof(User)
@@ -267,7 +267,7 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
     adsl_assert :correct, <<-ADSL
       authenticable class User {}
       class Stuff {}
-      action blah() {
+      action blah {
         if permitted(delete allof(Stuff)) {
           delete oneof(allof(Stuff))
         }
@@ -277,7 +277,7 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
     adsl_assert :correct, <<-ADSL
       authenticable class User {}
       class Stuff {}
-      action blah() {
+      action blah {
         if permitted(delete allof(Stuff)) {
           delete oneof(allof(Stuff))
         }
@@ -295,7 +295,7 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
         1 User owner inverseof notes
       }
       usergroup Mod
-      action blah() {
+      action blah {
         delete currentuser.notes
       }
       permit Mod edit allof(Note)
@@ -307,7 +307,7 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
       class Note {
         1 User owner inverseof notes
       }
-      action blah() {
+      action blah {
         delete currentuser.notes
       }
       permit edit allof(Note)
@@ -319,7 +319,7 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
       class Note {
         1 User owner inverseof notes
       }
-      action blah() {
+      action blah {
         delete currentuser.notes
       }
       permit edit currentuser.notes
@@ -332,7 +332,7 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
         0+ Other others
       }
       class Other {}
-      action blah() {
+      action blah {
         obj = oneof(allof(Other))
         delete obj
       }
@@ -344,7 +344,7 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
         0+ Other others
       }
       class Other {}
-      action blah() {
+      action blah {
         obj = oneof(allof(Other))
         currentuser.others += obj
         currentuser.others -= obj
@@ -361,7 +361,7 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
         1 Other others
       }
       class Other {}
-      action blah() {
+      action blah {
         currentuser.others = create(Other)
         currentuser.others = create(Other)
         currentuser.others = create(Other)
@@ -374,7 +374,7 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
     adsl_assert :correct, <<-ADSL
       authenticable class User {}
       permit read currentuser
-      action blah() {
+      action blah {
         at__user = oneof(allof(User))
         assert at__user in currentuser
       }
@@ -391,7 +391,7 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
       }
       permit read currentuser
       permit read currentuser.meals
-      action blah() {
+      action blah {
         at__meals = subset(allof(Meal))
         assert at__meals in currentuser.meals
       }
