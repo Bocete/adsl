@@ -252,6 +252,10 @@ module ADSL
       container_for
     end
 
+    class DSAssertFormula < DSNode
+      container_for :formula
+    end
+
     class DSEither < DSNode
       container_for :blocks, :lambdas
     end

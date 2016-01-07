@@ -111,6 +111,9 @@ class ADSL::Parser::ADSLParser < Racc::Parser
       when (text = @ss.scan(/allofusergroup\b/))
          action { [:allofusergroup, lineno] }
 
+      when (text = @ss.scan(/assert\b/))
+         action { [:assert, lineno] }
+
       when (text = @ss.scan(/raise\b/))
          action { [:raize, lineno] }
 

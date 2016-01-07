@@ -24,6 +24,10 @@ module ADSL
           self.class.name
         end
 
+        def present?
+          true
+        end
+
         def adsl_ast
           nil
         end

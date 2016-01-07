@@ -218,4 +218,25 @@ class ADSL::Util::GeneralTest < ActiveSupport::TestCase
     clone[0][0][0] = 4
     assert_not_equal a, clone
   end
+
+  def inc_a(a)
+    ensure_once { a + 1 }
+  end
+  def test_ensure_once_simple
+    a = 0
+    ensure_once { a = 1 }
+    assert_equal 1, a
+
+    ensure_once(:key) { a = a + 1 }
+    ensure_once(:key) { a = a + 1 }
+    assert_equal 2, a
+
+    ensure_once { a = a + 1 }
+    ensure_once { a = a + 1 }
+    assert_equal 4, a
+
+    a = inc_a a
+    a = inc_a a
+    assert_equal 5, a
+  end
 end

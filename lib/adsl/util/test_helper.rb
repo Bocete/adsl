@@ -39,7 +39,7 @@ class ActiveSupport::TestCase
       fol = translation.to_fol.optimize!
 
       engine = ADSL::Prover::Engine.new prover, fol, :timeout => options[:timeout]
-      
+      engine.prepare_prover_commands
       result = engine.run
       if result[:result] == :unknown || result[:result] == :timeout
         message "inconclusive result"# on testcase #{self.class.name}.#{method_name}"

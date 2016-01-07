@@ -145,27 +145,7 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
       permit edit currentuser.friends
     ADSL
   end
-
-  def test_create_assoc__without_permit
-    adsl_assert :incorrect, <<-ADSL
-      authenticable class User {
-        0+ User friends
-      }
-      action blah() {
-        currentuser.friends += oneof(allof(User))
-      }
-    ADSL
-    adsl_assert :correct, <<-ADSL
-      authenticable class User {
-        0+ User friends
-      }
-      action blah() {
-        currentuser.friends += oneof(allof(User))
-      }
-      permit create currentuser.friends
-    ADSL
-  end
-
+  
   def test_create_assoc__with_permit
     adsl_assert :correct, <<-ADSL
       authenticable class User {
@@ -186,26 +166,6 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
       }
       permit create currentuser
       permit create currentuser.friends
-    ADSL
-  end
-
-  def test_delete_assoc__without_permit
-    adsl_assert :incorrect, <<-ADSL
-      authenticable class User {
-        0+ User friends
-      }
-      action blah() {
-        currentuser.friends -= oneof(allof(User))
-      }
-    ADSL
-    adsl_assert :incorrect, <<-ADSL
-      authenticable class User {
-        0+ User friends
-      }
-      action blah() {
-        currentuser.friends -= oneof(allof(User))
-      }
-      permit delete currentuser.friends
     ADSL
   end
 
@@ -301,27 +261,6 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
       }
       permit Mod edit allof(User)
     ADSL
-    adsl_assert :correct, <<-ADSL
-      authenticable class User {}
-      class Stuff {}
-      usergroup Mod
-      action blah() {
-        if permitted(create allof(Stuff)) {
-          create(Stuff)
-        }
-      }
-      permit Mod edit allof(User)
-    ADSL
-    adsl_assert :correct, <<-ADSL
-      authenticable class User {}
-      class Stuff {}
-      usergroup Mod
-      action blah() {
-        if permitted(create allof(Stuff)) {
-          create(Stuff)
-        }
-      }
-    ADSL
   end
 
   def test_not_permitted_implies_skip
@@ -344,39 +283,6 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
         }
       }
       invariant not exists(Stuff s)
-    ADSL
-  end
-
-  def test_permitted_create
-    adsl_assert :incorrect, <<-ADSL
-      authenticable class User {}
-      class Stuff {}
-      usergroup Mod
-      action blah() {
-        delete allof(Stuff)
-      }
-      permit Mod edit allof(Stuff)
-    ADSL
-    adsl_assert :correct, <<-ADSL
-      authenticable class User {}
-      class Stuff {}
-      usergroup Mod
-      action blah() {
-        if permitted(delete allof(Stuff)) {
-          delete allof(Stuff)
-        }
-      }
-      permit Mod edit allof(Stuff)
-    ADSL
-    adsl_assert :correct, <<-ADSL
-      authenticable class User {}
-      class Stuff {}
-      usergroup Mod
-      action blah() {
-        if permitted(delete allof(Stuff)) {
-          delete allof(Stuff)
-        }
-      }
     ADSL
   end
 
@@ -461,6 +367,34 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
         currentuser.others = create(Other)
       }
       permit edit currentuser.others
+    ADSL
+  end
+
+  def test_the_user_reads_only_the_current_user
+    adsl_assert :correct, <<-ADSL
+      authenticable class User {}
+      permit read currentuser
+      action blah() {
+        at__user = oneof(allof(User))
+        assert at__user in currentuser
+      }
+    ADSL
+  end
+
+  def test_the_user_reads_their_own_meals
+    adsl_assert :correct, <<-ADSL
+      authenticable class User {
+        0+ Meal meals
+      }
+      class Meal {
+        0..1 User user
+      }
+      permit read currentuser
+      permit read currentuser.meals
+      action blah() {
+        at__meals = subset(allof(Meal))
+        assert at__meals in currentuser.meals
+      }
     ADSL
   end
 end

@@ -21,6 +21,7 @@ rule
   currentuser\b     { [:currentuser, lineno] }
   inusergroup\b     { [:inusergroup, lineno] }
   allofusergroup\b  { [:allofusergroup, lineno] }
+  assert\b          { [:assert, lineno] }
   raise\b           { [:raize, lineno] }
   foreach\b         { [:foreach, lineno] }
   either\b          { [:either, lineno] }

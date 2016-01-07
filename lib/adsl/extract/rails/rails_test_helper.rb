@@ -40,11 +40,25 @@ def initialize_test_context
     end
     
     def authorize!; end
+    def load_resource; end
     def should_authorize?; false; end
+    def should_load_resource?; false; end
+
     def self.authorize_resource(*args)
       ApplicationController.class_exec do
         def should_authorize?; true; end
       end
+    end
+    
+    def self.load_resource(*args)
+      ApplicationController.class_exec do
+        def should_load_resource?; true; end
+      end
+    end
+
+    def self.load_and_authorize_resource
+      load_resource
+      authorize_resource
     end
 
     # no templates exist and we do not care
@@ -78,6 +92,7 @@ def initialize_test_context
     def before_nothing; end
     def after_nothing; end
 
+    before_filter :load_resource
     before_filter :authorize!
   end
 end
@@ -160,20 +175,8 @@ def define_cancan_suite
   Object.lookup_or_create_class('::Ability', Object).class_exec do
     include ::CanCan::Ability
   end
-  AsdsController.class_exec do
-    #def self.authorize_resource(*args)
-    #  if AsdsController.instance_methods(false).include? :should_authorize?
-    #    AsdsController.send :remove_method, :should_authorize?
-    #  end
-    #  before_filter :authorize!, *args
-    #end
-  end
 end
 
 def teardown_cancan_suite
   unload_class :Ability, :User
-
-  AsdsController.class_exec do
-    #def should_authorize?; false; end
-  end
 end

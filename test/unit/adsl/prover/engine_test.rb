@@ -17,7 +17,12 @@ class ADSL::Prover::EngineTest < ActiveSupport::TestCase
   end
 
   def test__trivially_correct
-    assert_equal :correct,   Engine.new('spass', wrap_formula(true)).run[:result]
-    assert_equal :incorrect, Engine.new('spass', wrap_formula(false)).run[:result]
+    engine = Engine.new('spass', wrap_formula(true))
+    engine.prepare_prover_commands
+    assert_equal :correct, engine.run[:result]
+
+    engine = Engine.new('spass', wrap_formula(false))
+    engine.prepare_prover_commands
+    assert_equal :incorrect, engine.run[:result]
   end
 end

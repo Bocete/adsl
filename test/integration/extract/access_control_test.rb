@@ -86,30 +86,6 @@ class ADSL::Extract::AccessControlRailsVerificationTest < ADSL::Extract::Rails::
     assert verify :ast => ast, :verify_options => verify_options_for('AsdsController__destroy')
   end
 
-  def test_verify__assoc_deref_permission_is_inferred_from_delete_permission
-    AsdsController.class_exec do
-      def destroy
-        current_user.asds.delete_all
-      end
-    end
-
-    ast = create_rails_extractor.adsl_ast
-
-    assert verify :ast => ast, :verify_options => verify_options_for('AsdsController__destroy')
-  end
-
-  def test_verify__assoc_permission_is_inferred_from_create_permission
-    AsdsController.class_exec do
-      def create
-        current_user.asds << Asd.find
-      end
-    end
-
-    ast = create_rails_extractor.adsl_ast
-
-    assert_false verify :ast => ast, :verify_options => verify_options_for('AsdsController__create')
-  end
-
   def test_verify_authorize_resource_create
     AsdsController.class_exec do
       authorize_resource

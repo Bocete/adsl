@@ -36,11 +36,19 @@ module ADSL
 
         def instrument_gem_devise(controller_class, action)
           return unless Object.lookup_const('Devise')
-          
+
+          roles = []
           Devise.mappings.values.each do |mapping|
             role = mapping.singular
             role_class = mapping.class_name
+            roles << [role, role_class]
+          end
 
+          if roles.empty? && Object.lookup_const(:User)
+            roles << ['user', 'User']
+          end
+          
+          roles.each do |role, role_class|
             if cancan_exists?
               current_user_code = <<-RUBY.strip
                 #{role_class}.new(:adsl_ast => ADSL::Parser::ASTCurrentUser.new)

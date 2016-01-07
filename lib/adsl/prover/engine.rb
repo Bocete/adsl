@@ -28,7 +28,6 @@ module ADSL
       end
       
       def run
-        prepare_prover_commands
         output, index = ADSL::Prover::Util.process_race(*@commands.map(&:first))
         result = self.send "_analyze_#{commands[index][1]}_output", output
         result[:prover] = commands[index][1]

@@ -449,7 +449,6 @@ module ADSL
           context.rules << (rule_node.typecheck_and_resolve context)
         end
 
-
         # make sure invariants have unique names; create names for unnamed invariants
         names = Set.new
         @invariants.each do |invariant_node|
@@ -485,7 +484,8 @@ module ADSL
       end
 
       def to_adsl
-        [@classes, @usergroups, @rules, @ac_rules, @actions, @invariants].map{ |coll| coll.map(&:to_adsl).join }.join "\n"
+        output = [@classes, @usergroups, @rules, @ac_rules, @actions, @invariants].map{ |coll| coll.map(&:to_adsl).join }.join "\n"
+        output.gsub(/\n{2,}/, "\n\n")
       end
 
       def adsl_ast_size(options = {})
@@ -502,6 +502,65 @@ module ADSL
           sum += i.adsl_ast_size
         end
         sum
+      end
+
+      def split_into_individual_ac_rules
+        @ac_rules = @ac_rules.map do |rule|
+          subrules = []
+          group_name_lists = rule.group_names.map{ |name| [name] }
+          group_name_lists = [[]] if group_name_lists.empty?
+          group_name_lists.each do |group_names|
+            rule.ops.each do |op|
+              subrules << ADSL::Parser::ASTPermit.new(:group_names => group_names, :ops => [op], :expr => rule.expr.dup)
+            end
+          end
+          subrules
+        end.flatten.uniq
+      end
+
+      def remove_redundant_rules
+        rules_that_cover_all = @ac_rules.select{ |a| a.expr.is_a? ADSL::Parser::ASTAllOf }.group_by{ |a| a.expr.class_name.text }
+        rules_that_dereference = @ac_rules.select{ |a| a.expr.is_a? ADSL::Parser::ASTMemberAccess }
+
+        rules_that_dereference.each do |deref_entry|
+          login_class ||= @classes.select{ |c| c.authenticable }.first
+          to_class = login_class.members.select{ |a| a.name.text == deref_entry.expr.member_name.text }.first.to_class_name.text
+          cover_alls = rules_that_cover_all[to_class]
+          next if cover_alls.nil? || cover_alls.empty?
+
+          deref_covered_by_all = cover_alls.any? do |cover_all_entry|
+            cover_all_entry.group_names == deref_entry.group_names && cover_all_entry.ops == deref_entry.ops
+          end
+          @ac_rules.delete deref_entry if deref_covered_by_all
+        end
+      end
+
+      def merge_rule_ops
+        rules_by_non_ops = @ac_rules.group_by{ |e| [e.group_names, e.expr] }
+        @ac_rules = rules_by_non_ops.map do |pair, entries|
+          next entries.first if entries.length == 1
+          ADSL::Parser::ASTPermit.new :group_names => pair[0], :ops => entries.map(&:ops).flatten.uniq, :expr => pair[1]
+        end
+      end
+
+      def merge_rule_groups
+        rules_by_non_role_groups = @ac_rules.group_by{ |e| [e.ops, e.expr] }
+        @ac_rules = rules_by_non_role_groups.map do |pair, entries|
+          next entries.first if entries.length == 1
+          ADSL::Parser::ASTPermit.new :group_names => entries.map(&:group_names).flatten.uniq, :ops => pair[0], :expr => pair[1]
+        end
+      end
+
+      def optimize_ac_rules
+        split_into_individual_ac_rules
+        remove_redundant_rules
+        merge_rule_ops
+        merge_rule_groups
+      end
+
+      def optimize!
+        optimize_ac_rules
+        self
       end
     end
     
@@ -534,6 +593,10 @@ module ADSL
 
       def authenticable?
         @authenticable
+      end
+
+      def associations(incl_parent = true)
+        @members.select{ |m| m.is_a? ASTRelation }
       end
 
       def to_adsl
@@ -652,13 +715,17 @@ module ADSL
         raise new_ex
       end
 
+      def variable_read_by_view(var_name)
+        var_name.start_with? 'at__'
+      end
+
       def optimize
         copy = dup
         copy.instance_variable_set :@pre_optimize_adsl_ast_size, copy.adsl_ast_size
 
         copy.block = until_no_change(copy.block) do |block|
           block = block.optimize(true)
-          
+
           # update counters of branches that might be necesarry
           return_counter_map = Hash.new{ |hash, key| hash[key] = 0 }
           if_counter_map     = Hash.new{ |hash, key| hash[key] = 0 }
@@ -692,7 +759,7 @@ module ADSL
               expr
             end
           end
-          
+         
           block = block.optimize(true)
 
           variables_read = Set[]
@@ -705,10 +772,10 @@ module ADSL
             next unless node.reaches_view?
             variables_read += node.statements.select{ |s| s.is_a?(ASTExprStmt) && s.expr.is_a?(ASTAssignment) }.map{ |s| s.expr.var_name.text }
           end
-
           block.block_replace do |node|
             next unless node.is_a? ASTAssignment
             next if node.var_name.nil? || variables_read.include?(node.var_name.text)
+            next if variable_read_by_view node.var_name.text.to_s
             node.expr
           end
 
@@ -746,11 +813,17 @@ module ADSL
       end
 
       def prepend_global_variables_by_signatures(*regexes)
-        variable_names = []
-        preorder_traverse do |node|
-          next unless node.is_a? ASTVariable
-          name = node.var_name.text
-          variable_names << name if regexes.map{ |r| r =~ name ? true : false }.include? true
+        variable_names = Set[]
+        @block.statements.each do |stmt|
+          if stmt.is_a?(ASTBlock) || stmt.is_a?(ASTIf) || stmt.is_a?(ASTEither) || stmt.is_a?(ASTForEach)
+            stmt.blocks.each do |block|
+              block.preorder_traverse do |node|
+                next unless node.is_a? ASTVariable
+                name = node.var_name.text
+                variable_names << name if regexes.map{ |r| r =~ name ? true : false }.include? true
+              end
+            end
+          end
         end
         variable_names.each do |name|
           @block.statements.unshift ASTExprStmt.new(:expr => ASTAssignment.new(
@@ -799,6 +872,10 @@ module ADSL
         false
       end
 
+      def blocks
+        [self]
+      end
+
       def returns?
         stmt_type_inevitable :returns?
       end
@@ -809,6 +886,37 @@ module ADSL
 
       def reaches_view?
         stmt_type_inevitable :reaches_view?
+      end
+
+      # if there is an assignment before the action, and the exact same assignment repeated in the action,
+      # remove the second one.
+      #
+      # this is to avoid issues like creating an object with default values, authenticating, and recreating
+      def remove_overwritten_assignments!(action_label)
+        action_index = @statements.index{ |s| s.is_a?(ASTDummyStmt) && s.label.to_s == action_label.to_s }
+        return if action_index.nil?
+
+        action_index -= 1
+        before_action_assignments = Set[]
+        @statements.first(action_index).each do |stmt|
+          stmt.preorder_traverse do |node|
+            before_action_assignments << node.var_name.text if node.is_a? ASTAssignment
+          end
+        end
+
+        @statements[action_index..-1].each do |stmt|
+          stmt.block_replace do |node|
+            if node.is_a?(ASTAssignment)
+              if before_action_assignments.delete? node.var_name.text
+                # this assigment, and its expression, never happened
+                next ASTDummyObjset.new
+              end
+            elsif node.is_a?(ASTVariable)
+              before_action_assignments.delete node.var_name.text
+            end
+            node
+          end
+        end
       end
 
       def remove_statements_after_returns!(tail = [])
@@ -943,6 +1051,27 @@ module ADSL
       end
     end
 
+    class ASTAssertFormula < ASTNode
+      node_fields :formula
+      node_type :statement
+
+      def typecheck_and_resolve(context)
+        formula = @formula.typecheck_and_resolve context
+        unless formula.type_sig.is_bool_type?
+          raise ADSLError, "Asserted formula is not of boolean type (type provided `#{formula.type_sig}` on line #{ @lineno })"
+        end
+        ADSL::DS::DSAssertFormula.new :formula => formula
+      end
+
+      def optimize(last_stmt=false)
+        ASTAssertFormula.new :formula => formula.optimize
+      end
+
+      def to_adsl
+        "assert #{ @formula.to_adsl }\n"
+      end
+    end
+
     class ASTCreateObjset < ASTNode
       node_fields :class_name
       node_type :expr
@@ -967,6 +1096,10 @@ module ADSL
     class ASTForEach < ASTNode
       node_fields :var_name, :objset, :block
       node_type :statement
+
+      def blocks
+        [block]
+      end
 
       def force_flat(value)
         @force_flat = value
@@ -1630,11 +1763,12 @@ module ADSL
 
       def optimize
         until_no_change super do |union|
+          next union.optimize unless union.is_a? ASTUnion
           next ASTEmptyObjset.new if union.objsets.empty?
           next union.objsets.first if union.objsets.length == 1
-          ASTUnion.new(:objsets => union.objsets.map{ |objset|
-            objset.is_a?(ASTUnion) ? objset.objsets : [objset]
-          }.flatten(1).reject{ |o| o.is_a? ASTEmptyObjset })
+          flat_objsets = union.objsets.map{ |objset| objset.is_a?(ASTUnion) ? objset.objsets : [objset] }.flatten(1)
+          flat_objsets.reject!{ |o| o.is_a? ASTEmptyObjset }
+          ASTUnion.new(:objsets => flat_objsets)
         end
       end
 
@@ -2246,7 +2380,9 @@ module ADSL
       end
 
       def to_adsl
-        if @subformulae.length == 1
+        if @subformulae.empty?
+          return "(false)"
+        elsif @subformulae.length == 1
           @subformulae.first.to_adsl
         elsif @subformulae.length == 2
           "(#{ @subformulae.first.to_adsl } or #{@subformulae.last.to_adsl})"
@@ -2394,6 +2530,15 @@ module ADSL
       
       def to_adsl
         "#{ @objset1.to_adsl } in #{ @objset2.to_adsl }"
+      end
+
+      def optimize
+        until_no_change super do |astin|
+          next astin.optimize unless astin.is_a? ASTIn
+          next ASTBoolean::TRUE if astin.objset1.is_a? ASTEmptyObjset
+          next ASTBoolean::FALSE if astin.objset2.is_a? ASTEmptyObjset
+          next astin
+        end
       end
     end
     

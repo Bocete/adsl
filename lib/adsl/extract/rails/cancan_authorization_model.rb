@@ -12,9 +12,10 @@ module ADSL
           @entries ||= Set[]
         end
 
-        def permit(usergroup, op, objects)
+        def permit(usergroups, action, objects)
           initialize_model_permissions
-          @entries << CancanPermissionEntry.new(usergroup, op, objects)
+          usergroups = [usergroups || self.usergroups].flatten
+          @entries << CancanPermissionEntry.new(usergroups, action, objects)
         end
 
         def generate_can_query_formula(action, subject)
@@ -23,19 +24,33 @@ module ADSL
 
           if subject.is_a?(Class) && subject < ActiveRecord::Base
             # just check whether the current user is of the right usergroup
-            permitted_usergroups = Set[*related_entries.map(&:usergroup)]
+            permitted_usergroups = Set[*related_entries.map(&:usergroups).flatten]
           
             ASTOr.new :subformulae => permitted_usergroups.map{ |ug|
               name = ASTIdent.new :text => ug.name.text
               ASTInUserGroup.new :groupname => name
             }
-          elsif subject.is_a?(ActiveRecord::Base)
-            groups_and_entries = related_entries.group_by &:usergroup
+          elsif subject.respond_to? :adsl_ast
+            groups_and_entries = Hash.new{ |hash, key| hash[key] = [] }
+            related_entries.each do |entry|
+              if entry.usergroups.empty?
+                groups_and_entries[nil] << entry
+              else
+                entry.usergroups.each do |group|
+                  groups_and_entries[group] << entry
+                end
+              end
+            end
             ASTOr.new :subformulae => groups_and_entries.map{ |ug, entries|
-              usergroup_name = ASTIdent.new :text => ug.name
-              objsets = entries.map &:objset
+              ug_condition = if ug.nil?
+                ASTBoolean.new :bool_value => true
+              else
+                ASTInUserGroup.new :groupname => ASTIdent.new(:text => ug.name.text)
+              end
+
+              objsets = entries.map(&:objset).map &:adsl_ast
               ASTAnd.new :subformulae => [
-                ASTInUserGroup.new(:groupname => usergroup_name),
+                ug_condition,
                 ASTIn.new(:objset1 => subject.adsl_ast, :objset2 => ASTUnion.new(:objsets => objsets))
               ]
             }
@@ -45,8 +60,8 @@ module ADSL
         end
 
         def generate_permits
-          return [] if @entries.nil? 
-          @entries.map(&:generate_permit).flatten.compact
+          return [] if @entries.nil?
+          entries = @entries.map(&:generate_permit).flatten.compact.uniq
         end
 
         private
@@ -60,26 +75,27 @@ module ADSL
         end
 
         class CancanPermissionEntry
-          attr_reader :usergroup, :op, :subject
+          attr_reader :usergroups, :action, :subject
 
-          def initialize(usergroup, op, subject)
-            @usergroup = usergroup
-            @op = op
+          def initialize(usergroups, action, subject)
+            @usergroups = usergroups
+            @action = action
             @subject = subject
           end
 
           def related?(action, subject)
             subject_class = subject.is_a?(Class) ? subject : subject.class
-            subject_class <= @subject.class && (@op == :manage || @op == action)
+            ops_intersect = (inferred_ops & self.class.infer_ops(action))
+            (subject_class <= @subject.class) && (ops_intersect.any? || @action.to_s == action.to_s)
           end
 
-          def object_ops
-            case @op.to_sym
+          def self.infer_ops(action)
+            case action.to_sym
             when :manage
-              [:edit, :read]
-            when :manage, :edit
-              [:edit]
-            when :create
+              [:create, :delete, :read]
+            when :edit
+              [:create, :delete]
+            when :create, :new
               [:create]
             when :read, :index, :view, :show
               [:read]
@@ -90,14 +106,23 @@ module ADSL
             end
           end
 
+          def inferred_ops
+            self.class.infer_ops @action
+          end
+
           def objset
             @subject.is_a?(Class) ? @subject.all : @subject
           end
 
-          def generate_permit
-            group_names = @usergroup ? [ADSL::Parser::ASTIdent.new(:text => @usergroup.name.text)] : []
-            ops = object_ops
+          def to_s
+            subject_objset = self.objset
+            subject_text = subject_objset.respond_to?(:adsl_ast) ? subject_objset.adsl_ast.to_adsl : subject_objset
+            "#{ @usergroup.name.text } can #{ @action } #{ subject_text }"
+          end
 
+          def generate_permit
+            group_names = @usergroups.map{ |ug| ADSL::Parser::ASTIdent.new(:text => ug.name.text) }
+            ops = inferred_ops
             ADSL::Parser::ASTPermit.new :group_names => group_names, :ops => ops, :expr => objset.adsl_ast if ops.any?
           end
         end

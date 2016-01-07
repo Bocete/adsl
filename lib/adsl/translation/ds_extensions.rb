@@ -137,9 +137,6 @@ module ADSL
           rel.enforce_cardinality translation
         end
 
-        @invariants.each do |inv|
-          inv.prepare translation
-        end
         @ac_rules.each do |rule|
           rule.prepare translation
         end
@@ -404,7 +401,7 @@ module ADSL
       def gen_covers_formula(translation, op, ps, var_type_sig, var)
         return false unless @ops.include? op
         return false unless @expr.type_sig >= var_type_sig
-        
+
         ADSL::FOL::And[
           ADSL::FOL::Or[*@usergroups.map{ |g| g[translation.current_user[]] }],
           @expr.resolve_expr(translation, ps, var)
@@ -891,6 +888,22 @@ module ADSL
       end
     end
 
+    class DSAssertFormula < DSNode
+      def prepare(translation)
+        @formula.prepare_expr translation
+      end
+
+      def migrate_state(translation)
+        translation.reserve translation.context.make_ps do |ps|
+          f = ADSL::FOL::ForAll.new(ps, ADSL::FOL::Implies.new(
+            translation.branch_condition(translation, ps),
+            @formula.resolve_expr(translation, ps)
+          ))
+          translation.create_formula f
+        end
+      end
+    end
+
     class DSForEachCommon < DSNode
       include FOL
 
@@ -1176,19 +1189,20 @@ module ADSL
 
     class DSSubset < DSNode
       def prepare_expr(translation)
+        context = translation.context
         @objset.prepare_expr translation
+        @sort = @objset.type_sig.to_sort
+        @pred = translation.create_predicate :objset_subset, context.sort_array, @sort
       end
 
       def resolve_expr(translation, ps, var)
         context = translation.context
-        sort = @objset.type_sig.to_sort
-        pred = translation.create_predicate :objset_subset, context.sort_array, sort
-        translation.reserve context.make_ps, sort, :o do |ps, o|
+        translation.reserve context.make_ps, @sort, :o do |ps, o|
           translation.create_formula FOL::ForAll.new(ps, o,
-            FOL::Implies.new(pred[ps, o], @objset.resolve_expr(translation, ps, o))
+            FOL::Implies.new(@pred[ps, o], @objset.resolve_expr(translation, ps, o))
           )
         end
-        return pred[ps, var]
+        return @pred[ps, var]
       end
     end
 
@@ -1303,52 +1317,54 @@ module ADSL
     
     class DSTryOneOf < DSNode
       def prepare_expr(translation)
+        context = translation.context
         @objset.prepare_expr translation
+        @sort = @objset.to_sort
+        @pred = translation.create_predicate :try_one_of, context.sort_array, @sort
+        translation.create_formula ADSL::Translation::Util.gen_formula_for_unique_arg(
+          @pred, context.level
+        )
       end
 
       def resolve_expr(translation, ps, var)
         context = translation.context
-        sort = @objset.to_sort
-        pred = translation.create_predicate :try_one_of, context.sort_array, sort
-        translation.create_formula ADSL::Translation::Util.gen_formula_for_unique_arg(
-          pred, context.level
-        )
-        translation.reserve context.make_ps, sort, :o do |subps, o|
+        translation.reserve context.make_ps, @sort, :o do |subps, o|
           co_in_objset = @objset.resolve_expr(translation, subps, o)
           translation.create_formula FOL::ForAll.new(subps, FOL::Equiv.new(
-            FOL::Exists.new(o, FOL::And.new(translation.state[subps, o], pred[subps, o])),
+            FOL::Exists.new(o, FOL::And.new(translation.state[subps, o], @pred[subps, o])),
             FOL::Exists.new(o, FOL::And.new(translation.state[subps, o], co_in_objset))
           ))
           translation.create_formula FOL::ForAll.new(subps, o,
-            FOL::Implies.new(pred[subps, o], FOL::And.new(translation.state[subps, o], co_in_objset))
+            FOL::Implies.new(@pred[subps, o], FOL::And.new(translation.state[subps, o], co_in_objset))
           )
         end
-        pred[ps, var]
+        @pred[ps, var]
       end
     end
     
     class DSOneOf < DSNode
       def prepare_expr(translation)
+        context = translation.context
         @objset.prepare_expr translation
+        @sort = @objset.type_sig.to_sort
+        @pred = translation.create_predicate :one_of, context.sort_array, @sort
+        translation.create_formula ADSL::Translation::Util.gen_formula_for_unique_arg(
+          @pred, context.level
+        )
       end
 
       def resolve_expr(translation, ps, var)
         context = translation.context
-        sort = @objset.type_sig.to_sort
-        pred = translation.create_predicate :one_of, context.sort_array, sort
-        translation.create_formula ADSL::Translation::Util.gen_formula_for_unique_arg(
-          pred, context.level
-        )
-        translation.reserve context.make_ps, sort, :o do |subps, o|
+        translation.reserve context.make_ps, @sort, :o do |subps, o|
           co_in_objset = @objset.resolve_expr(translation, subps, o)
           translation.create_formula FOL::ForAll.new(subps,
-            FOL::Exists.new(o, pred[subps, o])
+            FOL::Exists.new(o, @pred[subps, o])
           )
           translation.create_formula FOL::ForAll.new(subps, o,
-            FOL::Implies.new(pred[subps, o], FOL::And.new(translation.state[subps, o], co_in_objset))
+            FOL::Implies.new(@pred[subps, o], FOL::And.new(translation.state[subps, o], co_in_objset))
           )
         end
-        pred[ps, var]
+        @pred[ps, var]
       end
     end
 

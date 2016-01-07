@@ -94,8 +94,16 @@ module ADSL
         end
         alias_method :==, :eql?
         
+        def to_hash
+          aggregate = {}
+          self.class.container_for_fields.each do |field|
+            aggregate[field] = self.send field
+          end
+          aggregate
+        end
+
         def hash
-          [*self.class.container_for_fields.map{ |f| self.send f }].hash
+          to_hash.hash
         end
         
         def dup

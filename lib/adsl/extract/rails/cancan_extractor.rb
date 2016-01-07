@@ -121,75 +121,116 @@ module ADSL
               var_name = [instance_name, instance_name.pluralize].select{ |i| instance_variable_defined? "@#{i}" }.first
 
               if var_name
-                subject = ADSL::Parser::ASTVariable.new(:var_name => ADSL::Parser::ASTIdent.new(:text => "at__#{var_name}"))
+                subject = model_class.new(
+                  :adsl_ast => ADSL::Parser::ASTVariable.new(
+                    :var_name => ADSL::Parser::ASTIdent.new(:text => "at__#{var_name}")
+                  )
+                )
               else
                 subject = controller_name.classify
               end
 
-              condition = rails_extractor.generate_can_query_formula action_name, subject
+              auth_guarantee = rails_extractor.generate_can_query_formula action_name, subject
               
-              ins_stmt ADSL::Parser::ASTIf.new(
-                :condition => condition,
-                :then_block => ADSL::Parser::ASTBlock.new(:statements => []),
-                :else_block => ADSL::Parser::ASTBlock.new(:statements => [
-                  ADSL::Parser::ASTRaise.new
-                ])
-              )
+              ins_explore_all 'authorize' do
+                ins_stmt ADSL::Parser::ASTAssertFormula.new(
+                  :formula => auth_guarantee
+                )
+              end
+            end
+
+            def load_resource(*args)
+              return if respond_to?(:should_load_resource?) && !should_load_resource?
+              self.class.cancan_resource_class.new(self).load_resource
             end
           end
         end
 
         def define_controller_resource_stuff
-          CanCan::ControllerAdditions::ClassMethods.class_exec do
-            def load_resource(*args)
-              before_filter do
-                ins_explore_all 'load_resource' do
-                  old_load_resource
-
-                  if load_instance?
-                    if new_actions.include?(@params[:action].to_sym)
-                      @controller.remove_instance_variable "@#{instance_name.to_s}"
-                      return
-                    else
-                      var_name, value = instance_name.to_s, resource_base.find
-                    end
-                  else
-                    var_name, value = instance_name.to_s.pluralize, resource_base.where
-                  end
-
-                  ins_stmt(ADSL::Parser::ASTAssignment.new(
-                    :var_name => ADSL::Parser::ASTIdent.new(:text => "at__#{var_name}"),
-                    :expr => value.adsl_ast
-                  ))
-                end
+          CanCan::ControllerResource.class_exec do
+            def resource_instance=(instance)
+              ins_explore_all 'load_resource_instance' do
+                var_name = ADSL::Parser::ASTIdent.new(:text => "at__#{instance_name}")
+                ins_stmt(ADSL::Parser::ASTAssignment.new(
+                  :var_name => var_name,
+                  :expr => instance.adsl_ast
+                ))
               end
+              @controller.instance_variable_set("@#{instance_name}", instance)
+            end
+            
+            def collection_instance=(instance)
+              ins_explore_all 'load_collection_instance' do
+                ins_stmt(ADSL::Parser::ASTAssignment.new(
+                  :var_name => ADSL::Parser::ASTIdent.new(:text => "at__#{instance_name.to_s.pluralize}"),
+                  :expr => instance.adsl_ast
+                ))
+              end
+              @controller.instance_variable_set("@#{instance_name.to_s.pluralize}", instance)
             end
           end
         end
 
         def instrument_ability
+          CanCan::Ability.class_eval <<-ruby
+            def rails_extractor
+              ObjectSpace._id2ref #{ self.object_id }
+            end
+          ruby
           CanCan::Ability.class_exec do
             def can(actions = nil, subject = nil, conditions_hash = nil, &block)
               return if ::ADSL::Extract::Instrumenter.get_instance.nil?
               return if ::ADSL::Extract::Instrumenter.get_instance.ex_method.nil?
               
+              if subject == :all
+                rails_extractor.ar_classes.each do |klass|
+                  can actions, klass, conditions_hash, &block
+                end
+                return
+              end
+              actions = expand_actions [actions].flatten
+              
               expr = nil
-              unless conditions_hash.nil?
+              login_class = CanCanExtractor.default_login_class
+              equality_lhs = nil
+              # try to deduce equality from arg hash
+              if conditions_hash.present?
                 conditions_hash.each do |key, val|
-                  login_class = CanCanExtractor.default_login_class
                   if val.is_a?(login_class) && val.adsl_ast.is_a?(ASTCurrentUser)
-                    # either we're talking about the User class or some class that relates to User
-                    if subject == login_class
-                      expr = login_class.new(:adsl_ast => ASTCurrentUser.new)
-                    else
-                      # we need an inverse of that dereference
-                      candidates = login_class.reflections.values.select do |refl|
-                        refl.foreign_key.to_sym == key.to_sym && refl.class_name.constantize == subject
-                      end
-                      if candidates.length == 1
-                        expr = login_class.new(:adsl_ast => ASTCurrentUser.new).send candidates.first.name
-                      end
-                    end
+                    equality_lhs = subject.new(:adsl_ast => :subject).send(key)
+                  end
+                end
+              end
+
+              # try to deduce equality from block
+              if block.present?
+                raise 'we are not supporting blocks anymore. Too buggy'
+                # arg = subject.new :adsl_ast => :subject
+                # result = block[arg]
+                # if result.is_a?(ASTEqual)
+                #   if result.exprs.any?{ |node| node.is_a? ASTCurrentUser }
+                #     ignore_in_default = true
+                #     equality_lhs = result.exprs.reject{ |node| node.is_a? ASTCurrentUser }.first
+                #   end
+                # end
+              end
+
+              if equality_lhs
+                equality_lhs = equality_lhs.adsl_ast if equality_lhs.respond_to? :adsl_ast
+                if equality_lhs == :subject
+                  expr = subject.new :adsl_ast => ASTCurrentUser.new
+                elsif equality_lhs.is_a?(ASTMemberAccess) && equality_lhs.objset == :subject
+                  name = equality_lhs.member_name.text.to_sym
+                  reflection = subject.reflections[name]
+
+                  inverse_refs = login_class.reflections.values.select do |r|
+                    r.class_name == subject.name && r.foreign_key == reflection.foreign_key
+                  end
+                  if inverse_refs.length == 1
+                    expr = subject.new :adsl_ast => ASTMemberAccess.new(
+                      :objset => ASTCurrentUser.new,
+                      :member_name => ASTIdent.new(:text => inverse_refs.first.name.to_s)
+                    )
                   end
                 end
               end
@@ -197,7 +238,7 @@ module ADSL
               ins_stmt(ADSL::Parser::ASTDummyStmt.new(:label => {
                 :actions => actions,
                 :domain => subject,
-                :expr => expr
+                :expr => expr,
               }))
             end
           end
@@ -244,13 +285,16 @@ module ADSL
                 if info[:expr]
                   expr = info[:expr]
                 else
+                  if klass.is_a? Symbol
+                    # klass may be unrelated to a class
+                    klass = Object.lookup_const klass.to_s.classify
+                    next if klass.nil?
+                  end
                   expr = klass.all
                 end
 
-                groups.each do |group|
-                  actions.each do |action|
-                    permit group, action, expr
-                  end
+                actions.each do |action|
+                  permit groups, action, expr
                 end
               end
             end

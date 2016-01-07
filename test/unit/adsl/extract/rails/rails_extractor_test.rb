@@ -149,27 +149,21 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :create)
     statements = ast.block.statements
 
-    assert_equal 4, statements.length
-    
-    # all instance variables are initialized to empty
-    assert_equal ASTExprStmt,    statements[0].class
-    assert_equal ASTAssignment,  statements[0].expr.class
-    assert_equal 'at__a',        statements[0].expr.var_name.text
-    assert_equal ASTEmptyObjset, statements[0].expr.expr.class
+    assert_equal 3, statements.length
 
-    assert_equal ASTExprStmt,     statements[1].class
-    assert_equal ASTAssignment,   statements[1].expr.class
-    assert_equal 'at__a',         statements[1].expr.var_name.text
-    assert_equal ASTCreateObjset, statements[1].expr.expr.class
-    assert_equal 'Asd',           statements[1].expr.expr.class_name.text
+    assert_equal ASTExprStmt,     statements[0].class
+    assert_equal ASTAssignment,   statements[0].expr.class
+    assert_equal 'at__a',         statements[0].expr.var_name.text
+    assert_equal ASTCreateObjset, statements[0].expr.expr.class
+    assert_equal 'Asd',           statements[0].expr.expr.class_name.text
 
-    assert_equal ASTExprStmt,    statements[2].class
-    assert_equal ASTAssignment,  statements[2].expr.class
-    assert_equal 'a',            statements[2].expr.var_name.text
-    assert_equal ASTEmptyObjset, statements[2].expr.expr.class
+    assert_equal ASTExprStmt,    statements[1].class
+    assert_equal ASTAssignment,  statements[1].expr.class
+    assert_equal 'a',            statements[1].expr.var_name.text
+    assert_equal ASTEmptyObjset, statements[1].expr.expr.class
     
-    assert_equal ASTDeleteObj, statements[3].class
-    assert_equal 'at__a',      statements[3].objset.var_name.text
+    assert_equal ASTDeleteObj, statements[2].class
+    assert_equal 'at__a',      statements[2].objset.var_name.text
   end
   
   def test_extract__class_variable_assignment
@@ -183,37 +177,32 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
         respond_to
       end
     end
-    
+
     extractor = create_rails_extractor
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :create)
     statements = ast.block.statements
 
-    assert_equal 5, statements.length
+    assert_equal 4, statements.length
     
     assert_equal ASTExprStmt,     statements[0].class
     assert_equal ASTAssignment,   statements[0].expr.class
     assert_equal 'atat__a',       statements[0].expr.var_name.text
-    assert_equal ASTEmptyObjset,  statements[0].expr.expr.class
-    
-    assert_equal ASTExprStmt,     statements[1].class
-    assert_equal ASTAssignment,   statements[1].expr.class
-    assert_equal 'atat__a',       statements[1].expr.var_name.text
-    assert_equal ASTCreateObjset, statements[1].expr.expr.class
-    assert_equal 'Asd',           statements[1].expr.expr.class_name.text
+    assert_equal ASTCreateObjset, statements[0].expr.expr.class
+    assert_equal 'Asd',           statements[0].expr.expr.class_name.text
 
-    assert_equal ASTExprStmt,     statements[2].class
-    assert_equal ASTAssignment,   statements[2].expr.class
-    assert_equal 'a',             statements[2].expr.var_name.text
-    assert_equal ASTEmptyObjset,  statements[2].expr.expr.class
+    assert_equal ASTExprStmt,    statements[1].class
+    assert_equal ASTAssignment,  statements[1].expr.class
+    assert_equal 'a',            statements[1].expr.var_name.text
+    assert_equal ASTEmptyObjset, statements[1].expr.expr.class
     
-    assert_equal ASTExprStmt,     statements[3].class
-    assert_equal ASTAssignment,   statements[3].expr.class
-    assert_equal 'at__a',         statements[3].expr.var_name.text
-    assert_equal ASTEmptyObjset,  statements[3].expr.expr.class
+    assert_equal ASTExprStmt,    statements[2].class
+    assert_equal ASTAssignment,  statements[2].expr.class
+    assert_equal 'at__a',        statements[2].expr.var_name.text
+    assert_equal ASTEmptyObjset, statements[2].expr.expr.class
     
-    assert_equal ASTDeleteObj, statements[4].class
-    assert_equal ASTVariable,  statements[4].objset.class
-    assert_equal 'atat__a',    statements[4].objset.var_name.text
+    assert_equal ASTDeleteObj, statements[3].class
+    assert_equal ASTVariable,  statements[3].objset.class
+    assert_equal 'atat__a',    statements[3].objset.var_name.text
   end
 
   def test_extract__assignments_dont_make_values_nil

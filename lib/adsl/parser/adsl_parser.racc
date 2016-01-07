@@ -11,7 +11,7 @@ class ADSLParser
     left '<=>'
     right '='
   preclow
-  token authenticable usergroup class extends inverseof action foreach flatforeach unflatforeach either or xor create derefcreate delete if else subset oneof tryoneof allof invariant forall exists in isempty empty true false not and equal implies unknown currentuser inusergroup allofusergroup permit permitted permittedbytype edit read IDENT NUMBER STRING BASIC_TYPE JS roole raize pickoneexpr
+  token authenticable usergroup class extends inverseof action foreach flatforeach unflatforeach either or xor create derefcreate delete if else subset oneof tryoneof allof invariant forall exists in isempty empty true false not and equal implies unknown currentuser inusergroup allofusergroup permit permitted permittedbytype edit read IDENT NUMBER STRING BASIC_TYPE JS roole raize assert pickoneexpr
   start adslspec
 rule
   adslspec: root_elems { return ASTSpec.new(:lineno => lineno,
@@ -98,6 +98,7 @@ rule
                :lineno => val[0], :condition => val[1], :then_block => val[2], :else_block => val[3]
              )}
            | raize                    { return ASTRaise.new :lineno => val[0] }
+           | assert expr              { return ASTAssertFormula.new :lineno => val[0], :formula => val[1] }
 
   foreach_stmt: foreach IDENT ':' expr block {
                   return ASTForEach.new :lineno => val[0], :var_name => val[1], :objset => val[3], :block => val[4]

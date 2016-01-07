@@ -219,6 +219,17 @@ module Kernel
       return object if old_object == object
     end
   end
+
+  def ensure_once(key = caller(1, 1).first)
+    @ensure_once_events_already_covered ||= {}
+    if @ensure_once_events_already_covered.include? key
+      @ensure_once_events_already_covered[key]
+    else
+      value = yield
+      @ensure_once_events_already_covered[key] = value
+      value
+    end
+  end
 end
 
 module Enumerable

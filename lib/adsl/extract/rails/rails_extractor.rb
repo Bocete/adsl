@@ -18,15 +18,16 @@ module ADSL
         include ADSL::Extract::Rails::RailsSpecialGemInstrumentation
         include ADSL::Extract::Rails::CanCanExtractor
         
-        attr_accessor :ar_classes, :actions, :invariants, :rules, :ac_rules, :instrumentation_filters
+        attr_accessor :ar_classes, :actions, :invariants, :rules, :instrumentation_filters
 
         def cyclic_destroy_dependency?(options)
           classes = options[:ar_classes]
           destroy_deps = {}
           classes.each do |ar_class|
-            destroy_deps[ar_class] = Set.new(ar_class.reflections.values.select{ |reflection|
-              [:destroy, :destroy_all].include? reflection.options[:dependent]
-            }.map{ |refl| refl.through_reflection || refl }.map(&:class_name).map(&:constantize))
+            dependent_assocs = ar_class.reflections.values.select{ |reflection|
+              [:destroy, :destroy_all].include?(reflection.options[:dependent]) && reflection.options[:as].nil?
+            }
+            destroy_deps[ar_class] = Set[*dependent_assocs.map{ |refl| refl.through_reflection || refl }.map(&:class_name).map(&:constantize)]
           end
           destroy_reachability = until_no_change Hash.new(Set.new) do |so_far|
             new_hash = so_far.dup
@@ -75,8 +76,7 @@ module ADSL
           @action_instrumenter.instrumentation_filters = @instrumentation_filters
           @actions = []
 
-          @rules = []
-          @ac_rules = []
+          @rules = Set[]
 
           prepare_cancan_instrumentation
           extract_ac_rules
@@ -142,7 +142,7 @@ module ADSL
           controller = controller_class.new
           @action_instrumenter.instrument controller, action
           callbacks(controller_class).each do |callback|
-            next if callback.filter.is_a?(String)
+            next unless callback.filter.is_a?(Symbol)
             @action_instrumenter.instrument controller, callback.filter 
           end
         end
@@ -177,6 +177,7 @@ module ADSL
           session.reset!
 
           block.remove_statements_after_returns!
+          block.remove_overwritten_assignments! route[:action]
 
           #interrupt_callback_chain_on_render block, route[:action]
           action = ADSL::Parser::ASTAction.new({
@@ -188,6 +189,7 @@ module ADSL
           })
 
           action = action.optimize
+
           action.prepend_global_variables_by_signatures /^at__.*/, /^atat__.*/
 
           action
@@ -222,10 +224,12 @@ module ADSL
 
         def controller_of(route)
           return nil unless route.defaults.include? :controller
-          possible_names = [
-            "#{route.defaults[:controller].singularize}_controller".camelize,
-            "#{route.defaults[:controller].pluralize}_controller".camelize
-          ]
+          controller_parts = route.defaults[:controller].split('/')
+          controller_names = controller_parts.length.times.map{ |i| controller_parts.last(i+1).join '/' }
+          possible_names = controller_names.map{ |n| [
+            "#{n.singularize}_controller".camelize,
+            "#{n.pluralize}_controller".camelize
+          ] }.flatten
           possible_names.each do |name|
             begin
               return name.constantize
@@ -264,14 +268,14 @@ module ADSL
             end
             usergroups = self.usergroups
           end
-          ADSL::Parser::ASTSpec.new(
+          spec = ADSL::Parser::ASTSpec.new(
             :classes => klass_nodes,
             :actions => @actions,
             :invariants => @invariants,
             :usergroups => usergroups,
             :rules => @rules,
             :ac_rules => generate_permits
-          )
+          ).optimize!
         end
       end
     end

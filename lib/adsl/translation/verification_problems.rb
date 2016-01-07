@@ -33,16 +33,16 @@ module ADSL
             problems += assignments.map{ |asgn| ADSL::Translation::AccessControlReadProblem.new asgn.expr }
 
             # assocs
-            rels = action.recursively_gather do |elem|
-              elem.relation if elem.is_a?(DSCreateTup)
-            end
-            problems += rels.uniq.map{ |rel| ADSL::Translation::AccessControlAssocProblem.new rel }
+            # rels = action.recursively_gather do |elem|
+            #   elem.relation if elem.is_a?(DSCreateTup)
+            # end
+            # problems += rels.uniq.map{ |rel| ADSL::Translation::AccessControlAssocProblem.new rel }
 
             # deassocs
-            rels = action.recursively_gather do |elem|
-              elem.relation if elem.is_a?(DSDeleteTup)
-            end
-            problems += rels.uniq.map{ |rel| ADSL::Translation::AccessControlDeassocProblem.new rel }
+            # rels = action.recursively_gather do |elem|
+            #   elem.relation if elem.is_a?(DSDeleteTup)
+            # end
+            # problems += rels.uniq.map{ |rel| ADSL::Translation::AccessControlDeassocProblem.new rel }
           end
         end
         
@@ -79,15 +79,21 @@ module ADSL
 
     class InvariantVerificationProblem
       def initialize(*listed_invariants)
-        @listed_invariants = listed_invariants.empty? ? spec.invariants : listed_invariants
+        @listed_invariants = (listed_invariants.empty? ? spec.invariants : listed_invariants).dup
       end
 
       def generate_conjecture(translation)
         translation.state = translation.initial_state
-        pre_invariants = translation.spec.invariants.map{ |invariant| invariant.formula.resolve_expr(translation, []) }
+        pre_invariants = translation.spec.invariants.map do |invariant|
+          invariant.prepare translation
+          invariant.formula.resolve_expr(translation, [])
+        end
         
         translation.state = translation.final_state
-        post_invariants = @listed_invariants.map{ |invariant| invariant.formula.resolve_expr(translation, []) }
+        post_invariants = @listed_invariants.map do |invariant|
+          invariant.prepare translation
+          invariant.formula.resolve_expr(translation, [])
+        end
         
         FOL::Implies.new(
           FOL::And.new(pre_invariants),

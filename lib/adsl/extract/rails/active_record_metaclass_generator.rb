@@ -68,7 +68,9 @@ module ADSL
               # just dont treat it as an inverse
               nil
             else
-              raise ExtractionError, "Multiple opposite relations found for #{reflection}: #{canditates}" if candidates.length > 1
+              origin_str = "#{ reflection.active_record.name }.#{ assoc_name }"
+              candidates_str = candidates.map(&:name).join(', ')
+              raise ExtractionError, "#{candidates.length} opposite relations found for #{origin_str}: #{candidates_str}" if candidates.length > 1
               candidates.first.name.to_s
             end
           when :has_and_belongs_to_many
@@ -105,7 +107,7 @@ module ADSL
             :through => nil,
           }.merge options
 
-          refs = @ar_class.reflections.values.dup
+          refs = @ar_class.reflections.values.select{ |ref| ref.class_name.constantize < ActiveRecord::Base }.dup
 
           case options[:this_class]
           when true;  refs.select!{ |ref| ref.active_record == @ar_class }
@@ -177,7 +179,7 @@ module ADSL
             include ADSL::Parser
 
             attr_accessor :adsl_ast
-            attr_accessible :adsl_ast
+            attr_accessible :adsl_ast if respond_to? :attr_accessible
 
             def initialize(attributes = {}, options = {})
               raise ExtractionError if attributes[:adsl_ast].is_a? Class
@@ -285,7 +287,7 @@ module ADSL
             def ==(other)
               other = other.adsl_ast if other.respond_to? :adsl_ast
               if other.is_a? ASTNode and other.class.is_expr?
-                ASTEqual.new :objsets => [self.adsl_ast, other]
+                ASTEqual.new :exprs => [self.adsl_ast, other]
               else
                 super
               end
@@ -420,7 +422,7 @@ module ADSL
 
           create_destroys @ar_class
 
-          @ar_class.send :default_scope, @ar_class.all
+          @ar_class.send :default_scope, lambda{ @ar_class.all }
           @ar_class.columns_hash.each do |name, column|
             next if name.split('_').last == 'id'
             
