@@ -196,13 +196,13 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
     adsl_assert :incorrect, <<-ADSL
       authenticable class User {}
       action blah {
-        v = allof(User)
+        at__v = allof(User)
       }
     ADSL
     adsl_assert :correct, <<-ADSL
       authenticable class User {}
       action blah {
-        v = allof(User)
+        at__v = allof(User)
       }
       permit read allof(User)
     ADSL
@@ -212,28 +212,28 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
     adsl_assert :correct, <<-ADSL
       authenticable class User {}
       action blah {
-        v = allof(User)
+        at__v = allof(User)
       }
       permit read allof(User)
     ADSL
     adsl_assert :correct, <<-ADSL
       authenticable class User {}
       action blah {
-        v = oneof(allof(User))
+        at__v = oneof(allof(User))
       }
       permit read allof(User)
     ADSL
     adsl_assert :incorrect, <<-ADSL
       authenticable class User {}
       action blah {
-        v = allof(User)
+        at__v = allof(User)
       }
       permit read oneof(allof(User))
     ADSL
     adsl_assert :incorrect, <<-ADSL
       authenticable class User {}
       action blah {
-        v = oneof(allof(User))
+        at__v = oneof(allof(User))
       }
       permit read oneof(allof(User))
     ADSL

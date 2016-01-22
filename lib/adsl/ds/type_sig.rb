@@ -174,6 +174,10 @@ module ADSL
           @min == 0 and @max == 0
         end
 
+        def any?
+          @min >= 1
+        end
+
         def singleton?
           @min == 1 and @max == 1
         end
@@ -186,9 +190,7 @@ module ADSL
           @max == 1
         end
 
-        def at_least_one?
-          @min >= 1
-        end
+        alias_method :at_least_one?, :any?
 
         ZERO      = ObjsetCardinality.new(0)
         ONE       = ObjsetCardinality.new(1)

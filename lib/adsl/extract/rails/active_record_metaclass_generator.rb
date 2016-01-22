@@ -21,9 +21,10 @@ module ADSL
         end
 
         def destroy_deps(origin_class)
-          Set[*origin_class.reflections.values.select{ |reflection|
+          destroy_class_names = origin_class.reflections.values.select{ |reflection|
             [:destroy, :destroy_all].include? reflection.options[:dependent]
-          }.map{ |refl| refl.through_reflection || refl }.map(&:class_name).map(&:constantize)]
+          }.map{ |refl| refl.through_reflection || refl }.map(&:class_name)
+          Set[*destroy_class_names.map{ |c| Object.lookup_const c }.compact]
         end
 
         def cyclic_destroy_dependency?
@@ -74,14 +75,18 @@ module ADSL
               candidates.first.name.to_s
             end
           when :has_and_belongs_to_many
-            join_table = reflection.options[:join_table]
+            join_table = reflection.options[:join_table] || reflection.join_table
+            return nil unless join_table.present?
+
             candidates = target_class.constantize.reflections.values.select do |r|
               r.macro == :has_and_belongs_to_many && r.options[:join_table] == join_table
             end
             if candidates.empty?
               nil
             else 
-              raise ExtractionError, "Multiple opposite relations found for #{reflection}: #{canditates}" if candidates.length > 1
+              origin_str = "#{ reflection.active_record.name }.#{ assoc_name }"
+              candidates_str = candidates.map{ |c| "#{ c.active_record.name }.#{ c.name }" }.join(', ')
+              raise ExtractionError, "#{candidates.length} opposite relations found for #{origin_str} over join table #{join_table}: #{candidates_str}" if candidates.length > 1
               foreign_name = candidates.first.name.to_s
               assoc_name < foreign_name ? nil : foreign_name
             end
@@ -107,7 +112,10 @@ module ADSL
             :through => nil,
           }.merge options
 
-          refs = @ar_class.reflections.values.select{ |ref| ref.class_name.constantize < ActiveRecord::Base }.dup
+          refs = @ar_class.reflections.values.select do |ref|
+            target_klass = Object.lookup_const ref.class_name
+            target_klass.present? && target_klass < ActiveRecord::Base
+          end.dup
 
           case options[:this_class]
           when true;  refs.select!{ |ref| ref.active_record == @ar_class }
@@ -383,11 +391,31 @@ module ADSL
               alias_method :pluck,   :calculate
 
               def find(*args)
-                self.all.take
+                self.all.take *args
+                # TODO this should ensure lookups using params[:id] return the same result every time. Doesnt work
+                # if args.length == 1 && args[0].is_a?(ADSL::Extract::Rails::MetaUnknown) && args[0].label
+                #   # presume we're loading this using params with key supplied in label
+                #   label = args[0].label
+                #   @assigned_variables ||= {}
+                #   if @assigned_variables.include?(label)
+                #     @assigned_variables[label]
+                #   else
+                #     var_name = "#{adsl_ast_class_name}_for_params_#{label}"
+                #     var = ADSL::Parser::ASTVariable.new :var_name => ADSL::Parser::ASTIdent.new(:text => var_name)
+                #     @assigned_variables[label] = var
+
+                #     self.new :adsl_ast => ADSL::Parser::ASTAssignment.new(
+                #       :var_name => ADSL::Parser::ASTIdent.new(:text => var_name),
+                #       :expr => self.all.take(*args).adsl_ast
+                #     )
+                #   end
+                # else
+                #   self.all.take *args
+                # end
               end
 
               def where(*args)
-                self.all.where
+                self.all.where *args
               end
               alias_method :only,   :where
               alias_method :except, :where

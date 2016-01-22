@@ -30,27 +30,36 @@ module ADSL
           login_class
         end
 
+        def define_usergroup(name)
+          @usergroups ||= []
+          return if @usergroups.any?{ |ug| ug.name.text == name.to_s }
+          new_group = ADSL::Parser::ASTUserGroup.new(:name => ASTIdent.new(:text => name.to_s))
+          @usergroups << new_group
+        end
+
         def usergroups
-          return @usergroups if @usergroups
+          return @usergroups if @usergroups && @usergroups.any?
 
           # see if roles are defined in the model
           roles = login_class.lookup_const 'ROLES'
           if roles
-            @usergroups = roles.map{ |role_name| ASTUserGroup.new :name => ASTIdent.new(:text => role_name) }
+            roles.each do |role_name|
+              define_usergroup role_name
+            end
           else
             # see if 'admin' is defined somewhere, and if it is, define an admin usergroup
             method_names = login_class.instance_methods.map &:to_s
             column_names = login_class.column_names
             things_that_exist = Set[*(method_names + column_names)]
             if (things_that_exist & Set['admin', 'admin?', 'is_admin', 'is_admin?']).any?
-              admin    = ADSL::Parser::ASTUserGroup.new(:name => ASTIdent.new(:text => 'admin'))
-              nonadmin = ADSL::Parser::ASTUserGroup.new(:name => ASTIdent.new(:text => 'nonadmin'))
-              @usergroups = [nonadmin, admin]
+              define_usergroup :admin
+              define_usergroup :nonadmin
             end
           end
+          
           @usergroups ||= []
           
-          if @usergroups.any?
+          if @usergroups.count == 2
             @rules << ADSL::Parser::ASTRule.new(:formula => ADSL::Parser::ASTXor.new(
               :subformulae => @usergroups.map do |ug|
                 ADSL::Parser::ASTInUserGroup.new(:groupname => ASTIdent.new(:text => ug.name.text))
@@ -85,14 +94,6 @@ module ADSL
           ApplicationController.class_exec do
             def current_user
               rails_extractor.login_class.new :adsl_ast => ADSL::Parser::ASTCurrentUser.new
-            end
-
-            def can?(action, subject, *args)
-              rails_extractor.generate_can_query_formula action, subject
-            end
-
-            def cannot?(*args)
-              ADSL::Parser::ASTNot.new :subformula => can?(*args)
             end
 
             def model_class_name
@@ -178,6 +179,14 @@ module ADSL
             end
           ruby
           CanCan::Ability.class_exec do
+            def can?(action, subject, *args)
+              rails_extractor.generate_can_query_formula action, subject
+            end
+
+            def cannot?(*args)
+              ADSL::Parser::ASTNot.new :subformula => can?(*args)
+            end
+
             def can(actions = nil, subject = nil, conditions_hash = nil, &block)
               return if ::ADSL::Extract::Instrumenter.get_instance.nil?
               return if ::ADSL::Extract::Instrumenter.get_instance.ex_method.nil?
@@ -252,6 +261,10 @@ module ADSL
           Object.lookup_const('CanCan') && Object.lookup_const('Ability')
         end
 
+        def freely_define_groups?
+          Object.lookup_const 'Rolify'
+        end
+
         def extract_rules_from_block(block, group = nil)
           block.statements.each do |stmt|
             if stmt.is_a?(ADSL::Parser::ASTBlock)
@@ -261,7 +274,13 @@ module ADSL
               if stmt.condition.is_a?(ADSL::Parser::ASTInUserGroup)
                 is_group = stmt.condition
                 then_group = @usergroups.select{ |g| stmt.condition.groupname.text.downcase == g.name.text.downcase }.first
-                raise "Group by name #{stmt.condition.groupname.text} not found" if then_group.nil?
+                if then_group.nil?
+                  if freely_define_groups?
+                    define_usergroup stmt.condition.groupname.text
+                  else
+                    raise "Group by name #{stmt.condition.groupname.text} not found"
+                  end
+                end
                 else_group = usergroups.select{ |g| g != then_group }.first if usergroups.length == 2
               end
               extract_rules_from_block stmt.then_block, then_group 
@@ -321,6 +340,23 @@ module ADSL
           extract_rules_from_block(block)
         end
 
+        def define_rolify_stuff
+          return unless Object.lookup_const 'Rolify'
+
+          Rolify::Role.class_exec do
+            def has_role?(role_name, resource = nil)
+              ADSL::Parser::ASTInUserGroup.new :groupname => ADSL::Parser::ASTIdent.new(:text => role_name.to_s)
+            end
+          end
+
+          login_class.class_eval <<-add_role
+            def add_role(role_name, resource = nil)
+              rails_extractor = ObjectSpace._id2ref(#{ self.object_id })
+              rails_extractor.define_usergroup role_name
+            end
+          add_role
+        end
+
         def prepare_cancan_instrumentation
           return unless cancan_exists?
 
@@ -329,6 +365,7 @@ module ADSL
           define_usergroup_getters
           define_controller_stuff
           define_controller_resource_stuff
+          define_rolify_stuff
           instrument_ability
         end
 

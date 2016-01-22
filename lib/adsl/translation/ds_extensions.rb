@@ -1045,7 +1045,6 @@ module ADSL
       def resolve_expr(translation, ps, var)
         context = translation.context
         ensure_once do
-          @exprs.each{ |expr| expr.prepare_expr translation }
           if @exprs.length == 2
             @condition_pred ||= translation.create_predicate('pick_one_choice', translation.context.sort_array)
           else

@@ -29,7 +29,11 @@ module ADSL
             # reads
             assignments = action.recursively_gather{ |elem|
               elem if elem.is_a?(DSAssignment)
-            }.reverse.uniq{ |asgn| asgn.var.name }.select{ |asgn| asgn.expr.type_sig.is_objset_type? && !asgn.expr.type_sig.cardinality.empty? }
+            }.reverse.uniq{ |asgn| asgn.var.name }.select{ |asgn|
+              asgn.expr.type_sig.is_objset_type? && !asgn.expr.type_sig.cardinality.empty?
+            }.select{ |asgn|
+              asgn.var.name.start_with?('at__')
+            }
             problems += assignments.map do |asgn|
               ADSL::Translation::AccessControlReadProblem.new ADSL::DS::DSVariableRead.new(:variable => asgn.var)
             end
@@ -191,7 +195,7 @@ module ADSL
 
           translation.reserve translation.context.make_ps do |ps|
             return ForAll[o, Implies[
-              @expr.resolve_expr(translation, ps, o),
+              And[translation.final_state[o], @expr.resolve_expr(translation, ps, o)],
               permitted_formula
             ]].optimize
           end

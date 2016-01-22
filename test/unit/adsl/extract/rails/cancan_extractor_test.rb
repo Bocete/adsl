@@ -99,21 +99,21 @@ class ADSL::Extract::Rails::CanCanExtractorTest < ADSL::Extract::Rails::RailsIns
     extractor = create_rails_extractor
     ast = extractor.adsl_ast
 
-    permits = ast.ac_rules
+    permits = ast.ac_rules.sort_by{ |a| a.group_names.map(&:text).sort.join('') }
 
     assert_equal 7, permits.length
-    
-    assert_equal ['nonadmin'],    permits[0].group_names.map(&:text)
-    assert_equal [:read],         permits[0].ops
-    assert_equal ASTAllOf,        permits[0].expr.class
-    assert_equal 'Asd',           permits[0].expr.class_name.text
 
-    ['Asd', 'Kme', 'Mod_Blah', 'User'].each_index do |class_name, i|
-      assert_equal     ['admin'],                 permits[i+1].group_names.map(&:text)
-      assert_set_equal [:create, :delete, :read], permits[i+1].ops
-      assert_equal     ASTAllOf,                  permits[i+1].expr.class
-      assert_equal     class_name,                permits[i+1].expr.class_name.text
+    ['Asd', 'User', 'Kme', 'Mod_Blah'].each_index do |class_name, i|
+      assert_equal     ['admin'],                 permits[i].group_names.map(&:text)
+      assert_set_equal [:create, :delete, :read], permits[i].ops
+      assert_equal     ASTAllOf,                  permits[i].expr.class
+      assert_equal     class_name,                permits[i].expr.class_name.text
     end
+    
+    assert_equal ['nonadmin'],    permits[4].group_names.map(&:text)
+    assert_equal [:read],         permits[4].ops
+    assert_equal ASTAllOf,        permits[4].expr.class
+    assert_equal 'Asd',           permits[4].expr.class_name.text
 
     assert_equal     ['nonadmin'],       permits[5].group_names.map(&:text)
     assert_set_equal [:create, :delete], permits[5].ops

@@ -235,6 +235,7 @@ class ADSL::Extract::BasicRailsVerificationTest < ADSL::Extract::Rails::RailsIns
       end
 
       def nothing
+        @asd = Asd.where
         asd.blahs.build
       end
     end

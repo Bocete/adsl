@@ -44,13 +44,15 @@ module ADSL
             []
           elsif @return_arg_classes && @return_path_count == 1 && block.statements.last.is_a?(ADSL::Parser::ASTReturn)
             return_stmt = block.statements.pop
-            @return_arg_classes.length.times.map do |i|
-              @return_arg_classes[i].new :adsl_ast => return_stmt.exprs[i]
+            @return_arg_classes.count.times.map do |i|
+              klass = @return_arg_classes[i]
+              klass.new :adsl_ast => return_stmt.exprs[i] unless klass == NilClass
             end
           elsif @return_arg_classes
             block = ADSL::Parser::ASTReturnGuard.new :block => block
-            @return_arg_classes.length.times.map do |i|
-              @return_arg_classes[i].new :adsl_ast => ::ADSL::Parser::ASTReturned.new(:return_guard => block, :index => i)
+            @return_arg_classes.count.times.map do |i|
+              klass = @return_arg_classes[i]
+              klass.new :adsl_ast => ::ADSL::Parser::ASTReturned.new(:return_guard => block, :index => i) unless klass == NilClass
             end
           else
             []

@@ -159,6 +159,9 @@ class ADSL::Parser::ADSLParser < Racc::Parser
       when (text = @ss.scan(/in\b/))
          action { [:in, lineno] }
 
+      when (text = @ss.scan(/union\b/))
+         action { [:union, lineno] }
+
       when (text = @ss.scan(/invariant\b/))
          action { [:invariant, lineno] }
 

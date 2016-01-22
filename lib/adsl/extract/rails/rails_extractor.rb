@@ -27,7 +27,8 @@ module ADSL
             dependent_assocs = ar_class.reflections.values.select{ |reflection|
               [:destroy, :destroy_all].include?(reflection.options[:dependent]) && reflection.options[:as].nil?
             }
-            destroy_deps[ar_class] = Set[*dependent_assocs.map{ |refl| refl.through_reflection || refl }.map(&:class_name).map(&:constantize)]
+            destroy_dep_class_names = dependent_assocs.map{ |refl| refl.through_reflection || refl }.map(&:class_name)
+            destroy_deps[ar_class] = Set[*destroy_dep_class_names.select{ |a| Object.lookup_const a }.compact]
           end
           destroy_reachability = until_no_change Hash.new(Set.new) do |so_far|
             new_hash = so_far.dup

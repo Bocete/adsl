@@ -47,6 +47,11 @@ module ADSL
           if roles.empty? && Object.lookup_const(:User)
             roles << ['user', 'User']
           end
+
+          Devise::Models::Trackable.class_exec do
+            def update_tracked_fields!(*args)
+            end
+          end
           
           roles.each do |role, role_class|
             if cancan_exists?

@@ -115,6 +115,10 @@ module ADSL
             raise "Unknown basic type: #{@ds_type}"
           end
         end
+
+        def method_missing(*args)
+          self
+        end
       end
 
     end

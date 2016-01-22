@@ -58,15 +58,12 @@ module Kernel
         ))
         if operator == '||='
           old_value = outer_binding.eval name rescue nil
-          if old_value.respond_to?(:adsl_ast) &&
-              old_value.adsl_ast.class.is_expr?
-            assignment = [
-              ::ADSL::Parser::ASTDeclareVar.new(:var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name.dup)),
-              ::ADSL::Parser::ASTEither.new(:blocks => [
-                ::ADSL::Parser::ASTBlock.new(:statements => []),
-                ::ADSL::Parser::ASTBlock.new(:statements => [assignment])
-              ])
-            ]
+          if old_value.respond_to?(:adsl_ast) && old_value.adsl_ast.class.is_expr?
+            assignment = ::ADSL::Parser::ASTIf.new(
+              :condition => ::ADSL::Parser::ASTIsEmpty.new(:objset => old_value.adsl_ast),
+              :then_block => ::ADSL::Parser::ASTBlock.new(:statements => [assignment]),
+              :else_block => ::ADSL::Parser::ASTBlock.new(:statements => []),
+            )
           end
         end
         ins_stmt assignment
@@ -157,6 +154,7 @@ module Kernel
 
   def ins_if(condition, arg1, arg2)
     ast = condition
+    
     ast = ast.adsl_ast if ast.respond_to?(:adsl_ast)
     condition_ast = nil
     if ast.is_a? ADSL::Parser::ASTNode
@@ -206,8 +204,8 @@ module Kernel
             :then_expr => frame1_ret_value.adsl_ast,
             :else_expr => frame2_ret_value.adsl_ast
           ))
-        else
-          return ADSL::Extract::Rails::UnknownOfBasicType.new frame1_ret_value.ds_type
+        elsif result_type.respond_to? :ds_type
+          return ADSL::Extract::Rails::UnknownOfBasicType.new result_type.ds_type
         end
       end
     end

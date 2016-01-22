@@ -12,6 +12,12 @@ module ADSL
     module Rails
 
       class MetaUnknown
+        attr_reader :label
+
+        def initialize(label = nil)
+          @label = label
+        end
+
         def method_missing(method, *args, &block)
           self
         end
@@ -39,7 +45,7 @@ module ADSL
         end
 
         def [](arg)
-          @options[arg] || MetaUnknown.new
+          @options[arg] || MetaUnknown.new(arg)
         end
 
         def []=(key, val)

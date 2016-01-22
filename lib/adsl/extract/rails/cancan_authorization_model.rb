@@ -86,15 +86,13 @@ module ADSL
           def related?(action, subject)
             subject_class = subject.is_a?(Class) ? subject : subject.class
             ops_intersect = (inferred_ops & self.class.infer_ops(action))
-            (subject_class <= @subject.class) && (ops_intersect.any? || @action.to_s == action.to_s)
+            (subject_class <= @subject.class) && (ops_intersect.any? || @action.to_s == action.to_s || @action == :manage)
           end
 
           def self.infer_ops(action)
             case action.to_sym
             when :manage
               [:create, :delete, :read]
-            when :edit
-              [:create, :delete]
             when :create, :new
               [:create]
             when :read, :index, :view, :show

@@ -9,9 +9,10 @@ require 'adsl/parser/util'
 
 class Array
   def optimize
-    map do |e|
+    map! do |e|
       e.respond_to?(:optimize) ? e.optimize : e
     end
+    self
   end
 end
 
@@ -64,14 +65,15 @@ module ADSL
       def reaches_view?; false; end
 
       def optimize
-        copy = self.dup
-        children = self.class.container_for_fields.map{ |field_name| [field_name, copy.send(field_name)] }
+        children = self.class.container_for_fields.map{ |field_name| [field_name, send(field_name)] }
         until children.empty?
           child_name, child = children.pop
-          new_value = child.respond_to?(:optimize) ? child.optimize : child.dup
-          copy.send "#{child_name}=", new_value unless new_value.equal? child
+          if child.respond_to?(:optimize)
+            new_value = child.optimize
+            send "#{child_name}=", new_value unless new_value.equal? child
+          end
         end
-        copy
+        self
       end
 
       def block_replace(&block)
@@ -539,7 +541,7 @@ module ADSL
         rules_by_non_ops = @ac_rules.group_by{ |e| [e.group_names, e.expr] }
         @ac_rules = rules_by_non_ops.map do |pair, entries|
           next entries.first if entries.length == 1
-          ADSL::Parser::ASTPermit.new :group_names => pair[0], :ops => entries.map(&:ops).flatten.uniq, :expr => pair[1]
+          ADSL::Parser::ASTPermit.new :group_names => pair[0], :ops => entries.map(&:ops).flatten.uniq.sort, :expr => pair[1]
         end
       end
 
@@ -547,7 +549,7 @@ module ADSL
         rules_by_non_role_groups = @ac_rules.group_by{ |e| [e.ops, e.expr] }
         @ac_rules = rules_by_non_role_groups.map do |pair, entries|
           next entries.first if entries.length == 1
-          ADSL::Parser::ASTPermit.new :group_names => entries.map(&:group_names).flatten.uniq, :ops => pair[0], :expr => pair[1]
+          ADSL::Parser::ASTPermit.new :group_names => entries.map(&:group_names).flatten.uniq.sort_by(&:text), :ops => pair[0], :expr => pair[1]
         end
       end
 
@@ -556,6 +558,7 @@ module ADSL
         remove_redundant_rules
         merge_rule_ops
         merge_rule_groups
+        @ac_rules.sort_by!{ |rule| [rule.group_names.map(&:text), rule.expr.to_adsl] }
       end
 
       def optimize!
@@ -700,16 +703,16 @@ module ADSL
       end
 
       def optimize
-        copy = dup
-        copy.instance_variable_set :@pre_optimize_adsl_ast_size, copy.adsl_ast_size
+        @pre_optimize_adsl_ast_size ||= adsl_ast_size
 
-        copy.block = until_no_change(copy.block) do |block|
-          block = block.optimize(true)
+        loop do
+          pre_loop_size = adsl_ast_size
+          @block = @block.optimize
 
           # update counters of branches that might be necesarry
           return_counter_map = Hash.new{ |hash, key| hash[key] = 0 }
           if_counter_map     = Hash.new{ |hash, key| hash[key] = 0 }
-          block.block_replace do |expr|
+          @block.block_replace do |expr|
             if expr.is_a? ASTReturned
               return_counter_map[expr.return_guard] += 1
             elsif expr.is_a? ASTIfExpr
@@ -718,7 +721,7 @@ module ADSL
             nil
           end
 
-          block.block_replace do |expr|
+          @block.block_replace do |expr|
             if expr.is_a?(ASTReturnGuard) && return_counter_map[expr] == 0
               expr.block.block_replace do |expr|
                 next unless expr.is_a? ASTReturn
@@ -739,45 +742,45 @@ module ADSL
               expr
             end
           end
-         
-          block = block.optimize(true)
 
+          # remove variables that are assigned to but are not read
           variables_read = Set[]
-          block.preorder_traverse do |node|
+          @block.preorder_traverse do |node|
             next unless node.is_a? ASTVariable
             variables_read << node.var_name.text
           end
-          block.preorder_traverse do |node|
+          @block.preorder_traverse do |node|
             next unless node.is_a? ASTBlock
             next unless node.reaches_view?
-            variables_read += node.statements.select{ |s| s.is_a?(ASTExprStmt) && s.expr.is_a?(ASTAssignment) }.map{ |s| s.expr.var_name.text }
+            assignments = node.statements.select{ |s| s.is_a?(ASTExprStmt) && s.expr.is_a?(ASTAssignment) }
+            variables_read += assignments.map{ |s| s.expr.var_name.text }
           end
-          block.block_replace do |node|
+          @block.block_replace do |node|
             next unless node.is_a? ASTAssignment
             next if node.var_name.nil? || variables_read.include?(node.var_name.text)
             next if variable_read_by_view node.var_name.text.to_s
             node.expr
           end
 
-          next block if block.statements.length != 1
-
-          if block.statements.first.is_a? ASTEither
-            either = block.statements.first
-            either = ASTEither.new(:blocks => either.blocks.reject{ |subblock| subblock.statements.empty? })
+          # if the block is a lone either statement, remove empty blocks
+          if @block.statements.length == 1 && @block.statements.first.is_a?(ASTEither)
+            either = @block.statements.first
+            either.blocks.reject!{ |subblock| subblock.statements.empty? }
             if either.blocks.length == 0
-              ASTBlock.new(:statements => [])
+              @block = ASTBlock.new(:statements => [])
             elsif either.blocks.length == 1
-              either.blocks.first
+              @block = either.blocks.first
             else
-              ASTBlock.new(:statements => [either])
+              @block = ASTBlock.new(:statements => [either])
             end
-          else
-            block
           end
+
+          new_adsl_ast_size = adsl_ast_size
+          break if new_adsl_ast_size == pre_loop_size
         end
 
         # finally, we can remove all dummy stmts, some of which we used for labels and placeholders and such
-        copy.block = until_no_change(copy.block) do |block|
+        @block = until_no_change @block do |block|
           block.block_replace do |block|
             next unless block.is_a? ASTBlock
             block.statements.reject!{ |s| s.is_a? ADSL::Parser::ASTDummyStmt }
@@ -785,7 +788,7 @@ module ADSL
           end
         end
 
-        copy
+        self
       end
 
       def pre_optimize_adsl_ast_size
@@ -928,30 +931,19 @@ module ADSL
         @statements += tail if return_statuses.uniq == [false]
       end
 
-      def optimize(last_stmt = false)
-        until_no_change super() do |block|
-          next block unless block.is_a? ASTBlock
-          next block if block.statements.empty?
-          next ASTBlock.new :statements => [ASTRaise.new] if block.raises?
+      def optimize
+        super
 
-          statements = block.statements.map(&:optimize).map{ |stmt|
-            stmt.is_a?(ASTBlock) ? stmt.statements : [stmt]
-          }.flatten(1).reject{ |stmt|
-            stmt.is_a?(ASTDummyStmt) && stmt.arbitrary?
-          }
-
-          if last_stmt
-            if statements.last.is_a?(ASTEither)
-              statements.last.blocks.map!{ |b| b.optimize true }
-              statements[-1] = statements.last.optimize
-            elsif statements.last.is_a?(ASTBlock)
-              last = statements.pop.optimize true
-              statements += last.statements
-            end
-          end
-
-          ASTBlock.new(:statements => statements)
+        return self if @statements.empty?
+        return ASTBlock.new :statements => [ASTRaise.new] if raises?
+        @statements = @statements.map do |stmt|
+          stmt.is_a?(ASTBlock) ? stmt.statements : [stmt]
+        end.flatten(1)
+        @statements.reject! do |stmt|
+          stmt.is_a?(ASTDummyStmt) && stmt.arbitrary?
         end
+
+        self
       end
 
       def to_adsl
@@ -972,11 +964,6 @@ module ADSL
         create_prestmt = ADSL::DS::DSAssignment.new :var => var, :expr => expr
         context.pre_stmts << create_prestmt
         var
-      end
-
-      def optimize
-        @expr = @expr.optimize if @expr.respond_to? :optimize
-        self
       end
 
       def to_adsl
@@ -1013,9 +1000,10 @@ module ADSL
         return nil
       end
 
-      def optimize(last_stmt = false)
+      def optimize
+        super
         return ASTDummyStmt.new unless @expr.expr_has_side_effects?
-        ASTExprStmt.new :expr => @expr.optimize
+        self
       end
 
       def to_adsl
@@ -1033,10 +1021,6 @@ module ADSL
           raise ADSLError, "Asserted formula is not of boolean type (type provided `#{formula.type_sig}` on line #{ @lineno })"
         end
         ADSL::DS::DSAssertFormula.new :formula => formula
-      end
-
-      def optimize(last_stmt=false)
-        ASTAssertFormula.new :formula => formula.optimize
       end
 
       def to_adsl
@@ -1169,15 +1153,15 @@ module ADSL
       end
 
       def optimize
-        optimized = super
-        if optimized.block.statements.empty?
-          return ASTExprStmt.new(:expr => optimized.objset).optimize
+        super
+        if @block.statements.empty?
+          return ASTExprStmt.new(:expr => @objset).optimize
         end
-        optimized
+        self
       end
 
       def to_adsl
-        "foreach #{ @var_name.text } : #{ @expr.to_adsl } {\n#{ @block.to_adsl.adsl_indent }}\n"
+        "foreach #{ @var_name.text } : #{ @objset.to_adsl } {\n#{ @block.to_adsl.adsl_indent }}\n"
       end
     end
 
@@ -1254,8 +1238,6 @@ module ADSL
       def returns?; false; end
 
       def raises?; true; end
-      
-      def optimize; self; end
 
       def to_adsl
         "raise\n"
@@ -1330,19 +1312,22 @@ module ADSL
       end
 
       def optimize
-        until_no_change super do |either|
-          next either.optimize unless either.is_a?(ASTEither)
-          either.blocks.reject! &:raises?
-          next ASTDummyStmt.new if either.blocks.empty?
-          next either.blocks.first if either.blocks.length == 1
-          ASTEither.new(:blocks => either.blocks.map{ |block|
-            if block.statements.length == 1 && block.statements.first.is_a?(ASTEither)
-              block.statements.first.blocks
-            else
-              [block]
-            end
-          }.flatten(1).uniq)
+        super
+       
+        @blocks = @blocks.map do |block|
+          if block.statements.length == 1 && block.statements.first.is_a?(ASTEither)
+            block.statements.first.blocks
+          else
+            [block]
+          end
+        end.flatten(1).uniq
+        if @blocks.any?{ |b| !b.raises? }
+          @blocks.reject! &:raises?
         end
+        return ASTDummyStmt.new if @blocks.empty?
+        return @blocks.first if @blocks.length == 1
+
+        self
       end
 
       def to_adsl
@@ -1423,13 +1408,6 @@ module ADSL
         return [*pre_stmts, ds_if, lambdas]
       end
 
-      def optimize
-        @condition = @condition.optimize
-        @then_block = @then_block.optimize
-        @else_block = @else_block.optimize
-        self
-      end
-
       def list_entity_classes_written_to
         [@then_block, @else_block].map(&:list_entity_classes_written_to).flatten
       end
@@ -1454,8 +1432,7 @@ module ADSL
       end
 
       def optimize
-        @then_expr = @then_expr.optimize
-        @else_expr = @else_expr.optimize
+        super
         if @if.condition.is_a?(ASTBoolean)
           case @if.condition.bool_value
           when true;  return @then_expr.optimize
@@ -1629,12 +1606,12 @@ module ADSL
       end
 
       def optimize
-        until_no_change super do |node|
-          next node.optimize unless node.is_a?(ASTSubset)
-          next node.objset if node.objset.is_a?(ASTSubset) || node.objset.is_a?(ASTOneOf)
-          next ASTOneOf.new :objset => node.objset.objset if node.objset.is_a?(ASTOneOf)
-          ASTSubset.new :objset => node.objset.optimize
-        end
+        super
+
+        return @objset if @objset.is_a?(ASTSubset) || @objset.is_a?(ASTTryOneOf)
+        return ASTTryOneOf.new :objset => @objset.objset if @objset.is_a?(ASTOneOf)
+
+        self
       end
 
       def to_adsl
@@ -1662,12 +1639,12 @@ module ADSL
       end
 
       def optimize
-        until_no_change super do |oneof|
-          next oneof.optimize unless oneof.is_a?(ASTTryOneOf)
-          next oneof.objset.optimize if oneof.objset.is_a?(ASTOneOf) or oneof.objset.is_a?(ASTTryOneOf)
-          next ASTTryOneOf.new(:objset => oneof.objset.objset) if oneof.objset.is_a?(ASTSubset)
-          ASTTryOneOf.new :objset => oneof.objset.optimize
-        end
+        super
+
+        return @objset if @objset.is_a?(ASTOneOf) or @objset.is_a?(ASTTryOneOf)
+        @objset = @objset.objset if @objset.is_a?(ASTSubset)
+
+        self
       end
 
       def to_adsl
@@ -1694,12 +1671,12 @@ module ADSL
       end
 
       def optimize
-        until_no_change super do |oneof|
-          next oneof.optimize unless oneof.is_a?(ASTOneOf)
-          next oneof.objset.optimize if oneof.objset.is_a?(ASTOneOf) or oneof.objset.is_a?(ASTTryOneOf)
-          next ASTOneOf.new(:objset => oneof.objset.objset) if oneof.objset.is_a?(ASTSubset)
-          ASTOneOf.new :objset => oneof.objset.optimize
-        end
+        super
+
+        return @objset if @objset.is_a?(ASTOneOf) or @objset.is_a?(ASTTryOneOf)
+        @objset = @objset.objset if @objset.is_a?(ASTSubset)
+        
+        self
       end
 
       def to_adsl
@@ -1736,15 +1713,18 @@ module ADSL
       end
 
       def optimize
-        until_no_change super do |union|
-          next union.optimize unless union.is_a? ASTUnion
-          next ASTEmptyObjset.new if union.objsets.empty?
-          next union.objsets.first if union.objsets.length == 1
-          flat_objsets = union.objsets.map{ |objset| objset.is_a?(ASTUnion) ? objset.objsets : [objset] }.flatten(1)
-          flat_objsets.reject!{ |o| o.is_a? ASTEmptyObjset }
-          flat_objsets.uniq!{ |o| o.expr_has_side_effects? ? o.object_id : o }
-          ASTUnion.new(:objsets => flat_objsets)
-        end
+        super
+
+        flat_objsets = @objsets.map{ |objset| objset.is_a?(ASTUnion) ? objset.objsets : [objset] }.flatten(1)
+        flat_objsets.reject!{ |o| o.is_a? ASTEmptyObjset }
+        flat_objsets.uniq!{ |o| o.expr_has_side_effects? ? o.object_id : o }
+        @objsets = flat_objsets
+
+        return ASTEmptyObjset.new if @objsets.empty?
+        return @objsets.first if @objsets.length == 1
+        ASTUnion.new(:objsets => flat_objsets)
+
+        self
       end
 
       def to_adsl
@@ -1782,12 +1762,13 @@ module ADSL
       end
 
       def optimize
-        until_no_change super do |o|
-          next o unless o.is_a? ASTPickOneExpr
-          next ASTEmptyObjset.new if o.exprs.empty?
-          next o.exprs.first if o.exprs.length == 1
-          ASTPickOneExpr.new(:exprs => o.exprs.uniq)
-        end
+        super
+        
+        return ASTEmptyObjset.new if @exprs.empty?
+        return @exprs.first if @exprs.length == 1
+        @exprs.uniq!{ |o| o.expr_has_side_effects? ? o.object_id : o }
+
+        self
       end
 
       def to_adsl
@@ -1943,13 +1924,6 @@ module ADSL
         ADSL::DS::DSInUserGroup.new :objset => objset, :usergroup => group[1]
       end
 
-      def optimize
-        until_no_change super do |node|
-          node.objset = node.objset.optimize if node.objset
-          node
-        end
-      end
-
       def to_adsl
         if @objset.nil? || @objset.is_a?(ASTCurrentUser)
           "inusergroup(#{@groupname.text})"
@@ -2048,12 +2022,6 @@ module ADSL
         return ADSL::DS::DSInvariant.new :name => name, :formula => formula
       end
 
-      def optimize
-        until_no_change super do |node|
-          node.formula = node.formula.optimize
-        end
-      end
-
       def to_adsl
         n = (@name.nil? || @name.text.nil?) ? "" : "#{ @name.text.gsub(/\s/, '_') }: "
         "invariant #{n}#{ @formula.to_adsl }\n"
@@ -2077,12 +2045,6 @@ module ADSL
         return ADSL::DS::DSRule.new :formula => formula
       end
 
-      def optimize
-        until_no_change super do |node|
-          node.formula = node.formula.optimize
-        end
-      end
-
       def to_adsl
         "rule #{@formula.to_adsl}\n"
       end
@@ -2101,13 +2063,12 @@ module ADSL
         end
       end
 
-      def optimize
-        self
-      end
-
       def to_adsl
         @bool_value.nil? ? '*' : "#{ @bool_value }"
       end
+
+      TRUE = ASTBoolean.new :bool_value => true
+      FALSE = ASTBoolean.new :bool_value => false
     end
 
     class ASTNumber < ASTNode
@@ -2172,14 +2133,18 @@ module ADSL
       end
 
       def optimize
-        until_no_change super do |node|
-          next node.optimize unless node.is_a?(ASTForAll)
-          next node.subformula if node.subformula.is_a?(ASTBoolean)
-          ASTForAll.new(
-            :vars       => node.vars.map{ |var, objset| [var, objset.optimize] },
-            :subformula => node.subformula.optimize
-          )
+        super
+
+        quantified_vars = Set[]
+        @subformula.preorder_traverse do |node|
+          quantified_vars << node.var_name.text if node.is_a?(ASTQuantifiedVariable)
         end
+        @vars.select! do |v|
+          quantified_vars.include? v[0].var_name.text
+        end
+        return @subformula if @vars.empty?
+
+        self
       end
     end
 
@@ -2216,16 +2181,6 @@ module ADSL
         v = @vars.map{ |var, objset| "#{ var.text } in #{ objset.to_adsl }" }.join ", " 
         "exists(#{v}: #{ @subformula.nil? ? 'true' : @subformula.to_adsl })"
       end
-
-      def optimize
-        until_no_change super do |node|
-          next node.optimize unless node.is_a?(ASTEither)
-          ASTExists.new(
-            :vars       => node.vars.map{ |var, objset| [var, objset.optimize] },
-            :subformula => node.subformula.optimize
-          )
-        end
-      end
     end
 
     class ASTNot < ASTNode
@@ -2245,17 +2200,16 @@ module ADSL
       end
 
       def optimize
-        until_no_change super do |node|
-          next node.optimize unless node.is_a?(ASTNot)
-          next node.subformula.subformula if node.subformula.is_a?(ASTNot)
-          if node.subformula.is_a?(ASTBoolean)
-            if [true, false].include?(node.subformula.bool_value)
-              next ASTBoolean.new :bool_value => !node.subformula.bool_value
-            end
-            next node.subformula
+        super
+
+        return @subformula.subformula if @subformula.is_a?(ASTNot)
+        if @subformula.is_a?(ASTBoolean)
+          if [true, false].include?(@subformula.bool_value)
+            return ASTBoolean.new :bool_value => !@subformula.bool_value
           end
-          next node
         end
+
+        self
       end
     end
 
@@ -2274,25 +2228,15 @@ module ADSL
       end
 
       def optimize
-        until_no_change super do |node|
-          next node.optimize unless node.is_a?(ASTAnd)
-          formulae = []
-          node.subformulae.each do |subf|
-            subf = subf.optimize
-            if subf.is_a?(ASTAnd)
-              formulae += subf.subformulae
-            else
-              formulae << subf
-            end
-          end
-          formulae.delete_if{ |subf| subf.is_a?(ASTBoolean) && subf.bool_value == true }
-          unless formulae.select{ |subf| subf.is_a?(ASTBoolean) && subf.bool_value == false }.empty?
-            next ASTBoolean.new(:bool_value => false)
-          end
-          next formulae.first if formulae.length == 1
-          next ASTBoolean.new(:bool_value => true) if formulae.empty?
-          ASTAnd.new :subformulae => formulae
-        end
+        super
+        
+        @subformulae = @subformulae.map{ |subf| subf.is_a?(ASTAnd) ? subf.subformulae : [subf] }.flatten(1)
+        @subformulae.delete ASTBoolean::TRUE
+        return ASTBoolean::FALSE if @subformulae.include? ASTBoolean::FALSE
+        return ASTBoolean::TRUE if @subformulae.empty?
+        return @subformulae.first if @subformulae.length == 1
+
+        self
       end
 
       def to_adsl
@@ -2333,25 +2277,15 @@ module ADSL
       end
       
       def optimize
-        until_no_change super do |node|
-          next node.optimize unless node.is_a?(ASTOr)
-          formulae = []
-          node.subformulae.each do |subf|
-            subf = subf.optimize
-            if subf.is_a?(ASTOr)
-              formulae += subf.subformulae
-            else
-              formulae << subf
-            end
-          end
-          formulae.delete_if{ |subf| subf.is_a?(ASTBoolean) && subf.bool_value == false }
-          unless formulae.select{ |subf| subf.is_a?(ASTBoolean) && subf.bool_value == true }.empty?
-            next ASTBoolean.new(:bool_value => true)
-          end
-          next formulae.first if formulae.length == 1
-          next ASTBoolean.new(:bool_value => false) if formulae.empty?
-          ASTOr.new :subformulae => formulae
-        end
+        super
+        
+        @subformulae = @subformulae.map{ |subf| subf.is_a?(ASTOr) ? subf.subformulae : [subf] }.flatten(1)
+        @subformulae.delete ASTBoolean::FALSE
+        return ASTBoolean::TRUE if @subformulae.include? ASTBoolean::TRUE
+        return ASTBoolean::FALSE if @subformulae.empty?
+        return @subformulae.first if @subformulae.length == 1
+
+        self
       end
 
       def to_adsl
@@ -2386,23 +2320,20 @@ module ADSL
       end
 
       def optimize
-        until_no_change super do |node|
-          next node.optimize unless node.is_a?(ASTXor)
-          formulae = node.subformulae.dup
-          formulae.delete false
-          if formulae.include? true
-            next ASTBoolean.new(:bool_value => false) if formulae.count(true) > 1
-            formulae.delete true
-            next ASTAnd.new(:subformulae => formulae.map{ |f| ASTNot.new(:subformula => f) }).optimize
-          end
-          if formulae.empty
-            next ASTBoolean.new(:bool_value => false)
-          elsif formulae.length == 1
-            next formulae.first
-          else
-            next ASTXor.new :subformulae => formulae
-          end
+        super
+          
+        @subformulae.delete ASTBoolean::FALSE
+        if @subformulae.include? ASTBoolean::TRUE
+          return ASTBoolean::FALSE if @subformulae.count(ASTBoolean::TRUE) >= 2
+          return ASTAnd.new(:subformulae => @subformulae.reject(ASTBoolean::TRUE)).optimize
         end
+        if @subformulae.empty
+          return ASTBoolean::FALSE
+        elsif @subformulae.length == 1
+          return @subformulae.first
+        end
+
+        self
       end
 
       def to_adsl
@@ -2457,20 +2388,19 @@ module ADSL
       end
       
       def optimize
-        until_no_change super do |node|
-          next node.optimize unless node.is_a?(ASTEqual)
-          subs = node.exprs.map(&:optimize).uniq
-          unless subs.select{ |subf| subf.is_a?(ASTBoolean) && subf.bool_value == true }.empty?
-            next ASTAnd.new(:subformulae => subs).optimize
-          end
-          unless subs.select{ |subf| subf.is_a?(ASTBoolean) && subf.bool_value == false }.empty?
-            next ASTAnd.new(:subformulae => subs.map{ |sub| ASTNot.new(:subformula => sub) }).optimize
-          end
-          # if there are fewer than 2 elements, we had duplicates, making 'equal' trivially true
-          next ASTBoolean::TRUE if subs.length < 2
+        super
 
-          ASTEqual.new :exprs => subs
+        @exprs.uniq!
+        if @exprs.include? ASTBoolean::TRUE
+          return ASTAnd.new(:subformulae => @exprs).optimize
         end
+        if @exprs.include? ASTBoolean::FALSE
+          return ASTAnd.new(:subformulae => @exprs.map{ |sub| ASTNot.new(:subformula => sub) }).optimize
+        end
+        # if there are fewer than 2 elements, we had duplicates making 'equal' trivially true
+        return ASTBoolean::TRUE if subs.length < 2
+
+        self
       end
       
       def to_adsl
@@ -2508,12 +2438,12 @@ module ADSL
       end
 
       def optimize
-        until_no_change super do |astin|
-          next astin.optimize unless astin.is_a? ASTIn
-          next ASTBoolean::TRUE if astin.objset1.is_a? ASTEmptyObjset
-          next ASTBoolean::FALSE if astin.objset2.is_a? ASTEmptyObjset
-          next astin
-        end
+        super
+
+        return ASTBoolean::TRUE if @objset1.is_a? ASTEmptyObjset
+        return ASTBoolean::FALSE if @objset2.is_a? ASTEmptyObjset
+
+        self
       end
     end
     
@@ -2527,7 +2457,15 @@ module ADSL
           raise ADSLError, "IsEmpty possible only on objset sets (type provided `#{objset.type_sig}` on line #{ @lineno })"
         end
         return ADSL::DS::DSConstant::TRUE if objset.type_sig.cardinality.empty?
+        return ADSL::DS::DSConstant::FALSE if objset.type_sig.cardinality.any?
         return ADSL::DS::DSIsEmpty.new :objset => objset
+      end
+
+      def optimize
+        super
+        return ASTBoolean::TRUE if @objset.is_a? ASTEmptyObjset
+        return ASTBoolean::FALSE if @objset.is_a?(ASTOneOf) || @objset.is_a?(ASTCurrentUser)
+        self
       end
 
       def to_adsl

@@ -37,6 +37,7 @@ rule
   forall\b          { [:forall, lineno] }
   exists\b          { [:exists, lineno] }
   in\b              { [:in, lineno] }
+  union\b           { [:union, lineno] }
   invariant\b       { [:invariant, lineno] }
   rule\b            { [:roole, lineno] }
   true\b            { [:true, lineno] }
