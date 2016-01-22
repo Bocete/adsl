@@ -88,7 +88,7 @@ class ADSL::Translation::DSExtensionsTest < ActiveSupport::TestCase
     spec = ADSL::Parser::ADSLParser.new.parse <<-adsl
       authenticable class Class {}
       action blah {
-        x = allof(Class)
+        at__x = allof(Class)
       }
     adsl
     problems = spec.generate_problems 'blah'
@@ -101,13 +101,13 @@ class ADSL::Translation::DSExtensionsTest < ActiveSupport::TestCase
       class Class2 {}
       action blah {
         foreach v: allof(Class) {
-          y = allof(Class2)
+          at__y = allof(Class2)
         }
-        x = allof(Class)
+        at__x = allof(Class)
       }
     adsl
     problems = spec.generate_problems 'blah'
-    assert_equal 3, problems.length
+    assert_equal 2, problems.length
   end
 
 end

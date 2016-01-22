@@ -103,7 +103,7 @@ class ADSL::Extract::Rails::CanCanExtractorTest < ADSL::Extract::Rails::RailsIns
 
     assert_equal 7, permits.length
 
-    ['Asd', 'User', 'Kme', 'Mod_Blah'].each_index do |class_name, i|
+    ['Asd', 'Kme', 'Mod_Blah', 'User'].each_index do |class_name, i|
       assert_equal     ['admin'],                 permits[i].group_names.map(&:text)
       assert_set_equal [:create, :delete, :read], permits[i].ops
       assert_equal     ASTAllOf,                  permits[i].expr.class
@@ -115,15 +115,15 @@ class ADSL::Extract::Rails::CanCanExtractorTest < ADSL::Extract::Rails::RailsIns
     assert_equal ASTAllOf,        permits[4].expr.class
     assert_equal 'Asd',           permits[4].expr.class_name.text
 
-    assert_equal     ['nonadmin'],       permits[5].group_names.map(&:text)
-    assert_set_equal [:create, :delete], permits[5].ops
-    assert_equal     ASTMemberAccess,    permits[5].expr.class
-    assert_equal     'asds',             permits[5].expr.member_name.text
-    assert_equal     ASTCurrentUser,     permits[5].expr.objset.class
+    assert_equal     ['nonadmin'],              permits[5].group_names.map(&:text)
+    assert_set_equal [:create, :delete, :read], permits[5].ops
+    assert_equal     ASTCurrentUser,            permits[5].expr.class
 
-    assert_equal     ['nonadmin'],              permits[6].group_names.map(&:text)
-    assert_set_equal [:create, :delete, :read], permits[6].ops
-    assert_equal     ASTCurrentUser,            permits[6].expr.class
+    assert_equal     ['nonadmin'],       permits[6].group_names.map(&:text)
+    assert_set_equal [:create, :delete], permits[6].ops
+    assert_equal     ASTMemberAccess,    permits[6].expr.class
+    assert_equal     'asds',             permits[6].expr.member_name.text
+    assert_equal     ASTCurrentUser,     permits[6].expr.objset.class
   end
 
   def test_currentuser_in_action

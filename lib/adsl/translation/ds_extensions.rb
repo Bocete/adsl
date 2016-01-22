@@ -985,13 +985,13 @@ module ADSL
 
     class DSVariable < DSNode
       def define_variable_pred(translation)
-        context = translation.context
-        @pred = translation.create_predicate "var_#{@name}", context.sort_array, type_sig.to_sort
+        @context = translation.context
+        @pred = translation.create_predicate "var_#{@name}", @context.sort_array, type_sig.to_sort
       end
 
       def resolve_expr(translation, ps, var)
         context = translation.context
-        @pred[*ps.first(context.level), var]
+        @pred[*ps.first(@context.level), var]
       end
     end
 
@@ -1119,7 +1119,7 @@ module ADSL
     class DSTryOneOf < DSNode
       def resolve_expr(translation, ps, var)
         context = translation.context
-        sort = @objset.to_sort
+        sort = @objset.type_sig.to_sort
         @pred = translation.create_predicate :try_one_of, context.sort_array, sort
         translation.create_formula ADSL::Translation::Util.gen_formula_for_unique_arg(
           @pred, context.level
