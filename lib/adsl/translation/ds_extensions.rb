@@ -67,6 +67,7 @@ module ADSL
           end
           klasses.each do |klass|
             translation.create_formula FOL::ForAll.new(sort, :o, FOL::And.new(
+              # define precise type pred
               FOL::Equiv.new(
                 klass.precise_type_pred[:o],
                 FOL::And.new(
@@ -74,10 +75,18 @@ module ADSL
                   FOL::Not.new(*children_rels[klass].map{ |c| c[:o] })
                 )
               ),
+              # being of this class implies all parent classes
               FOL::Implies.new(
                 klass[:o],
                 FOL::And.new(*klass.parents.map{ |p| p[:o] })
               )
+            ))
+          end
+          # define that existing in the initial state implies that the object exists
+          translation.reserve sort, :o do |o|
+            translation.create_formula FOL::ForAll.new(o, FOL::Implies.new(
+              translation.initial_state[o],
+              FOL::Or.new(*children_rels[nil].map{ |klass| klass[o] })
             ))
           end
         end
@@ -1044,18 +1053,15 @@ module ADSL
     class DSPickOneExpr < DSNode
       def resolve_expr(translation, ps, var)
         context = translation.context
-        ensure_once do
-          if @exprs.length == 2
-            @condition_pred ||= translation.create_predicate('pick_one_choice', translation.context.sort_array)
-          else
-            return unless @condition_preds.nil?
-            @condition_preds = []
-            @exprs.length.times do |i|
-              @condition_preds << translation.create_predicate("pick_one_choice_#{i}", translation.context.sort_array)
-            end
-            translation.reserve context.make_ps do |ps|
-              translation.create_formula FOL::ForAll[ps, FOL::Xor[*condition_preds.map{ |pred| pred[ps] }]]
-            end
+        if @exprs.length == 2
+          @condition_pred ||= translation.create_predicate('pick_one_choice', translation.context.sort_array)
+        else
+          @condition_preds = []
+          @exprs.length.times do |i|
+            @condition_preds << translation.create_predicate("pick_one_choice_#{i}", translation.context.sort_array)
+          end
+          translation.reserve context.make_ps do |ps|
+            translation.create_formula FOL::ForAll[ps, FOL::Xor[*condition_preds.map{ |pred| pred[ps] }]]
           end
         end
         if @exprs.length == 2
@@ -1063,10 +1069,10 @@ module ADSL
           expr2 = @exprs[1].resolve_expr translation, ps, var
           FOL::IfThenElse[@condition_pred[ps], expr1, expr2]
         else
-          subformulae = @objsets.length.times.map do |index|
+          subformulae = @expr.length.times.map do |index|
             FOL::And.new(
-              @conditions[index].resolve_expr(translation, ps, var),
-              @objsets[index].resolve_expr(translation, ps, var)
+              @condition_preds[index].resolve_expr(translation, ps, var),
+              @exprs[index].resolve_expr(translation, ps, var)
             )
           end
           FOL::Or.new(subformulae)

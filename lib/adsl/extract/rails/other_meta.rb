@@ -37,6 +37,10 @@ module ADSL
         def adsl_ast
           nil
         end
+
+        def as_json(*args)
+          "{}"
+        end
       end
 
       class PartiallyUnknownHash < MetaUnknown
@@ -50,6 +54,10 @@ module ADSL
 
         def []=(key, val)
           @options[key] = val
+        end
+
+        def as_json(*args)
+          "{}"
         end
 
         def method_missing(method, *args, &block)

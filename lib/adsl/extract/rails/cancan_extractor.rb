@@ -32,9 +32,11 @@ module ADSL
 
         def define_usergroup(name)
           @usergroups ||= []
-          return if @usergroups.any?{ |ug| ug.name.text == name.to_s }
+          matching_groups = @usergroups.select{ |ug| ug.name.text == name.to_s }
+          return matching_groups.first if matching_groups.any?
           new_group = ADSL::Parser::ASTUserGroup.new(:name => ASTIdent.new(:text => name.to_s))
           @usergroups << new_group
+          new_group
         end
 
         def usergroups
@@ -116,7 +118,8 @@ module ADSL
               controller_name.gsub('Controller', '').underscore.singularize
             end
         
-            def authorize!(*args)
+            def authorize!(action = action_name, resource = nil)
+              @_authorized = true
               return if respond_to?(:should_authorize?) && (!should_authorize?)
 
               var_name = [instance_name, instance_name.pluralize].select{ |i| instance_variable_defined? "@#{i}" }.first
@@ -131,7 +134,7 @@ module ADSL
                 subject = controller_name.classify
               end
 
-              auth_guarantee = rails_extractor.generate_can_query_formula action_name, subject
+              auth_guarantee = rails_extractor.generate_can_query_formula action, subject
               
               ins_explore_all 'authorize' do
                 ins_stmt ADSL::Parser::ASTAssertFormula.new(
@@ -187,13 +190,13 @@ module ADSL
               ADSL::Parser::ASTNot.new :subformula => can?(*args)
             end
 
-            def can(actions = nil, subject = nil, conditions_hash = nil, &block)
+            def process_ability_declaration(declaration, actions, subject, conditions_hash, &block)
               return if ::ADSL::Extract::Instrumenter.get_instance.nil?
               return if ::ADSL::Extract::Instrumenter.get_instance.ex_method.nil?
               
               if subject == :all
                 rails_extractor.ar_classes.each do |klass|
-                  can actions, klass, conditions_hash, &block
+                  process_ability_declaration declaration, actions, klass, conditions_hash, &block
                 end
                 return
               end
@@ -211,9 +214,8 @@ module ADSL
                 end
               end
 
-              # try to deduce equality from block
               if block.present?
-                raise 'we are not supporting blocks anymore. Too buggy'
+                # Blocks are too buggy for now
                 # arg = subject.new :adsl_ast => :subject
                 # result = block[arg]
                 # if result.is_a?(ASTEqual)
@@ -245,10 +247,19 @@ module ADSL
               end
               
               ins_stmt(ADSL::Parser::ASTDummyStmt.new(:label => {
+                :declaration => declaration,
                 :actions => actions,
                 :domain => subject,
                 :expr => expr,
               }))
+            end
+
+            def cannot(actions = nil, subject = nil, conditions_hash = nil, &block)
+              process_ability_declaration :cannot, actions, subject, conditions_hash, &block
+            end
+
+            def can(actions = nil, subject = nil, conditions_hash = nil, &block)
+              process_ability_declaration :can, actions, subject, conditions_hash, &block
             end
           end
         end
@@ -265,26 +276,28 @@ module ADSL
           Object.lookup_const 'Rolify'
         end
 
-        def extract_rules_from_block(block, group = nil)
+        def extract_rules_from_block(block, possible_groups)
           block.statements.each do |stmt|
             if stmt.is_a?(ADSL::Parser::ASTBlock)
-              extract_rules_from_block stmt
+              extract_rules_from_block stmt, possible_groups
             elsif stmt.is_a?(ADSL::Parser::ASTIf)
               then_group, else_group = nil, nil
               if stmt.condition.is_a?(ADSL::Parser::ASTInUserGroup)
                 is_group = stmt.condition
-                then_group = @usergroups.select{ |g| stmt.condition.groupname.text.downcase == g.name.text.downcase }.first
-                if then_group.nil?
+                then_groups = possible_groups.select{ |g| stmt.condition.groupname.text.downcase == g.name.text.downcase }
+                if then_groups.empty?
                   if freely_define_groups?
-                    define_usergroup stmt.condition.groupname.text
+                    then_groups = [define_usergroup(stmt.condition.groupname.text)]
                   else
                     raise "Group by name #{stmt.condition.groupname.text} not found"
                   end
                 end
-                else_group = usergroups.select{ |g| g != then_group }.first if usergroups.length == 2
+                else_groups = possible_groups - then_groups
               end
-              extract_rules_from_block stmt.then_block, then_group 
-              extract_rules_from_block stmt.else_block, else_group
+              then_groups ||= possible_groups
+              else_groups ||= possible_groups
+              extract_rules_from_block stmt.then_block, then_groups
+              extract_rules_from_block stmt.else_block, else_groups
             elsif stmt.is_a?(ADSL::Parser::ASTDummyStmt) && stmt.label.is_a?(Hash)
               info = stmt.label
 
@@ -298,7 +311,7 @@ module ADSL
               end
               next if klasses.empty?
 
-              groups = group ? [group] : @usergroups
+              declaration = info[:declaration]
 
               klasses.each do |klass|
                 if info[:expr]
@@ -313,7 +326,7 @@ module ADSL
                 end
 
                 actions.each do |action|
-                  permit groups, action, expr
+                  permit possible_groups, action, expr, declaration == :cannot
                 end
               end
             end
@@ -337,7 +350,7 @@ module ADSL
             ADSL::Parser::ASTBlock.new :statements => statements
           end
 
-          extract_rules_from_block(block)
+          extract_rules_from_block block, usergroups
         end
 
         def define_rolify_stuff
