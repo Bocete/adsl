@@ -3,12 +3,12 @@ require 'pp'
 require 'minitest/autorun'
 require 'minitest/reporters'
 
-require 'adsl/parser/adsl_parser.tab'
+require 'adsl/lang/parser/adsl_parser.tab'
 require 'adsl/prover/engine'
 require 'adsl/util/general'
 require 'adsl/ds/data_store_spec'
-require 'adsl/translation/ds_extensions'
-require 'adsl/translation/verification_problems'
+require 'adsl/ds/fol_translation/ds_extensions'
+require 'adsl/ds/fol_translation/verification_problems'
 
 Minitest::Reporters.use!
 
@@ -25,7 +25,7 @@ class ActiveSupport::TestCase
   def adsl_assert(expected_result, input, options={})
     options[:timeout] ||= TESTING_TIMEOUT
 
-    ds_spec = ADSL::Parser::ADSLParser.new.parse input
+    ds_spec = ADSL::Lang::Parser::ADSLParser.new.parse input
     raise "Exactly one action required in ADSL" if ds_spec.actions.length != 1
     action_name = ds_spec.actions.first.name
     provers = (options[:prover] || ['spass', 'z3', 'z3_unsorted']).to_a

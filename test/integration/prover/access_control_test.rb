@@ -255,11 +255,11 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
     adsl_assert :incorrect, <<-ADSL
       authenticable class User {}
       class Stuff {}
-      usergroup Mod
+      usergroup mod
       action blah {
         create(Stuff)
       }
-      permit Mod edit allof(User)
+      permit mod edit allof(User)
     ADSL
   end
 
@@ -294,11 +294,11 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
       class Note {
         1 User owner inverseof notes
       }
-      usergroup Mod
+      usergroup mod
       action blah {
         delete currentuser.notes
       }
-      permit Mod edit allof(Note)
+      permit mod edit allof(Note)
     ADSL
     adsl_assert :correct, <<-ADSL
       authenticable class User {

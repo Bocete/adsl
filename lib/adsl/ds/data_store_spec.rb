@@ -232,22 +232,6 @@ module ADSL
       container_for :objset, :field, :expr
     end
 
-    class DSReturnGuard < DSNode
-      container_for :block, :ret_type_sigs
-    end
-
-    class DSReturn < DSNode
-      container_for :exprs
-    end
-
-    class DSReturned < DSNode
-      container_for :guard, :index
-
-      def type_sig
-        @guard.ret_type_sigs[index]
-      end
-    end
-
     class DSRaise < DSNode
       container_for
     end
@@ -255,19 +239,7 @@ module ADSL
     class DSAssertFormula < DSNode
       container_for :formula
     end
-
-    class DSEither < DSNode
-      container_for :blocks, :lambdas
-    end
     
-    class DSEitherLambdaExpr < DSNode
-      container_for :either, :exprs
-
-      def type_sig
-        ADSL::DS::TypeSig.join @exprs.map(&:type_sig)
-      end
-    end
-
     class DSIf < DSNode
       container_for :condition, :then_block, :else_block
     end
@@ -280,14 +252,8 @@ module ADSL
       end
     end
 
-    class DSForEachCommon < DSNode
+    class DSForEach < DSNode
       container_for :objset, :block
-    end
-
-    class DSForEach < DSForEachCommon
-    end
-
-    class DSFlatForEach < DSForEachCommon
     end
 
     class DSForEachIteratorObjset < DSNode
@@ -411,6 +377,8 @@ module ADSL
       def type_sig
         SIG
       end
+
+      INSTANCE = DSEmptyObjset.new
     end
 
     class DSInvariant < DSNode

@@ -56,7 +56,7 @@ module ADSL
           roles.each do |role, role_class|
             if cancan_exists?
               current_user_code = <<-RUBY.strip
-                #{role_class}.new(:adsl_ast => ADSL::Parser::ASTCurrentUser.new)
+                #{role_class}.new(:adsl_ast => ADSL::Lang::ASTCurrentUser.new)
               RUBY
             else
               current_user_code = <<-RUBY.strip
@@ -115,8 +115,8 @@ module ADSL
           method_pattern = <<-ruby
             def ${1}
               ins_explore_all :${1} do
-                ins_stmt(ADSL::Parser::ASTAssignment.new(
-                  :var_name => ADSL::Parser::ASTIdent.new(:text => "at__${2}"),
+                ins_stmt(ADSL::Lang::ASTAssignment.new(
+                  :var_name => ADSL::Lang::ASTIdent["at__${2}"],
                   :expr => ${3}.adsl_ast
                 ))
               end
@@ -139,13 +139,13 @@ module ADSL
             controller_class.class_eval <<-ruby, __FILE__, __LINE__
               def destroy
                 ins_explore_all :destroy do
-                  ins_stmt(ADSL::Parser::ASTAssignment.new(
-                    :var_name => ADSL::Parser::ASTIdent.new(:text => "at__#{collection_name}"),
+                  ins_stmt(ADSL::Lang::ASTAssignment.new(
+                    :var_name => ADSL::Lang::ASTIdent["at__#{collection_name}"],
                     :expr => #{class_name}.where.adsl_ast
                   ))
-                  ins_stmt(ADSL::Parser::ASTDeleteObj.new(
-                    :objset => ADSL::Parser::ASTVariable.new(
-                      :var_name => ADSL::Parser::ASTIdent.new(:text => "at__#{collection_name}")
+                  ins_stmt(ADSL::Lang::ASTDeleteObj.new(
+                    :objset => ADSL::Lang::ASTVariableRead.new(
+                      :var_name => ADSL::Lang::ASTIdent["at__#{collection_name}"]
                     )
                   ))
                 end

@@ -2,9 +2,9 @@ require 'active_support/core_ext/numeric/time'
 require 'optparse'
 require 'colorize'
 require 'set'
-require 'adsl/parser/adsl_parser.tab'
+require 'adsl/lang/parser/adsl_parser.tab'
 require 'adsl/prover/engine'
-require 'adsl/translation/ds_extensions'
+require 'adsl/ds/fol_translation/ds_extensions'
 require 'adsl/util/csv_hash_formatter'
 
 module ADSL
@@ -45,7 +45,7 @@ module ADSL
           adsl = STDIN.read
         end
 
-        @ds = ADSL::Parser::ADSLParser.new.parse adsl
+        @ds = ADSL::Lang::Parser::ADSLParser.new.parse adsl
         @ds
       end
 

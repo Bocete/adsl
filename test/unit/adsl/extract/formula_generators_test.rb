@@ -5,7 +5,7 @@ require 'adsl/extract/rails/rails_instrumentation_test_case'
 require 'adsl/extract/extraction_error'
 
 class ADSL::Extract::FormulaGeneratorsTest < ADSL::Extract::Rails::RailsInstrumentationTestCase
-  include ADSL::Parser
+  include ADSL::Lang
   include ADSL::Extract
 
   attr_reader :fg
@@ -68,7 +68,7 @@ class ADSL::Extract::FormulaGeneratorsTest < ADSL::Extract::Rails::RailsInstrume
     {:forall => ASTForAll, :exists => ASTExists}.each do |quantifier, klass|
       formula = fg.send(quantifier, {:a => Asd}, &lambda do |a|
         assert_equal Asd, a.class
-        assert_equal ASTVariable, a.adsl_ast.class
+        assert_equal ASTVariableRead, a.adsl_ast.class
         assert_equal 'a', a.adsl_ast.var_name.text
         anything_with_adsl_ast
       end)
@@ -77,10 +77,10 @@ class ADSL::Extract::FormulaGeneratorsTest < ADSL::Extract::Rails::RailsInstrume
 
       formula = fg.send(quantifier, {:a => Asd, :b => Kme}, &lambda do |a, b|
         assert_equal Asd, a.class
-        assert_equal ASTVariable, a.adsl_ast.class
+        assert_equal ASTVariableRead, a.adsl_ast.class
         assert_equal 'a', a.adsl_ast.var_name.text
         assert_equal Kme, b.class
-        assert_equal ASTVariable, b.adsl_ast.class
+        assert_equal ASTVariableRead, b.adsl_ast.class
         assert_equal 'b', b.adsl_ast.var_name.text
         anything_with_adsl_ast
       end)
@@ -94,7 +94,7 @@ class ADSL::Extract::FormulaGeneratorsTest < ADSL::Extract::Rails::RailsInstrume
     {:forall => ASTForAll, :exists => ASTExists}.each do |quantifier, klass|
       formula = fg.send(quantifier, &lambda do |asd|
         assert_equal Asd, asd.class
-        assert_equal ASTVariable, asd.adsl_ast.class
+        assert_equal ASTVariableRead, asd.adsl_ast.class
         assert_equal 'asd', asd.adsl_ast.var_name.text
         anything_with_adsl_ast
       end)
@@ -103,10 +103,10 @@ class ADSL::Extract::FormulaGeneratorsTest < ADSL::Extract::Rails::RailsInstrume
 
       formula = fg.send(quantifier, &lambda do |asd, kme|
         assert_equal Asd, asd.class
-        assert_equal ASTVariable, asd.adsl_ast.class
+        assert_equal ASTVariableRead, asd.adsl_ast.class
         assert_equal 'asd',       asd.adsl_ast.var_name.text
         assert_equal Kme, kme.class
-        assert_equal ASTVariable, kme.adsl_ast.class
+        assert_equal ASTVariableRead, kme.adsl_ast.class
         assert_equal 'kme',       kme.adsl_ast.var_name.text
         anything_with_adsl_ast
       end)
@@ -120,7 +120,7 @@ class ADSL::Extract::FormulaGeneratorsTest < ADSL::Extract::Rails::RailsInstrume
     {:forall => ASTForAll, :exists => ASTExists}.each do |quantifier, klass|
       formula = fg.send(quantifier, {:asd => Kme}, &lambda do |asd|
         assert_equal Kme, asd.class
-        assert_equal ASTVariable, asd.adsl_ast.class
+        assert_equal ASTVariableRead, asd.adsl_ast.class
         assert_equal 'asd', asd.adsl_ast.var_name.text
         anything_with_adsl_ast
       end)

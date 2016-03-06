@@ -1,5 +1,5 @@
 require 'adsl/extract/rails/rails_extractor'
-require 'adsl/translation/ds_extensions'
+require 'adsl/ds/fol_translation/ds_extensions'
 require 'adsl/prover/engine'
 
 module ADSL

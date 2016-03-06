@@ -1,12 +1,8 @@
-require 'adsl/parser/ast_nodes'
+require 'adsl/lang/ast_nodes'
 
 module ADSL
   module Extract
     module Utils
-
-      def t(text)
-        ADSL::Parser::ASTIdent.new :text => text.to_s
-      end
       
       def infer_classname_from_varname(varname)
         varname.to_s.match(/^(\w+?)(?:_*\d+)?$/)[1].camelize

@@ -49,22 +49,24 @@ module ADSL
       # false otherwise: neither select or recursively descend further
       def recursively_select(&block)
         selection = []
-        self.class.container_for_fields.each do |field_name|
-          field = send field_name
-          subfields = field.is_a?(Array) ? field.flatten : [field]
-          subfields.each do |field|
-            progress = block[field]
-            case progress
-            when true
-              selection << field
-              selection += field.recursively_select &block if field.respond_to? :recursively_select
-            when nil
-              selection += field.recursively_select &block if field.respond_to? :recursively_select
-            else
-            end
+        hash = self.to_h
+        children = hash.values.flatten
+        children.each do |child|
+          result = block[child]
+          selection << child if result
+          if result != false && child.respond_to?(:recursively_select)
+            selection += child.recursively_select &block
           end
         end
         selection
+      end
+
+      def to_h
+        self.class.container_for_fields.map{ |f| [f, send(f)] }.to_h
+      end
+
+      def children
+        self.to_h.values.flatten
       end
 
       module ClassMethods
@@ -122,7 +124,7 @@ end
 
 class Module
   def container_for(*fields)
-    all_fields = Set.new(fields)
+    all_fields = Set[*fields]
     if respond_to? :container_for_fields
       prev_fields = send :container_for_fields
       all_fields.merge prev_fields

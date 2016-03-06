@@ -1,12 +1,12 @@
 require 'adsl/util/test_helper'
-require 'adsl/parser/ast_nodes'
+require 'adsl/lang/ast_nodes'
 require 'adsl/extract/rails/cancan_extractor'
 require 'adsl/extract/rails/rails_extractor'
 require 'adsl/extract/rails/rails_test_helper'
 require 'adsl/extract/rails/rails_instrumentation_test_case'
 
 class ADSL::Extract::Rails::CanCanExtractorTest < ADSL::Extract::Rails::RailsInstrumentationTestCase
-  include ::ADSL::Parser
+  include ::ADSL::Lang
 
   def setup
     super
@@ -57,14 +57,14 @@ class ADSL::Extract::Rails::CanCanExtractorTest < ADSL::Extract::Rails::RailsIns
 
     assert_equal 'admin',         option1.subformulae[0].groupname.text
     assert_equal ASTIn,           option1.subformulae[1].class
-    assert_equal ASTVariable,     option1.subformulae[1].objset1.class
+    assert_equal ASTVariableRead, option1.subformulae[1].objset1.class
     assert_equal var_name,        option1.subformulae[1].objset1.var_name.text
     assert_equal ASTAllOf,        option1.subformulae[1].objset2.class
     assert_equal 'Asd',           option1.subformulae[1].objset2.class_name.text
 
     assert_equal 'nonadmin',      option2.subformulae[0].groupname.text
     assert_equal ASTIn,           option2.subformulae[1].class
-    assert_equal ASTVariable,     option2.subformulae[1].objset1.class
+    assert_equal ASTVariableRead, option2.subformulae[1].objset1.class
     assert_equal var_name,        option2.subformulae[1].objset1.var_name.text
 
     if op == :read
@@ -136,13 +136,10 @@ class ADSL::Extract::Rails::CanCanExtractorTest < ADSL::Extract::Rails::RailsIns
    
     extractor = create_rails_extractor
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing) 
-    statements = ast.block.statements
 
-    assert_equal 1, statements.length
-    assert_equal ASTExprStmt,    statements.first.class
-    assert_equal ASTAssignment,  statements.first.expr.class
-    assert_equal 'at__user',     statements.first.expr.var_name.text
-    assert_equal ASTCurrentUser, statements.first.expr.expr.class
+    assert_equal ASTAssignment,  ast.expr.class
+    assert_equal 'at__user',     ast.expr.var_name.text
+    assert_equal ASTCurrentUser, ast.expr.expr.class
   end
 
   def test_can_test_in_action
@@ -156,18 +153,18 @@ class ADSL::Extract::Rails::CanCanExtractorTest < ADSL::Extract::Rails::RailsIns
 
     extractor = create_rails_extractor
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing) 
-    statements = ast.block.statements
+
+    assert_equal ASTBlock, ast.expr.class
+
+    statements = ast.expr.exprs
 
     assert_equal 2,                statements.length
-    assert_equal ASTIf,            statements[0].class
-    assert_class_level_auth_check  statements[0].condition
-    assert_equal [],               statements[0].then_block.statements
-    assert_equal [ASTRaise],       statements[0].else_block.statements.map(&:class)
-    assert_equal ASTExprStmt,      statements[1].class
-    assert_equal ASTAssignment,    statements[1].expr.class
-    assert_equal 'at__user',       statements[1].expr.var_name.text
-    assert_equal ASTCreateObjset,  statements[1].expr.expr.class
-    assert_equal 'User',           statements[1].expr.expr.class_name.text
+    assert_equal ASTAssertFormula, statements[0].class
+    assert_class_level_auth_check  statements[0].formula
+    assert_equal ASTAssignment,    statements[1].class
+    assert_equal 'at__user',       statements[1].var_name.text
+    assert_equal ASTCreateObjset,  statements[1].expr.class
+    assert_equal 'User',           statements[1].expr.class_name.text
   end
 
   def test_can_manage_all_extracted
@@ -194,14 +191,15 @@ class ADSL::Extract::Rails::CanCanExtractorTest < ADSL::Extract::Rails::RailsIns
     
     extractor = create_rails_extractor
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :create)
-    statements = ast.block.statements
+
+    assert_equal ASTBlock, ast.expr.class
+    statements = ast.expr.exprs
 
     assert_equal 2, statements.length
 
     assert_equal ASTAssertFormula, statements[0].class
     assert_class_level_auth_check  statements[0].formula
-    assert_equal ASTExprStmt,      statements[1].class
-    assert_equal ASTCreateObjset,  statements[1].expr.class
+    assert_equal ASTCreateObjset,  statements[1].class
   end
 
   def test_authorize_resource_doesnt_persist_between_tests
@@ -222,10 +220,7 @@ class ADSL::Extract::Rails::CanCanExtractorTest < ADSL::Extract::Rails::RailsIns
     extractor = create_rails_extractor
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :create)
 
-    statements = ast.block.statements
-    assert_equal 1, statements.length
-    assert_equal ASTExprStmt, statements.first.class
-    assert_equal ASTCreateObjset, statements.first.expr.class
+    assert_equal ASTCreateObjset, ast.expr.class
 
     teardown
     setup
@@ -242,14 +237,15 @@ class ADSL::Extract::Rails::CanCanExtractorTest < ADSL::Extract::Rails::RailsIns
     extractor = create_rails_extractor
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :show)
 
-    statements = ast.block.statements
+    assert_equal ASTBlock, ast.expr.class
+
+    statements = ast.expr.exprs
     assert_equal 2, statements.length
     
-    assert_equal ASTExprStmt,   statements[0].class
-    assert_equal ASTAssignment, statements[0].expr.class
-    assert_equal ASTOneOf,      statements[0].expr.expr.class
-    assert_equal ASTAllOf,      statements[0].expr.expr.objset.class
-    assert_equal 'Asd',         statements[0].expr.expr.objset.class_name.text
+    assert_equal ASTAssignment, statements[0].class
+    assert_equal ASTOneOf,      statements[0].expr.class
+    assert_equal ASTAllOf,      statements[0].expr.objset.class
+    assert_equal 'Asd',         statements[0].expr.objset.class_name.text
 
     assert_equal ASTAssertFormula,  statements[1].class
     assert_variable_read_auth_check statements[1].formula, 'at__asd', :read
@@ -263,14 +259,14 @@ class ADSL::Extract::Rails::CanCanExtractorTest < ADSL::Extract::Rails::RailsIns
     extractor = create_rails_extractor
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :index)
 
-    statements = ast.block.statements
+    assert_equal ASTBlock, ast.expr.class
+    statements = ast.expr.exprs
     assert_equal 2, statements.length
     
-    assert_equal ASTExprStmt,   statements[0].class
-    assert_equal ASTAssignment, statements[0].expr.class
-    assert_equal ASTSubset,     statements[0].expr.expr.class
-    assert_equal ASTAllOf,      statements[0].expr.expr.objset.class
-    assert_equal 'Asd',         statements[0].expr.expr.objset.class_name.text
+    assert_equal ASTAssignment, statements[0].class
+    assert_equal ASTSubset,     statements[0].expr.class
+    assert_equal ASTAllOf,      statements[0].expr.objset.class
+    assert_equal 'Asd',         statements[0].expr.objset.class_name.text
 
     assert_equal ASTAssertFormula,  statements[1].class
     assert_variable_read_auth_check statements[1].formula, 'at__asds', :read
@@ -284,13 +280,14 @@ class ADSL::Extract::Rails::CanCanExtractorTest < ADSL::Extract::Rails::RailsIns
     extractor = create_rails_extractor
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :create)
 
-    statements = ast.block.statements
+    assert_equal ASTBlock, ast.expr.class
+
+    statements = ast.expr.exprs
     assert_equal 2, statements.length
 
-    assert_equal ASTExprStmt,     statements[0].class
-    assert_equal ASTAssignment,   statements[0].expr.class
-    assert_equal ASTCreateObjset, statements[0].expr.expr.class
-    assert_equal 'Asd',           statements[0].expr.expr.class_name.text
+    assert_equal ASTAssignment,   statements[0].class
+    assert_equal ASTCreateObjset, statements[0].expr.class
+    assert_equal 'Asd',           statements[0].expr.class_name.text
 
     assert_equal ASTAssertFormula,  statements[1].class
     assert_variable_read_auth_check statements[1].formula, 'at__asd', :create
@@ -308,13 +305,14 @@ class ADSL::Extract::Rails::CanCanExtractorTest < ADSL::Extract::Rails::RailsIns
     extractor = create_rails_extractor
     ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :create)
 
-    statements = ast.block.statements
+    assert_equal ASTBlock, ast.expr.class
+
+    statements = ast.expr.exprs
     assert_equal 2, statements.length
     
-    assert_equal ASTExprStmt,     statements[0].class
-    assert_equal ASTAssignment,   statements[0].expr.class
-    assert_equal ASTCreateObjset, statements[0].expr.expr.class
-    assert_equal 'Asd',           statements[0].expr.expr.class_name.text
+    assert_equal ASTAssignment,   statements[0].class
+    assert_equal ASTCreateObjset, statements[0].expr.class
+    assert_equal 'Asd',           statements[0].expr.class_name.text
 
     assert_equal ASTAssertFormula,  statements[1].class
     assert_variable_read_auth_check statements[1].formula, 'at__asd', :create

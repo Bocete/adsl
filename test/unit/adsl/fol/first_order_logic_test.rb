@@ -1,6 +1,6 @@
 require 'adsl/util/test_helper'
 require 'adsl/fol/first_order_logic'
-require 'adsl/translation/typed_string'
+require 'adsl/ds/fol_translation/typed_string'
 
 class ADSL::FOL::FirstOrderLogicTest < ActiveSupport::TestCase
   include ADSL::FOL
@@ -125,11 +125,11 @@ class ADSL::FOL::FirstOrderLogicTest < ActiveSupport::TestCase
 
   def test_quantification__typed_string_support
     sort = Sort.new :sort
-    v1 = ADSL::Translation::TypedString.new sort, :v1
-    v2 = ADSL::Translation::TypedString.new sort, :v2
-    v3 = ADSL::Translation::TypedString.new sort, :v3
-    v4 = ADSL::Translation::TypedString.new sort, :v4
-    v5 = ADSL::Translation::TypedString.new sort, :v5
+    v1 = ADSL::DS::FOLTranslation::TypedString.new sort, :v1
+    v2 = ADSL::DS::FOLTranslation::TypedString.new sort, :v2
+    v3 = ADSL::DS::FOLTranslation::TypedString.new sort, :v3
+    v4 = ADSL::DS::FOLTranslation::TypedString.new sort, :v4
+    v5 = ADSL::DS::FOLTranslation::TypedString.new sort, :v5
     [ForAll, Exists].each do |q|
       5.times do |a|
         args = [v1, v2, v3, v4, v5].first(a+1), true

@@ -240,5 +240,4 @@ class ADSL::Util::GeneralTest < ActiveSupport::TestCase
     assert_equal [1, 2],                  foo2.recursively_select{ |r| !r.is_a? Foo }
     assert_equal [],                      foo2.recursively_select{ nil }
   end
-  
 end

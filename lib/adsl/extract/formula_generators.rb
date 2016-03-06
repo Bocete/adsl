@@ -1,4 +1,4 @@
-require 'adsl/parser/ast_nodes'
+require 'adsl/lang/ast_nodes'
 require 'adsl/util/general'
 require 'adsl/extract/utils'
 require 'adsl/extract/extraction_error'
@@ -12,7 +12,7 @@ module ADSL
 
     module FormulaGenerators
       include Utils
-      include ADSL::Parser
+      include ADSL::Lang
 
       def in_formula_builder
         formula_builder = nil
@@ -50,17 +50,17 @@ module ADSL
 
           vars_and_objsets = block.parameters.map{ |param|
             [
-              t(param[1].to_s),
+              ASTIdent[param[1].to_s],
               param_types[param[1].to_sym].all.adsl_ast
             ]
           }
           block_params = block.parameters.map do |param|
-            param_types[param[1].to_sym].new :adsl_ast => ASTVariable.new(:var_name => t(param[1]))
+            param_types[param[1].to_sym].new :adsl_ast => ASTVariableRead.new(:var_name => ASTIdent[param[1]])
           end
           subformula = block.(*block_params)
           subformula = subformula.adsl_ast if !subformula.nil? and subformula.respond_to? :adsl_ast
           subformula = ASTBoolean.new(:bool_value => true) if subformula.nil?
-          unless subformula.is_a?(ASTNode) && subformula.class.is_expr? 
+          unless subformula.is_a?(ASTNode)
             raise ExtractionError, "Invalid formula #{subformula} returned by block in `#{quantifier}'"
           end
           fb.adsl_stack << adsl_ast_node_klass.new(:vars => vars_and_objsets, :subformula => subformula)
@@ -216,7 +216,7 @@ module ADSL
   end
 end
 
-class ADSL::Parser::ASTNode
+class ADSL::Lang::Parser::ASTNode
   include ADSL::Extract::FormulaGenerators
 end
 

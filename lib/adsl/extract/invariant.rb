@@ -1,4 +1,4 @@
-require 'adsl/parser/ast_nodes'
+require 'adsl/lang/ast_nodes'
 
 module ADSL
   module Extract
@@ -12,7 +12,7 @@ module ADSL
       end
 
       def adsl_ast
-        ADSL::Parser::ASTInvariant.new :name => ADSL::Parser::ASTIdent.new(:text => @description), :formula => @formula
+        ADSL::Lang::ASTInvariant.new :name => ADSL::Lang::ASTIdent[@description], :formula => @formula
       end
     end
   end

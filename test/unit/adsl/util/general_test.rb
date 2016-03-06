@@ -176,6 +176,16 @@ class ADSL::Util::GeneralTest < ActiveSupport::TestCase
     end
   end
 
+  def test_array__map_index
+    assert [].respond_to? :map_index
+
+    result = [1, 2, 3].map_index do |elem, i|
+      assert_equal elem, i+1
+      'a' * elem
+    end
+    assert_equal ['a', 'aa', 'aaa'], result 
+  end
+
   def test_array__try_map
     a = [13, 35, [], "kme", nil]
     assert_equal [13, 35, 0, 3, nil], a.try_map(:length)
@@ -238,5 +248,16 @@ class ADSL::Util::GeneralTest < ActiveSupport::TestCase
     a = inc_a a
     a = inc_a a
     assert_equal 5, a
+  end
+
+  def test_string__without_leading_whitespace
+    assert_equal "asd", "asd".without_leading_whitespace
+    assert_equal "asd", "           asd".without_leading_whitespace
+    assert_equal "asd  ", "  asd  ".without_leading_whitespace
+
+    assert_equal "asd\nasd", "  asd\n  asd".without_leading_whitespace
+    assert_equal "asd\n  asd", "  asd\n    asd".without_leading_whitespace
+    assert_equal "  asd\nasd", "    asd\n  asd".without_leading_whitespace
+    assert_equal "asd\n\nasd", "  asd\n\n  asd".without_leading_whitespace
   end
 end

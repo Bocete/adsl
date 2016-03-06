@@ -1,6 +1,6 @@
 require 'active_record'
 require 'active_support'
-require 'adsl/parser/ast_nodes'
+require 'adsl/lang/ast_nodes'
 require 'adsl/extract/meta'
 require 'adsl/extract/extraction_error'
 require 'adsl/extract/rails/other_meta'
@@ -11,7 +11,7 @@ module ADSL
     module Rails
 
       class ActiveRecordMetaclassGenerator
-        include ADSL::Parser
+        include ADSL::Lang
 
         def initialize(ar_class)
           @ar_class = ar_class
@@ -140,10 +140,10 @@ module ADSL
           new_class.send :define_method, :destroy do |*args|
             stmts = []
 
-            object = if self.adsl_ast.expr_has_side_effects?
+            object = if self.adsl_ast.has_side_effects?
               var_name = ASTIdent.new(:text => "__delete_#{ self.class.adsl_ast_class_name }_temp_var")
-              stmts << ASTExprStmt.new(:expr => ASTAssignment.new(:var_name => var_name.dup, :expr => self.adsl_ast))
-              self.class.new :adsl_ast => ASTVariable.new(:var_name => var_name.dup)
+              stmts << ASTAssignment.new(:var_name => var_name.dup, :expr => self.adsl_ast)
+              self.class.new :adsl_ast => ASTVariableRead.new(:var_name => var_name.dup)
             else
               self
             end
@@ -184,7 +184,7 @@ module ADSL
         def generate_class
           @ar_class.class_exec do
 
-            include ADSL::Parser
+            include ADSL::Lang
 
             attr_accessor :adsl_ast
             attr_accessible :adsl_ast if respond_to? :attr_accessible
@@ -270,20 +270,20 @@ module ADSL
             def each(&block)
               instrumenter = ::ADSL::Extract::Instrumenter.get_instance
               var_name = ASTIdent.new(:text => block.parameters.first[1].to_s)
-              var = self.class.new(:adsl_ast => ADSL::Parser::ASTVariable.new(:var_name => var_name))
+              var = self.class.new(:adsl_ast => ADSL::Lang::ASTVariableRead.new(:var_name => var_name))
 
-              substmts = instrumenter.ex_method.in_stmt_frame var, &block
+              expr = block[var]
 
               ASTForEach.new(
                 :objset => self.adsl_ast,
                 :var_name => var_name.dup,
-                :block => ASTBlock.new(:statements => substmts)
+                :expr => expr
               )
             end
 
             def include?(other)
               other = other.adsl_ast if other.respond_to? :adsl_ast
-              if other.is_a? ASTNode and other.class.is_expr?
+              if other.is_a? ASTNode 
                 ASTIn.new :objset1 => other, :objset2 => self.adsl_ast
               else
                 super
@@ -294,7 +294,7 @@ module ADSL
 
             def ==(other)
               other = other.adsl_ast if other.respond_to? :adsl_ast
-              if other.is_a? ASTNode and other.class.is_expr?
+              if other.is_a? ASTNode
                 ASTEqual.new :exprs => [self.adsl_ast, other]
               else
                 super
@@ -303,7 +303,7 @@ module ADSL
 
             def !=(other)
               other = other.adsl_ast if other.respond_to? :adsl_ast
-              if other.is_a? ASTNode and other.class.is_expr?
+              if other.is_a? ASTNode
                 ASTNot.new(:subformula => ASTEqual.new(:exprs => [self.adsl_ast, other]))
               else
                 super
@@ -362,7 +362,7 @@ module ADSL
             alias_method :add, :<<
 
             class << self
-              include ADSL::Parser
+              include ADSL::Lang
             
               def ar_class
                 superclass
@@ -401,11 +401,11 @@ module ADSL
                 #     @assigned_variables[label]
                 #   else
                 #     var_name = "#{adsl_ast_class_name}_for_params_#{label}"
-                #     var = ADSL::Parser::ASTVariable.new :var_name => ADSL::Parser::ASTIdent.new(:text => var_name)
+                #     var = ADSL::Lang::ASTVariable.new :var_name => ADSL::Lang::ASTIdent.new(:text => var_name)
                 #     @assigned_variables[label] = var
 
-                #     self.new :adsl_ast => ADSL::Parser::ASTAssignment.new(
-                #       :var_name => ADSL::Parser::ASTIdent.new(:text => var_name),
+                #     self.new :adsl_ast => ADSL::Lang::ASTAssignment.new(
+                #       :var_name => ADSL::Lang::ASTIdent.new(:text => var_name),
                 #       :expr => self.all.take(*args).adsl_ast
                 #     )
                 #   end
@@ -614,29 +614,29 @@ module ADSL
               iter_name   = ASTIdent.new :text => "#{self.class.name.underscore}__#{through_assoc.name}__iterator"
               join_name   = ASTIdent.new :text => "#{self.class.name.underscore}__#{through_assoc.name}__join_object"
               [
-                ASTExprStmt.new(:expr => ASTAssignment.new(:var_name => origin_name.dup, :expr => self.adsl_ast)),
-                ASTExprStmt.new(:expr => ASTAssignment.new(:var_name => target_name.dup, :expr => other.adsl_ast)),
+                ASTAssignment.new(:var_name => origin_name.dup, :expr => self.adsl_ast),
+                ASTAssignment.new(:var_name => target_name.dup, :expr => other.adsl_ast),
                 ASTDeleteObj.new(:objset => ASTMemberAccess.new(
-                  :objset => ASTVariable.new(:var_name => origin_name.dup),
-                  :member_name => ASTIdent.new(:text => through_assoc.name.to_s)
+                  :objset => ASTVariableRead.new(:var_name => origin_name.dup),
+                  :member_name => ASTIdent[through_assoc.name.to_s]
                 )),
                 ASTForEach.new(
                   :var_name => iter_name,
-                  :objset => ASTVariable.new(:var_name => target_name.dup),
-                  :block => ASTBlock.new(:statements => [
-                    ASTExprStmt.new(:expr => ASTAssignment.new(
+                  :objset => ASTVariableRead.new(:var_name => target_name.dup),
+                  :expr => ASTBlock.new(:exprs => [
+                    ASTAssignment.new(
                       :var_name => join_name,
-                      :expr => ASTCreateObjset.new(:class_name => ASTIdent.new(:text => join_class_name))
-                    )),
-                    ASTCreateTup.new(
-                      :objset1  => ASTVariable.new(:var_name => origin_name.dup),
-                      :rel_name => ASTIdent.new(:text => through_assoc.name.to_s),
-                      :objset2  => ASTVariable.new(:var_name => join_name.dup)
+                      :expr => ASTCreateObjset.new(:class_name => ASTIdent[join_class_name])
                     ),
                     ASTCreateTup.new(
-                      :objset1  => ASTVariable.new(:var_name => join_name.dup),
-                      :rel_name => ASTIdent.new(:text => source_assoc.name.to_s),
-                      :objset2  => ASTVariable.new(:var_name => iter_name.dup)
+                      :objset1  => ASTVariableRead.new(:var_name => origin_name.dup),
+                      :rel_name => ASTIdent[through_assoc.name.to_s],
+                      :objset2  => ASTVariableRead.new(:var_name => join_name.dup)
+                    ),
+                    ASTCreateTup.new(
+                      :objset1  => ASTVariableRead.new(:var_name => join_name.dup),
+                      :rel_name => ASTIdent[source_assoc.name.to_s],
+                      :objset2  => ASTVariableRead.new(:var_name => iter_name.dup)
                     )
                   ])
                 )

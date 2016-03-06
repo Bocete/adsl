@@ -1,9 +1,9 @@
 require 'active_support'
-require 'adsl/parser/ast_nodes'
+require 'adsl/lang/ast_nodes'
 
 class NilClass
   def adsl_ast
-    ::ADSL::Parser::ASTEmptyObjset.new
+    ::ADSL::Lang::ASTEmptyObjset.new
   end
 end
 

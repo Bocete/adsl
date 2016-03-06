@@ -1,0 +1,249 @@
+class ADSLParser
+  prechigh
+    left '*'
+    left '+'
+    left '.'
+    left in
+    left '==' '!='
+    noassoc NOT
+    left and or xor
+    left '<=' '=>'
+    left '<=>'
+    left forall exists
+    left '+=' '-='
+    right '='
+    noassoc subset oneof tryoneof isempty
+    noassoc delete create
+    noassoc assert
+    right if elsif else
+    noassoc return returnguard
+  preclow
+  token authenticable usergroup class extends inverseof action foreach flatforeach unflatforeach or xor create derefcreate delete if elsif else subset oneof tryoneof allof invariant forall exists in union isempty empty true false not and equal implies unknown currentuser inusergroup allofusergroup permit permitted permittedbytype edit read IDENT CLASS_IDENT NUMBER STRING BASIC_TYPE JS roole raize return returnguard assert
+  start adslspec
+rule
+  adslspec: root_elems { return ASTSpec.new(:lineno => lineno,
+                                            :classes => val[0][0],
+                                            :actions => val[0][1],
+                                            :invariants => val[0][2],
+                                            :usergroups => val[0][3].flatten(1),
+                                            :ac_rules => val[0][4],
+                                            :rules => val[0][5]
+                                            )}
+  
+  root_elems: class_decl root_elems      { val[1][0].unshift val[0]; return val[1] }
+            | action_decl root_elems     { val[1][1].unshift val[0]; return val[1] }
+            | invariant_decl root_elems  { val[1][2].unshift val[0]; return val[1] }
+            | usergroups_decl root_elems { val[1][3].unshift val[0]; return val[1] }
+            | acrule_decl root_elems     { val[1][4].unshift val[0]; return val[1] }
+            | rule_decl   root_elems     { val[1][5].unshift val[0]; return val[1] }
+            |                            { return [[], [], [], [], [], []] }
+
+  class_decl: opt_authenticable class CLASS_IDENT opt_parents '{' member_decls '}' { return ASTClass.new(
+                  :lineno => val[1],
+                  :authenticable => val[0],
+                  :name => val[2],
+                  :parent_names => val[3],
+                  :members => val[5]
+              ) }
+
+  opt_authenticable : authenticable { return true }
+                    |               { return false }
+
+  opt_parents: extends class_ident_list { return val[1] }
+             |                          { return [] }
+
+  member_decls: member_decls member_decl { val[0] << val[1]; return val[0] }
+              |                          { return [] }
+
+  member_decl: cardinality CLASS_IDENT IDENT opt_inverse { return ASTRelation.new(
+                 :lineno => val[0][2], :cardinality => val[0].first(2), :to_class_name => val[1],
+                 :name => val[2], :inverse_of_name => val[3]
+               )}
+#             | BASIC_TYPE IDENT { return ASTField.new :lineno => val[0][1], :type_name => val[0][0], :name => val[1] }
+
+  cardinality: NUMBER             { return [val[0][:value], val[0][:value], val[0][:lineno]] }
+             | NUMBER '..' NUMBER { return [val[0][:value], val[2][:value], val[0][:lineno]] }
+             | NUMBER '+'         { return [val[0][:value], Numeric::INFINITY, val[0][:lineno]] }
+
+  opt_inverse: inverseof IDENT { return val[1] }
+             |                 { return nil }
+
+  action_decl: action IDENT expr { return ASTAction.new :lineno => val[0], :name => val[1], :expr => val[2] }
+
+  exprs: expr exprs { val[1].unshift val[0]; return val[1] }
+       |            { return [] }
+  
+  expr: '{' exprs '}'              { return ASTBlock.new :lineno => val[0], :exprs => val[1] }
+      | IDENT                      { return ASTVariableRead.new :lineno => val[0].lineno, :var_name => val[0] }
+      | IDENT '=' expr             { return ASTAssignment.new :lineno => val[0].lineno, :var_name => val[0], :expr => val[2] }
+      | member_expr                { return val[0] }
+      | CLASS_IDENT                { return ASTAllOf.new :lineno => val[0].lineno, :class_name => val[0] }
+      | create CLASS_IDENT         { return ASTCreateObjset.new :lineno => val[0], :class_name => val[1] }
+      | create '(' member_expr ')' { return ASTDereferenceCreate.new :lineno => val[0], :objset => val[2], :rel_name => val[4] }
+      | delete expr                { return ASTDeleteObj.new :lineno => val[0], :objset => val[1] }
+      | member_expr '+=' expr { return ASTCreateTup.new(:lineno => val[0].lineno,
+          :objset1 => val[0].objset, :rel_name => val[0].member_name, :objset2 => val[2])
+        }
+      | member_expr '-=' expr { return ASTDeleteTup.new(:lineno => val[0].lineno,
+          :objset1 => val[0].objset, :rel_name => val[0].member_name, :objset2 => val[2])
+        }
+      | member_expr '=' expr { return ASTMemberSet.new(:lineno => val[0].lineno,
+          :objset => val[0].objset, :member_name => val[0].member_name, :expr => val[2])
+        }
+        # objsets
+      | '(' expr ')'  { return val[1] }
+      | subset expr   { return ASTSubset.new :lineno => val[0], :objset => val[1] }
+      | oneof expr    { return ASTOneOf.new :lineno => val[0], :objset => val[1] }
+      | tryoneof expr { return ASTTryOneOf.new :lineno => val[0], :objset => val[1] }
+      | empty         { return ASTEmptyObjset.new :lineno => val[0] }
+      | union '(' comma_separated_exprs ')'       { return ASTUnion.new :lineno => val[0], :objsets => val[2] }
+        # for backwards compatibility
+      | create '(' CLASS_IDENT ')' { return ASTCreateObjset.new :lineno => val[0], :class_name => val[2] }
+      | allof CLASS_IDENT         { return ASTAllOf.new :lineno => val[0], :class_name => val[1] }
+      | allof '(' CLASS_IDENT ')' { return ASTAllOf.new :lineno => val[0], :class_name => val[2] }
+        # boolean
+      | forall '(' quantifier_parameters_with_commas ':' expr ')' { return ASTForAll.new :lineno => val[0], :vars => val[2], :subformula => val[4] }
+      | exists '(' quantifier_parameters_with_commas optional_expr ')' { return ASTExists.new :lineno => val[0], :vars => val[2], :subformula => val[3] }
+      | not expr { return ASTNot.new :lineno => val[0], :subformula => val[1] } =NOT
+      | expr and expr { return ASTAnd.new :lineno => val[0].lineno, :subformulae => [val[0], val[2]] }
+      | expr or  expr { return ASTOr.new  :lineno => val[0].lineno, :subformulae => [val[0], val[2]] }
+      | expr xor expr { return ASTXor.new :lineno => val[0].lineno, :subformulae => [val[0], val[2]] }
+      | expr '=>' expr
+        { return ASTImplies.new :lineno => val[0].lineno, :subformula1 => val[0], :subformula2 => val[2] }
+      | expr '<=' expr
+        { return ASTImplies.new :lineno => val[0].lineno, :subformula1 => val[2], :subformula2 => val[0] }
+      | implies '(' expr ',' expr ')'
+        { return ASTImplies.new :lineno => val[0], :subformula1 => val[2], :subformula2 => val[4] }
+      | expr '==' expr
+        { return ASTEqual.new :lineno => val[0].lineno, :exprs => [val[0], val[2]] }
+      | expr '<=>' expr
+        { return ASTEqual.new :lineno => val[0].lineno, :exprs => [val[0], val[2]] }
+      | expr '!=' expr { return ASTNot.new(
+          :lineno => val[0].lineno, :subformula => ASTEqual.new(:lineno => val[0].lineno, :exprs => [val[0], val[2]])
+        )}
+      | equal '(' comma_separated_exprs ')' { return ASTEqual.new :lineno => val[0], :exprs => val[2] }
+      | expr in expr                        { return ASTIn.new :lineno => val[0].lineno, :objset1 => val[0], :objset2 => val[2] }
+      | true                                { return ASTBoolean.new :lineno => val[0], :bool_value => true  }
+      | false                               { return ASTBoolean.new :lineno => val[0], :bool_value => false }
+      | '*'                                 { return ASTBoolean.new :lineno => val[0], :bool_value => nil   }
+      | isempty expr                { return ASTIsEmpty.new :lineno => val[0], :objset => val[1] }
+        # access control
+      | currentuser           { return ASTCurrentUser.new :lineno => val[0] }
+      | inusergroup '(' IDENT ')'
+               { return ASTInUserGroup.new :lineno => val[0], :groupname => val[2] }
+      | inusergroup '(' expr ',' IDENT ')'
+               { return ASTInUserGroup.new :lineno => val[0], :objset => val[2], :groupname => val[4] }
+      | allofusergroup '(' IDENT ')' { return ASTAllOfUserGroup.new :lineno => val[0], :groupname => val[2] }
+      | permitted '(' perm_op_list expr ')' { return ASTPermitted.new :lineno => val[0], :ops => val[2], :expr => val[3] }
+        # branches
+      | foreach_expr { return val[0] }
+      | if expr expr optelse { return ASTIf.new :lineno => val[0], :condition => val[1], :then_expr => val[2], :else_expr => val[3] }
+      | raize            { return ASTRaise.new :lineno => val[0] }
+      | return expr      { return ASTReturn.new :lineno => val[0], :expr => val[1] }
+      | returnguard expr { return ASTReturnGuard.new :lineno => val[0], :expr => val[1] }
+        # other
+      | assert expr { return ASTAssertFormula.new :lineno => val[0], :formula => val[1] }
+      #| JS             { return ASTJsExpr.new :lineno => val[0][:lineno], :js    => val[0][:js] }
+      #| NUMBER         { return ASTNumber.new :lineno => val[0][:lineno], :value => val[0][:value] }
+      #| STRING         { return ASTString.new :lineno => val[0][:lineno], :value => val[0][:value].gsub(%q{\'}, %q{'}) }
+
+  member_expr: expr '.' IDENT { return ASTMemberAccess.new :lineno => val[0].lineno, :objset => val[0], :member_name => val[2] }
+
+  foreach_expr: foreach IDENT ':' expr expr { return ASTForEach.new(
+                  :lineno => val[0], :var_name => val[1], :objset => val[3], :expr => val[4]
+                )} =else
+              | flatforeach IDENT ':' expr expr { return ASTForEach.new(
+                  :lineno => val[0], :var_name => val[1], :objset => val[3], :expr => val[4]
+                ).force_flat!(true) } =else
+              | unflatforeach IDENT ':' expr expr { return ASTForEach.new(
+                  :lineno => val[0], :var_name => val[1], :objset => val[3], :expr => val[4]
+                ).force_flat!(false) } =else
+
+  optelse: else expr               { return val[1] } =else
+         | elsif expr expr optelse { return ASTIf.new :condition => val[1], :then_expr => val[2], :else_expr => val[3] } =else
+         |                         { return ASTEmptyObjset.new } =else
+
+  invariant_decl: invariant expr {
+          return ASTInvariant.new :lineno => val[0], :name => nil, :formula => val[1]
+        }
+      | invariant IDENT ':' expr { 
+          return ASTInvariant.new :lineno => val[0], :name => val[1], :formula => val[3]
+        }
+
+  rule_decl: roole expr { return ASTRule.new :lineno => val[0], :formula => val[1] }
+  
+  acrule_decl: permit opt_ident_list perm_op_list expr
+             { return ASTPermit.new :lineno => val[0], :group_names => val[1], :ops => val[2], :expr => val[3] }
+
+  perm_op_list: perm_op more_perm_ops      { val[1].unshift val[0]; return val[1] }
+  more_perm_ops: more_perm_ops ',' perm_op { val[0] << val[2]; return val[0] }
+               |                           { return [] }
+
+  perm_op: read    { return [:read, val[0]] }
+         | edit    { return [:edit, val[0]] }
+         | create  { return [:create, val[0]] }
+         | delete  { return [:delete, val[0]] }
+
+  quantifier_parameters_with_commas: quantifier_parameters_with_commas ',' quantifier_parameter
+                                     { val[0] << val[2]; return val[0] }
+                                   | quantifier_parameter { return [val[0]] }
+
+  quantifier_parameter: CLASS_IDENT IDENT {
+                          return [val[1], ASTAllOf.new(:lineno => val[0].lineno, :class_name => val[0]), val[0].lineno]
+                        }
+                      | IDENT in expr { return [val[0], val[2], val[0].lineno] }
+  
+  comma_separated_exprs: expr additional_exprs { val[1].unshift val[0]; return val[1] }
+
+  additional_exprs: additional_exprs ',' expr { val[0] << val[2]; return val[0] }
+                  |                           { return [] }
+
+  optional_expr: ':' expr { return val[1] }
+               |          { return nil }
+
+  usergroups_decl: usergroup IDENT additional_ugs
+                       { val[2].unshift ASTUserGroup.new(:lineno => val[1].lineno, :name => val[1]); return val[2] }
+  additional_ugs: additional_ugs ',' IDENT
+                       { val[0] << ASTUserGroup.new(:lineno => val[2].lineno, :name => val[2]); return val[0] }
+                |      { return [] }
+
+  opt_ident_list: ident_list { return val[0] }
+                |            { return [] }
+  ident_list: IDENT more_idents      { val[1].unshift val[0]; return val[1] }
+  more_idents: more_idents ',' IDENT { val[0] << val[2]; return val[0] }
+             |                       { return [] }
+  
+  class_ident_list: CLASS_IDENT more_class_idents      { val[1].unshift val[0]; return val[1] }
+  more_class_idents: more_class_idents ',' CLASS_IDENT { val[0] << val[2]; return val[0] }
+                   |                                   { return [] }
+
+end
+
+---- header
+
+require 'adsl/lang/parser/adsl_parser.rex'
+require 'adsl/fol/first_order_logic'
+
+module ADSL
+  module Lang
+    module Parser
+
+---- inner
+
+# generated by racc
+  def generate_ast(str)
+    scan str
+    # do_parse
+  end
+
+  def parse(str)
+    generate_ast(str).typecheck_and_resolve
+  rescue ScanError, Racc::ParseError => e
+    raise ADSLError, e.message
+  end
+
+---- footer
+
+    end
+  end
+end

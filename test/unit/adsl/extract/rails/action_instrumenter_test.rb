@@ -8,7 +8,7 @@ require 'adsl/extract/rails/method'
 require 'adsl/extract/rails/rails_instrumentation_test_case'
 
 class ADSL::Extract::ActionInstrumenterTest < ADSL::Extract::Rails::RailsInstrumentationTestCase
-  include ADSL::Parser
+  include ADSL::Lang::Parser
   include ADSL::Extract::Rails
 
   def test__local_instance_class_variables_differ
@@ -66,28 +66,6 @@ class ADSL::Extract::ActionInstrumenterTest < ADSL::Extract::Rails::RailsInstrum
       assert_equal expected_results[1], kme.instance_variable_get(:@b), code
       assert_equal expected_results[2], kme.instance_variable_get(:@c), code
     end
-  end
-
-  def test__in_stmt_frame
-    method = ADSL::Extract::Rails::Method.new
-    
-    assert_equal([:a, :b, :d], method.in_stmt_frame do
-      method << :a
-      method << :b
-      assert_equal([:c], method.in_stmt_frame do
-        method << :c
-      end)
-      method << :d
-    end)
-    
-    assert_equal([:a, :b, :d], method.in_stmt_frame do
-      method << :a
-      method << :b
-      assert_equal([:c], method.in_stmt_frame do
-        method << :c
-      end)
-      method << :d
-    end)
   end
 
 end

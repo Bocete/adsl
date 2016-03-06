@@ -1,17 +1,17 @@
-require 'adsl/parser/ast_nodes'
+require 'adsl/lang/ast_nodes'
 
 module ADSL
   module Extract
     module Rails
       module CallbackChainSimulator
 
-        include ADSL::Parser
+        include ADSL::Lang
        
         # returns true or false if the node will render or raise, or will not render or raise
         # returns nil if the node may or may not render or raise
         def returning_status_of(ast_node, is_action_body = false)
           if ast_node.is_a?(ASTBlock)
-            sub_statuses = ast_node.statements.map do |stmt|
+            sub_statuses = ast_node.exprs.map do |stmt|
               sub_rs = halting_status_of stmt, is_action_body
               return true if sub_rs == true
               sub_rs
@@ -81,7 +81,7 @@ module ADSL
         def split_into_callbacks(root_block)
           pairs = []
           root_block.statements.reverse_each do |stmt|
-            if stmt.is_a? ADSL::Parser::ASTDummyStmt
+            if stmt.is_a? ADSL::Lang::Parser::ASTDummyStmt
               pairs << [stmt.label, []]
             else
               pairs.last[1] << stmt
@@ -101,8 +101,8 @@ module ADSL
 
           callbacks.each do |label, block|
             block.block_replace do |expr|
-              next unless expr.is_a?(ADSL::Parser::ASTDummyStmt) && expr.label == :render
-              label.to_s == action_name.to_s ? ADSL::Parser::ASTDummyStmt.new : ADSL::Parser::ASTRaise.new
+              next unless expr.is_a?(ADSL::Lang::Parser::ASTDummyStmt) && expr.label == :render
+              label.to_s == action_name.to_s ? ADSL::Lang::Parser::ASTDummyStmt.new : ADSL::Lang::Parser::ASTRaise.new
             end
           end
 

@@ -1,31 +1,15 @@
 require 'set'
-require 'adsl/parser/ast_nodes'
+require 'adsl/lang/ast_nodes'
 
 module ADSL
-  module Parser
-    class ASTTypecheckResolveContext
-      def relations_around(*classes)
-        classes = classes.flatten.map do |c|
-          c.respond_to?(:to_a) ? c.to_a : c
-        end
-        classes = Set[*classes.flatten]
-        Set[*@members.values.map(&:values).flatten(1).map(&:last).select do |rel|
-          rel.is_a?(ADSL::DS::DSRelation) && (classes.include?(rel.from_class) || classes.include?(rel.to_class))
-        end]
-      end
-    end
-
-    # declaration required because of dependencies
-    class ASTNode
-    end
-
-    class ASTDummyObjset < ::ADSL::Parser::ASTNode
-      def objset_effect_domain_analysis(context, info)
-        return [], true if @type_sig.cardinality.empty?
-        return @type_sig.all_children(true), false
-      end
-    end
-  end
+  # module Parser
+  #   class ASTDummyObjset < ::ADSL::Lang::Parser::ASTNode
+  #     def objset_effect_domain_analysis(context, info)
+  #       return [], true if @type_sig.cardinality.empty?
+  #       return @type_sig.all_children(true), false
+  #     end
+  #   end
+  # end
 
   module DS
     class NodeEffectDomainInfo

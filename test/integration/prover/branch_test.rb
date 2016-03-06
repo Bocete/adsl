@@ -7,14 +7,14 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :correct, <<-ADSL
       class Class{}
       action blah {
-        either {} or {}
+        if * {} else {}
       }
       invariant exists(Class o)
     ADSL
     adsl_assert :correct, <<-ADSL
       class Class{}
       action blah {
-        either {} or {}
+        if * {} else {}
       }
       invariant not exists(Class o)
     ADSL
@@ -24,24 +24,24 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :correct, <<-ADSL
       class Class{}
       action blah {
-        create(Class)
-        either {} or {}
+        create Class
+        if * {} else {}
       }
       invariant exists(Class o)
     ADSL
     adsl_assert :correct, <<-ADSL
       class Class{}
       action blah {
-        either {} or {}
-        create(Class)
+        if * {} else {}
+        create Class
       }
       invariant exists(Class o)
     ADSL
     adsl_assert :incorrect, <<-ADSL
       class Class{}
       action blah {
-        either {} or {}
-        create(Class)
+        if * {} else {}
+        create Class
       }
       invariant not exists(Class o)
     ADSL
@@ -51,22 +51,10 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :incorrect, <<-ADSL
       class Class{}
       action blah {
-        either {
-          delete allof(Class)
-        } or {}
+        if *
+          delete Class
       }
       invariant exists(Class o)
-    ADSL
-  end
-
-  def test_either__blank_is_noop
-    adsl_assert :incorrect, <<-ADSL
-      class Class{}
-      action blah {
-        create(Class)
-        either {} or {} or {} or {}
-      }
-      invariant not exists(Class c)
     ADSL
   end
 
@@ -74,10 +62,10 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :incorrect, <<-ADSL
       class Class{}
       action blah {
-        either {
-          delete allof(Class)
-          create(Class)
-        } or {}
+        if * {
+          delete Class
+          create Class
+        }
       }
       invariant not exists(Class o)
     ADSL
@@ -87,19 +75,19 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :incorrect, <<-ADSL
       class Class{}
       action blah {
-        either {
-          delete allof(Class)
-          create(Class)
-        } or {}
+        if * {
+          delete Class
+          create Class
+        }
       }
       invariant not exists(Class o)
     ADSL
     adsl_assert :incorrect, <<-ADSL
       class Class{}
       action blah {
-        either {} or {
-          delete allof(Class)
-          create(Class)
+        if * {
+          delete Class
+          create Class
         }
       }
       invariant not exists(Class o)
@@ -110,10 +98,10 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :incorrect, <<-ADSL
       class Class{}
       action blah {
-        either {
-          create(Class)
-        } or {
-          create(Class)
+        if * {
+          create Class
+        } else {
+          create Class
         }
       }
       invariant not exists(Class o)
@@ -121,10 +109,10 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :correct, <<-ADSL
       class Class{}
       action blah {
-        either {
-          create(Class)
-        } or {
-          create(Class)
+        if * {
+          create Class
+        } else {
+          create Class
         }
       }
       invariant exists(Class o)
@@ -135,11 +123,11 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :correct, <<-ADSL
       class Class {}
       action blah {
-        either {} or {
-          delete allof(Class)
-          create(Class)
-        } or {
-          create(Class)
+        if * {
+          delete Class
+          create Class
+        } else {
+          create Class
         }
       }
       invariant exists(Class o)
@@ -147,13 +135,13 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :incorrect, <<-ADSL
       class Class {}
       action blah {
-        either {
-          create(Class)
-        } or {
-          delete allof(Class)
-          create(Class)
-        } or {
-          delete allof(Class)
+        if * {
+          create Class
+        } elsif * {
+          delete Class
+          create Class
+        } else {
+          delete Class
         }
       }
       invariant exists(Class o)
@@ -164,12 +152,12 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :correct, <<-ADSL
       class Class{}
       action blah {
-        either {
-          delete allof(Class)
-          create(Class)
-        } or {
-          delete allof(Class)
-          create(Class)
+        if * {
+          delete Class
+          create Class
+        } else {
+          delete Class
+          create Class
         }
       }
       invariant forall(Class a, Class b: a == b)
@@ -180,11 +168,11 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :incorrect, <<-ADSL
       class Class{}
       action blah {
-        either {
-          a = create(Class)
+        if * {
+          a = create Class
           delete a
-        } or {
-          create(Class)
+        } else {
+          create Class
         }
       }
       invariant forall(Class a, Class b: a == b)
@@ -192,10 +180,9 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :incorrect, <<-ADSL
       class Class{}
       action blah {
-        a = create(Class)
-        either {
+        a = create Class
+        if * {
           delete a
-        } or {
         }
       }
       invariant not exists(Class a)
@@ -206,9 +193,8 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :incorrect, <<-ADSL
       class Class{}
       action blah {
-        a = create(Class)
-        either {
-        } or {
+        a = create Class
+        if * {
           delete a
         }
       }
@@ -217,10 +203,9 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :incorrect, <<-ADSL
       class Class{}
       action blah {
-        a = create(Class)
-        either {
+        a = create Class
+        if * {
           delete a
-        } or {
         }
       }
       invariant forall(Class a, Class b: a == b)
@@ -228,10 +213,10 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :correct, <<-ADSL
       class Class{}
       action blah {
-        a = create(Class)
-        either {
+        a = create Class
+        if * {
           delete a
-        } or {
+        } else {
           delete a
         }
       }
@@ -240,10 +225,10 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :correct, <<-ADSL
       class Class{}
       action blah {
-        a = create(Class)
-        either {
+        a = create Class
+        if * {
           delete a
-        } or {
+        } else {
           delete a
         }
       }
@@ -252,14 +237,14 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :correct, <<-ADSL
       class Class{}
       action blah {
-        a = allof(Class)
-        either {
-          a = create(Class)
-        } or {
-          a = create(Class)
-          a = oneof(allof(Class))
-        } or {
-          a = create(Class)
+        a = Class
+        if * {
+          a = create Class
+        } elsif * {
+          a = create Class
+          a = oneof Class
+        } else {
+          a = create Class
         }
         delete a
       }
@@ -271,8 +256,8 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :correct, <<-ADSL
       class Class {}
       action blah {
-        if isempty(allof(Class)) {
-          create(Class)
+        if isempty(Class) {
+          create Class
         }
       }
       invariant exists(Class o)
@@ -280,8 +265,8 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :correct, <<-ADSL
       class Class {}
       action blah {
-        if not isempty(allof(Class)) {
-          create(Class)
+        if not isempty(Class) {
+          create Class
         }
       }
       invariant not exists(Class o)
@@ -295,7 +280,7 @@ class BranchTest < ActiveSupport::TestCase
         if exists(Class o) {
         } else {
           if not exists(Class o) {
-            create(Class)
+            create Class
           }
         }
       }
@@ -310,7 +295,7 @@ class BranchTest < ActiveSupport::TestCase
       }
       class Class2 {}
       action blah {
-        foreach o: allof(Class) {
+        foreach o: Class {
           if isempty(o.rel) {
             o.rel += create(Class2)
           }
@@ -324,7 +309,7 @@ class BranchTest < ActiveSupport::TestCase
       }
       class Class2 {}
       action blah {
-        foreach o: allof(Class) {
+        foreach o: Class {
           if isempty(o.rel) {
             delete o
           }
@@ -338,8 +323,8 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :correct, <<-ADSL
       class Class {}
       action blah {
-        if isempty(allof(Class)) {
-          create(Class)
+        if isempty(Class) {
+          create Class
         }
       }
       invariant exists(Class o)
@@ -351,10 +336,10 @@ class BranchTest < ActiveSupport::TestCase
     #   class Class {}
     #   action blah {
     #     var = empty
-    #     if isempty(allof(Class)) {
-    #       var = create(Class)
+    #     if isempty(Class) {
+    #       var = create Class
     #     } else {
-    #       var = oneof(allof(Class))
+    #       var = oneof Class
     #     }
     #     delete var
     #   }
@@ -365,7 +350,7 @@ class BranchTest < ActiveSupport::TestCase
       action blah {
         var = empty
         if forall(Class o1, Class o2: o1 == o2) {
-          var = oneof(allof(Class))
+          var = oneof Class
         }
         delete var
       }
@@ -377,7 +362,7 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :incorrect, <<-ADSL, :conjecture => false
       class Class{}
       action blah {
-        foreach c: allof(Class) {
+        foreach c: Class {
         }
       }
     ADSL
@@ -387,8 +372,8 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :incorrect, <<-ADSL, :conjecture => false
       class Class{}
       action blah {
-        create(Class)
-        foreach c: allof(Class) {
+        create Class
+        foreach c: Class {
         }
       }
     ADSL
@@ -469,13 +454,13 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :correct, <<-ADSL, :conjecture => true
       class Class {}
       action blah {
-        unflatforeach c: allof(Class) {}
+        unflatforeach c: Class {}
       }
     ADSL
     adsl_assert :incorrect, <<-ADSL, :conjecture => false
       class Class {}
       action blah {
-        unflatforeach c: allof(Class) {}
+        unflatforeach c: Class {}
       }
     ADSL
   end
@@ -497,17 +482,17 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :correct, <<-ADSL, :conjecture => true
       class Class {}
       action blah {
-        delete allof(Class)
-        create(Class)
-        unflatforeach c: allof(Class) {}
+        delete Class
+        create Class
+        unflatforeach c: Class {}
       }
     ADSL
     adsl_assert :incorrect, <<-ADSL, :conjecture => false
       class Class {}
       action blah {
-        delete allof(Class)
-        create(Class)
-        unflatforeach c: allof(Class) {}
+        delete Class
+        create Class
+        unflatforeach c: Class {}
       }
     ADSL
   end
@@ -516,19 +501,19 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :correct, <<-ADSL, :conjecture => true
       class Class {}
       action blah {
-        delete allof(Class)
-        create(Class)
-        create(Class)
-        unflatforeach c: allof(Class) {}
+        delete Class
+        create Class
+        create Class
+        unflatforeach c: Class {}
       }
     ADSL
     adsl_assert :incorrect, <<-ADSL, :conjecture => false
       class Class {}
       action blah {
-        delete allof(Class)
-        create(Class)
-        create(Class)
-        unflatforeach c: allof(Class) {}
+        delete Class
+        create Class
+        create Class
+        unflatforeach c: Class {}
       }
     ADSL
   end
@@ -537,21 +522,21 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :correct, <<-ADSL, :conjecture => true
       class Class {}
       action blah {
-        delete allof(Class)
-        create(Class)
-        create(Class)
-        create(Class)
-        unflatforeach c: allof(Class) {}
+        delete Class
+        create Class
+        create Class
+        create Class
+        unflatforeach c: Class {}
       }
     ADSL
     adsl_assert :incorrect, <<-ADSL, :conjecture => false
       class Class {}
       action blah {
-        delete allof(Class)
-        create(Class)
-        create(Class)
-        create(Class)
-        unflatforeach c: allof(Class) {}
+        delete Class
+        create Class
+        create Class
+        create Class
+        unflatforeach c: Class {}
       }
     ADSL
   end
@@ -560,7 +545,7 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :incorrect, <<-ADSL
       class Class {}
       action blah {
-        unflatforeach c: allof(Class) {
+        unflatforeach c: Class {
           delete c
         }
       }
@@ -574,7 +559,7 @@ class BranchTest < ActiveSupport::TestCase
         0+ Class other
       }
       action blah {
-        flatforeach c: allof(Class) {
+        flatforeach c: Class {
           if not isempty(c.other) {
             delete c
           }
@@ -590,7 +575,7 @@ class BranchTest < ActiveSupport::TestCase
         0+ Class other
       }
       action blah {
-        unflatforeach c: allof(Class) {
+        unflatforeach c: Class {
           if not isempty(c.other) {
             delete c
           }
@@ -604,9 +589,9 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :correct, <<-ADSL
       class Class { 0+ Class rel }
       action blah {
-        allof(Class).rel -= allof(Class)
-        foreach c: allof(Class) {
-          c2 = oneof(allof(Class))
+        Class.rel -= Class
+        foreach c: Class {
+          c2 = oneof Class
           c.rel += c2
         }
       }
@@ -615,9 +600,9 @@ class BranchTest < ActiveSupport::TestCase
     adsl_assert :correct, <<-ADSL
       class Class { 0+ Class rel }
       action blah {
-        allof(Class).rel -= allof(Class)
-        foreach c: allof(Class) {
-          c2 = oneof(allof(Class))
+        Class.rel -= Class
+        foreach c: Class {
+          c2 = oneof Class
           c.rel += c2
         }
       }

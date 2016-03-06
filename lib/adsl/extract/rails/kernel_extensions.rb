@@ -1,6 +1,8 @@
 require 'adsl/extract/instrumenter'
 require 'adsl/extract/rails/action_instrumenter'
 require 'adsl/extract/rails/basic_type_extensions'
+require 'adsl/extract/rails/method'
+require 'adsl/lang/ast_nodes'
 
 module Kernel
   alias_method :old_ins_call, :ins_call
@@ -20,19 +22,14 @@ module Kernel
     old_ins_call object, method_name, *args, &block
   end
 
-  def ins_stmt(expr = nil, options = {})
-    if expr.is_a? Array
-      expr.each do |subexpr|
-        ins_stmt subexpr, options
-      end
+  def ins_block(*exprs)
+    adsl_asts = exprs.flatten.map{ |e| e.respond_to?(:adsl_ast) ? e.adsl_ast : e }.flatten.select{ |e| e.is_a? ::ADSL::Lang::ASTNode }
+    block = ::ADSL::Lang::ASTBlock.new :exprs => adsl_asts
+    if exprs.last.is_a?(ActiveRecord::Base)
+      exprs.last.class.new :adsl_ast => block
     else
-      instrumenter = ::ADSL::Extract::Instrumenter.get_instance
-      stmt = ::ADSL::Extract::Rails::ActionInstrumenter.extract_stmt_from_expr expr
-      if stmt.is_a?(::ADSL::Parser::ASTNode) && stmt.class.is_statement?
-        instrumenter.ex_method.append_stmt stmt, options
-      end
+      block
     end
-    expr
   end
 
   def ins_multi_assignment(outer_binding, names, values, operator = '=')
@@ -50,31 +47,34 @@ module Kernel
       else
         name.to_s
       end
+
+      value_adsl_ast = value.try_adsl_ast
       
-      if value.respond_to?(:adsl_ast) && (value.nil? || value.is_a?(ActiveRecord::Base)) #value.adsl_ast.class.is_expr?
-        assignment = ::ADSL::Parser::ASTExprStmt.new(:expr => ::ADSL::Parser::ASTAssignment.new(
-          :var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name),
-          :expr => value.adsl_ast
-        ))
+      if value_adsl_ast
         if operator == '||='
           old_value = outer_binding.eval name rescue nil
-          if old_value.respond_to?(:adsl_ast) && old_value.adsl_ast.class.is_expr?
-            assignment = ::ADSL::Parser::ASTIf.new(
-              :condition => ::ADSL::Parser::ASTIsEmpty.new(:objset => old_value.adsl_ast),
-              :then_block => ::ADSL::Parser::ASTBlock.new(:statements => [assignment]),
-              :else_block => ::ADSL::Parser::ASTBlock.new(:statements => []),
+          if old_value.respond_to?(:adsl_ast)
+            value_adsl_ast = ::ADSL::Lang::ASTIf.new(
+              :condition => ::ADSL::Lang::ASTIsEmpty.new(:objset => old_value.adsl_ast),
+              :then_expr => value_adsl_ast,
+              :else_expr => old_value.adsl_ast
             )
           end
         end
-        ins_stmt assignment
+        assignment = ::ADSL::Lang::ASTAssignment.new(
+          :var_name => ::ADSL::Lang::ASTIdent[adsl_ast_name],
+          :expr => value_adsl_ast
+        )
 
-        new_value = !value.is_a?(ActiveRecord::Base) ? value.dup : value.class.new(
-          :adsl_ast => ::ADSL::Parser::ASTVariable.new(:var_name => ::ADSL::Parser::ASTIdent.new(:text => adsl_ast_name)
+        new_value = !value.is_a?(ActiveRecord::Base) ? value : value.class.new(
+          :adsl_ast => ::ADSL::Lang::ASTVariableRead.new(:var_name => ::ADSL::Lang::ASTIdent[adsl_ast_name]
         ))
-
         outer_binding.eval "#{name} #{operator} ObjectSpace._id2ref(#{new_value.object_id})"
-        
-        values_to_be_returned << new_value
+
+        assignment = value.class.new :adsl_ast => assignment if value.is_a?(ActiveRecord::Base)
+        values_to_be_returned << assignment
+        # 
+        # values_to_be_returned << new_value
       else
         outer_binding.eval "#{name} #{operator} ObjectSpace._id2ref(#{value.object_id})"
         values_to_be_returned << value
@@ -86,35 +86,24 @@ module Kernel
   def ins_do_return(return_value = nil)
     instrumenter = ::ADSL::Extract::Instrumenter.get_instance
 
-    return_asts = [return_value].flatten.map{ |r| r.respond_to?(:adsl_ast) ? r.adsl_ast : r }
-    all_asts = return_asts.map{ |r| r.is_a? ADSL::Parser::ASTNode }.uniq == [true]
-
-    if all_asts
-      all_exprs = return_asts.map(&:class).map(&:is_expr?).uniq == [true]
-    end
-
-    if all_asts && all_exprs 
-      instrumenter.ex_method.set_return_types [return_value].flatten.map(&:class)
-      ins_stmt ::ADSL::Parser::ASTReturn.new(:exprs => return_asts)
+    return_values = [return_value].flatten
+    if return_values.length == 1
+      ::ADSL::Lang::ASTReturn.new :expr => return_value.try_adsl_ast
     else
-      instrumenter.ex_method.cancel_return_stmt
-      [return_value].flatten.each do |returned_value|
-        ins_stmt returned_value
-      end
+      ::ADSL::Lang::ASTBlock.new :exprs => return_values.map(&:try_adsl_ast) + [::ADSL::Lang::ASTReturn.new(:expr => nil.adsl_ast)]
     end
-    nil
   end
 
   def ins_do_raise(*args)
-    ::ADSL::Parser::ASTRaise.new
+    ::ADSL::Lang::ASTRaise.new
   end
 
   def ins_do_render
     instrumenter = ::ADSL::Extract::Instrumenter.get_instance
     if instrumenter.action_name.to_s == instrumenter.ex_method.name.to_s
-      ins_stmt ::ADSL::Parser::ASTDummyStmt.new(:label => :render)
+      ::ADSL::Lang::ASTFlag.new(:label => :render)
     else
-      ins_stmt ::ADSL::Parser::ASTRaise.new 
+      ::ADSL::Lang::ASTRaise.new 
     end
   end
 
@@ -124,11 +113,19 @@ module Kernel
     method = ::ADSL::Extract::Rails::Method.new :name => method_name, :action_or_callback => old_method.name == :root
     instrumenter.ex_method = method
 
-    block, return_val = method.extract_from &block
+    return_val = method.extract_from &block
+    adsl_ast = return_val.try_adsl_ast
+    adsl_ast = ::ADSL::Lang::ASTReturnGuard.new :expr => adsl_ast if adsl_ast.is_a? ::ADSL::Lang::ASTNode
 
-    old_method << block
-    if method.action_or_callback?
-      old_method << ::ADSL::Parser::ASTDummyStmt.new(:label => method_name)
+    if old_method.is_root_level?
+      old_method.root_block.exprs << adsl_ast if adsl_ast.is_a? ::ADSL::Lang::ASTNode
+      old_method.root_block.exprs << ::ADSL::Lang::ASTFlag.new(:label => method_name)
+    else
+      if return_val.is_a? ActiveRecord::Base
+        return_val = return_val.class.new :adsl_ast => adsl_ast
+      elsif return_val.is_a?(::ADSL::Lang::ASTNode) && adsl_ast.is_a?(::ADSL::Lang::ASTNode)
+        return_val = adsl_ast
+      end
     end
 
     return return_val
@@ -136,7 +133,7 @@ module Kernel
     if TEST_ENV
       raise e
     else
-      return nil
+      return ::ADSL::Lang::ASTRaise.new
     end
   ensure
     instrumenter.ex_method = old_method if instrumenter
@@ -152,70 +149,19 @@ module Kernel
     instrumenter.ex_method.pop_frame
   end
 
-  def ins_if(condition, arg1, arg2)
-    ast = condition
-    
-    ast = ast.adsl_ast if ast.respond_to?(:adsl_ast)
-    condition_ast = nil
-    if ast.is_a? ADSL::Parser::ASTNode
-      if ast.class.is_expr?
-        condition_ast = ast
-      else
-        ins_stmt condition
-      end
+  def ins_if(condition, then_expr, else_expr)
+    condition_ast = condition.try_adsl_ast ADSL::Lang::ASTBoolean.new 
+    then_ast = then_expr.try_adsl_ast
+    else_ast = else_expr.try_adsl_ast
+
+    iff = ::ADSL::Lang::ASTIf.new :condition => condition_ast, :then_expr => then_ast, :else_expr => else_ast
+
+    classes = [then_expr, else_expr].map(&:class).select{ |c| c < ActiveRecord::Base }
+    if classes.length == 1
+      iff = classes.first.new :adsl_ast => iff
     end
 
-    # this condition exists because of an error condition in kandan
-    condition_ast = nil if condition_ast.is_a?(ADSL::Parser::ASTString || ADSL::Parser::ASTNumber)
-
-    condition_ast ||= ADSL::Parser::ASTBoolean.new(:bool_value => nil)
-    
-    push_frame_expr1, frame1_ret_value, frame1_stmts = arg1
-    push_frame_expr2, frame2_ret_value, frame2_stmts = arg2
-
-    if (frame1_ret_value != nil || frame2_ret_value != nil) &&
-        frame1_ret_value.respond_to?(:adsl_ast) && frame1_ret_value.adsl_ast.class.is_expr? &&
-        frame2_ret_value.respond_to?(:adsl_ast) && frame2_ret_value.adsl_ast.class.is_expr? &&
-        !frame1_ret_value.adsl_ast.expr_has_side_effects? && !frame2_ret_value.adsl_ast.expr_has_side_effects?
-     
-      result_type = if frame1_ret_value.nil?
-        frame2_ret_value.class
-      elsif frame2_ret_value.nil?
-        frame1_ret_value.class
-      elsif frame1_ret_value.class <= frame2_ret_value.class
-        frame2_ret_value.class
-      elsif frame2_ret_value.class <= frame1_ret_value.class
-        frame1_ret_value.class
-      else
-        nil 
-      end
-
-      if result_type
-        if result_type < ActiveRecord::Base
-          block1 = ::ADSL::Parser::ASTBlock.new :statements => frame1_stmts
-          block2 = ::ADSL::Parser::ASTBlock.new :statements => frame2_stmts
-          if_stmt = ::ADSL::Parser::ASTIf.new :condition => condition_ast, :then_block => block1, :else_block => block2
-
-          frame1_stmts.pop
-          frame2_stmts.pop
-          ins_stmt if_stmt
-          return result_type.new(:adsl_ast => ::ADSL::Parser::ASTIfExpr.new(
-            :if => if_stmt,
-            :then_expr => frame1_ret_value.adsl_ast,
-            :else_expr => frame2_ret_value.adsl_ast
-          ))
-        elsif result_type.respond_to? :ds_type
-          return ADSL::Extract::Rails::UnknownOfBasicType.new result_type.ds_type
-        end
-      end
-    end
-
-    block1 = ::ADSL::Parser::ASTBlock.new :statements => frame1_stmts
-    block2 = ::ADSL::Parser::ASTBlock.new :statements => frame2_stmts
-    if_stmt = ::ADSL::Parser::ASTIf.new :condition => condition_ast, :then_block => block1, :else_block => block2
-
-    ins_stmt if_stmt
-    return nil
+    iff
   end
 end
 

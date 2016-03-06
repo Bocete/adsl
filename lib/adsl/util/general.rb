@@ -27,6 +27,12 @@ class String
     indented = "  " + gsub("\n", "\n  ")
     (/  $/ =~ indented) ? indented[0..-3] : indented
   end
+
+  def without_leading_whitespace
+    lines = self.lines
+    whitespace_len = lines.map{ |line| line =~ /\S/ }.compact.min
+    lines.map{ |line| line.length > whitespace_len ? line[whitespace_len..-1] : line }.join ""
+  end
   
   def resolve_params(*args)
     args = args.flatten
@@ -65,6 +71,12 @@ class Array
     self
   end
   alias_method_chain :each_index, :elem
+
+  def map_index(&block)
+    return map(&block) if block.nil? or block.arity < 2
+    pairs = self.zip self.length.times
+    pairs.map(&block)
+  end
   
   def worklist_each
     changed = true

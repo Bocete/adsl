@@ -14,7 +14,7 @@ class ADSL::Extract::AccessControlRailsVerificationTest < ADSL::Extract::Rails::
           can :manage, :all
         else
           can :destroy, Asd, :user_id => user.id
-          can :destroy, User, :user_id => user.id
+          can :destroy, User, :id => user.id
         end
       end
     end
@@ -42,7 +42,9 @@ class ADSL::Extract::AccessControlRailsVerificationTest < ADSL::Extract::Rails::
       end
     end
     
-    ast = create_rails_extractor.adsl_ast
+    extractor = create_rails_extractor
+    extractor.extract_all_actions
+    ast = extractor.adsl_ast
 
     assert_false verify :ast => ast, :verify_options => verify_options_for('AsdsController__create')
   end
@@ -55,7 +57,9 @@ class ADSL::Extract::AccessControlRailsVerificationTest < ADSL::Extract::Rails::
       end
     end
     
-    ast = create_rails_extractor.adsl_ast
+    extractor = create_rails_extractor
+    extractor.extract_all_actions
+    ast = extractor.adsl_ast
 
     assert verify :ast => ast, :verify_options => verify_options_for('AsdsController__create')
   end
@@ -69,7 +73,9 @@ class ADSL::Extract::AccessControlRailsVerificationTest < ADSL::Extract::Rails::
       end
     end
     
-    ast = create_rails_extractor.adsl_ast
+    extractor = create_rails_extractor
+    extractor.extract_all_actions
+    ast = extractor.adsl_ast
 
     assert_false verify :ast => ast, :verify_options => verify_options_for('AsdsController__create')
   end
@@ -81,7 +87,9 @@ class ADSL::Extract::AccessControlRailsVerificationTest < ADSL::Extract::Rails::
       end
     end
     
-    ast = create_rails_extractor.adsl_ast
+    extractor = create_rails_extractor
+    extractor.extract_all_actions
+    ast = extractor.adsl_ast
 
     assert verify :ast => ast, :verify_options => verify_options_for('AsdsController__destroy')
   end
@@ -95,8 +103,10 @@ class ADSL::Extract::AccessControlRailsVerificationTest < ADSL::Extract::Rails::
         respond_to
       end
     end
-
-    ast = create_rails_extractor.adsl_ast
+    
+    extractor = create_rails_extractor
+    extractor.extract_all_actions
+    ast = extractor.adsl_ast
 
     assert verify :ast => ast, :verify_options => verify_options_for('AsdsController__create')
   end
@@ -108,8 +118,10 @@ class ADSL::Extract::AccessControlRailsVerificationTest < ADSL::Extract::Rails::
         respond_to
       end
     end
-
-    ast = create_rails_extractor.adsl_ast
+    
+    extractor = create_rails_extractor
+    extractor.extract_all_actions
+    ast = extractor.adsl_ast
 
     assert_false verify :ast => ast, :verify_options => verify_options_for('AsdsController__create')
   end

@@ -16,9 +16,11 @@ class ADSL::Extract::BasicRailsVerificationTest < ADSL::Extract::Rails::RailsIns
   end
   
   def test_verify__true
-    ast = create_rails_extractor(<<-ruby).adsl_ast
+    extractor = create_rails_extractor <<-ruby
       invariant self.true
     ruby
+    extractor.extract_all_actions 
+    ast = extractor.adsl_ast
 
     assert verify :ast => ast, :verify_options => verify_options_for(:AsdsController__create)
   end
@@ -30,9 +32,11 @@ class ADSL::Extract::BasicRailsVerificationTest < ADSL::Extract::Rails::RailsIns
       end
     end
     
-    ast = create_rails_extractor(<<-ruby).adsl_ast
+    extractor = create_rails_extractor <<-ruby
       invariant self.not(exists{|asd|})
     ruby
+    extractor.extract_all_actions
+    ast = extractor.adsl_ast
 
     assert_false verify :ast => ast, :verify_options => verify_options_for('AsdsController__create')
   end
@@ -45,9 +49,11 @@ class ADSL::Extract::BasicRailsVerificationTest < ADSL::Extract::Rails::RailsIns
       end
     end
     
-    ast = create_rails_extractor(<<-ruby).adsl_ast
+    extractor = create_rails_extractor <<-ruby
       invariant self.not(exists{|asd|})
     ruby
+    extractor.extract_all_actions
+    ast = extractor.adsl_ast
 
     assert verify :ast => ast, :verify_options => verify_options_for('AsdsController__nothing')
   end
@@ -59,9 +65,11 @@ class ADSL::Extract::BasicRailsVerificationTest < ADSL::Extract::Rails::RailsIns
       end
     end
     
-    ast = create_rails_extractor(<<-ruby).adsl_ast
+    extractor = create_rails_extractor <<-ruby
       invariant self.not(exists{|asd|})
     ruby
+    extractor.extract_all_actions
+    ast = extractor.adsl_ast
 
     assert verify :ast => ast, :verify_options => verify_options_for('AsdsController__nothing')
   end
@@ -83,9 +91,11 @@ class ADSL::Extract::BasicRailsVerificationTest < ADSL::Extract::Rails::RailsIns
       end
     end
     
-    ast = create_rails_extractor(<<-ruby).adsl_ast
+    extractor = create_rails_extractor <<-ruby
       invariant self.not(exists{|asd|})
     ruby
+    extractor.extract_all_actions
+    ast = extractor.adsl_ast
 
     assert_false verify :ast => ast, :verify_options => verify_options_for('AsdsController__nothing')
   end
@@ -99,9 +109,11 @@ class ADSL::Extract::BasicRailsVerificationTest < ADSL::Extract::Rails::RailsIns
       end
     end
 
-    ast = create_rails_extractor(<<-ruby).adsl_ast
+    extractor = create_rails_extractor <<-ruby
       invariant forall{ |asd| asd.blahs.empty? }
     ruby
+    extractor.extract_all_actions
+    ast = extractor.adsl_ast
 
     assert verify :ast => ast, :verify_options => verify_options_for('AsdsController__nothing')
   end
@@ -115,9 +127,11 @@ class ADSL::Extract::BasicRailsVerificationTest < ADSL::Extract::Rails::RailsIns
       end
     end
 
-    ast = create_rails_extractor(<<-ruby).adsl_ast
+    extractor = create_rails_extractor <<-ruby
       invariant forall{ |asd| asd.kmes.empty? }
     ruby
+    extractor.extract_all_actions
+    ast = extractor.adsl_ast
 
     assert verify :ast => ast, :verify_options => verify_options_for('AsdsController__nothing')
   end
@@ -129,9 +143,11 @@ class ADSL::Extract::BasicRailsVerificationTest < ADSL::Extract::Rails::RailsIns
       end
     end
 
-    ast = create_rails_extractor(<<-ruby).adsl_ast
+    extractor = create_rails_extractor <<-ruby
       invariant forall{ |asd| not asd.blahs.empty? }
     ruby
+    extractor.extract_all_actions
+    ast = extractor.adsl_ast
 
     assert verify :ast => ast, :verify_options => verify_options_for('AsdsController__nothing')
   end
@@ -144,10 +160,12 @@ class ADSL::Extract::BasicRailsVerificationTest < ADSL::Extract::Rails::RailsIns
       end
     end
 
-    ast = create_rails_extractor(<<-ruby).adsl_ast
+    extractor = create_rails_extractor <<-ruby
       invariant forall(:blah => Mod::Blah){ |blah| not blah.asd.empty? }
       invariant exists{ |asd| }
     ruby
+    extractor.extract_all_actions
+    ast = extractor.adsl_ast
 
     assert verify :ast => ast, :verify_options => verify_options_for('AsdsController__nothing')
   end
@@ -159,9 +177,11 @@ class ADSL::Extract::BasicRailsVerificationTest < ADSL::Extract::Rails::RailsIns
       end
     end
 
-    ast = create_rails_extractor(<<-ruby).adsl_ast
+    extractor = create_rails_extractor <<-ruby
       invariant forall{ |asd| asd.blahs.empty? }
     ruby
+    extractor.extract_all_actions
+    ast = extractor.adsl_ast
 
     assert verify :ast => ast, :verify_options => verify_options_for('AsdsController__nothing')
   end
@@ -173,9 +193,11 @@ class ADSL::Extract::BasicRailsVerificationTest < ADSL::Extract::Rails::RailsIns
       end
     end
 
-    ast = create_rails_extractor(<<-ruby).adsl_ast
+    extractor = create_rails_extractor <<-ruby
       invariant Mod::Blah.all.empty?
     ruby
+    extractor.extract_all_actions
+    ast = extractor.adsl_ast
 
     assert verify :ast => ast, :verify_options => verify_options_for('AsdsController__nothing')
   end
@@ -187,9 +209,11 @@ class ADSL::Extract::BasicRailsVerificationTest < ADSL::Extract::Rails::RailsIns
       end
     end
 
-    ast = create_rails_extractor(<<-ruby).adsl_ast
+    extractor = create_rails_extractor <<-ruby
       invariant forall{ |asd| asd.blahs.empty? }
     ruby
+    extractor.extract_all_actions
+    ast = extractor.adsl_ast
 
     assert_false verify :ast => ast, :verify_options => verify_options_for('AsdsController__nothing')
   end
@@ -204,9 +228,11 @@ class ADSL::Extract::BasicRailsVerificationTest < ADSL::Extract::Rails::RailsIns
       end
     end
     
-    ast = create_rails_extractor(<<-ruby).adsl_ast
+    extractor = create_rails_extractor <<-ruby
       invariant Mod::Blah.all.empty?
     ruby
+    extractor.extract_all_actions
+    ast = extractor.adsl_ast
 
     assert verify :ast => ast, :verify_options => verify_options_for('AsdsController__nothing')
   end
@@ -221,9 +247,11 @@ class ADSL::Extract::BasicRailsVerificationTest < ADSL::Extract::Rails::RailsIns
       end
     end
     
-    ast = create_rails_extractor(<<-ruby).adsl_ast
+    extractor = create_rails_extractor <<-ruby
       invariant !Mod::Blah.all.empty?
     ruby
+    extractor.extract_all_actions
+    ast = extractor.adsl_ast
 
     assert verify :ast => ast, :verify_options => verify_options_for('AsdsController__nothing')
   end
@@ -236,13 +264,15 @@ class ADSL::Extract::BasicRailsVerificationTest < ADSL::Extract::Rails::RailsIns
 
       def nothing
         @asd = Asd.where
-        asd.blahs.build
+        (@asd ||= Asd.find).blahs.build
       end
     end
     
-    ast = create_rails_extractor(<<-ruby).adsl_ast
-      invariant forall(:blah => Mod::Blah){ |blah| !blah.asd.empty? }
+    extractor = create_rails_extractor <<-ruby
+      invariant forall(:blah => Mod::Blah){ |blah| blah.asd.empty? }
     ruby
+    extractor.extract_all_actions
+    ast = extractor.adsl_ast
 
     assert_false verify :ast => ast, :verify_options => verify_options_for('AsdsController__nothing')
   end

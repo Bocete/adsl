@@ -26,9 +26,11 @@ class ADSL::Extract::BranchVerificationTest < ADSL::Extract::Rails::RailsInstrum
       end
     end
     
-    ast = create_rails_extractor(<<-ruby).adsl_ast
+    extractor = create_rails_extractor <<-ruby
       invariant(self.not.exists{ |asd| })
     ruby
+    extractor.extract_all_actions
+    ast = extractor.adsl_ast
 
     assert_false verify :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing)
   end
@@ -45,9 +47,11 @@ class ADSL::Extract::BranchVerificationTest < ADSL::Extract::Rails::RailsInstrum
       end
     end
     
-    ast = create_rails_extractor(<<-ruby).adsl_ast
+    extractor = create_rails_extractor <<-ruby
       invariant(self.not.exists{ |asd| })
     ruby
+    extractor.extract_all_actions
+    ast = extractor.adsl_ast
 
     assert_false verify :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing)
   end
@@ -63,9 +67,11 @@ class ADSL::Extract::BranchVerificationTest < ADSL::Extract::Rails::RailsInstrum
       end
     end
     
-    ast = create_rails_extractor(<<-ruby).adsl_ast
+    extractor = create_rails_extractor <<-ruby
       invariant(self.not.exists{ |asd| })
     ruby
+    extractor.extract_all_actions
+    ast = extractor.adsl_ast
 
     assert verify :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing)
   end
@@ -80,9 +86,11 @@ class ADSL::Extract::BranchVerificationTest < ADSL::Extract::Rails::RailsInstrum
       end
     end
     
-    ast = create_rails_extractor(<<-ruby).adsl_ast
+    extractor = create_rails_extractor <<-ruby
       invariant(self.not.exists{ |asd| })
     ruby
+    extractor.extract_all_actions
+    ast = extractor.adsl_ast
     
     assert verify :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing)
   end
@@ -98,9 +106,11 @@ class ADSL::Extract::BranchVerificationTest < ADSL::Extract::Rails::RailsInstrum
       end
     end
     
-    ast = create_rails_extractor(<<-ruby).adsl_ast
+    extractor = create_rails_extractor <<-ruby
       invariant(self.not.exists{ |asd| })
     ruby
+    extractor.extract_all_actions
+    ast = extractor.adsl_ast
     
     assert_false verify :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing)
   end
@@ -118,9 +128,11 @@ class ADSL::Extract::BranchVerificationTest < ADSL::Extract::Rails::RailsInstrum
       end
     end
     
-    ast = create_rails_extractor(<<-ruby).adsl_ast
+    extractor = create_rails_extractor <<-ruby
       invariant(self.not.exists{ |asd| })
     ruby
+    extractor.extract_all_actions
+    ast = extractor.adsl_ast
 
     assert verify :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing)
   end

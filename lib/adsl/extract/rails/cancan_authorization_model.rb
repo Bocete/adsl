@@ -1,4 +1,4 @@
-require 'adsl/parser/ast_nodes'
+require 'adsl/lang/ast_nodes'
 require 'adsl/util/general'
 
 module ADSL
@@ -6,7 +6,7 @@ module ADSL
     module Rails
       module CancanAuthorizationModel
 
-        include ADSL::Parser
+        include ADSL::Lang
 
         def initialize_model_permissions
           @entries ||= Set[]
@@ -30,8 +30,7 @@ module ADSL
             permitted_usergroups -= forbidden_usergroups
           
             ASTOr.new :subformulae => permitted_usergroups.map{ |ug|
-              name = ASTIdent.new :text => ug.name.text
-              ASTInUserGroup.new :groupname => name
+              ASTInUserGroup.new :groupname => ASTIdent[ug.name.text]
             }
           elsif subject.respond_to? :adsl_ast
             groups_and_entries = Hash.new{ |hash, key| hash[key] = [] }
@@ -141,12 +140,12 @@ module ADSL
           end
 
           def generate_permits
-            group_nameses = @usergroups.map{ |ug| [ ADSL::Parser::ASTIdent.new(:text => ug.name.text) ] }
+            group_nameses = @usergroups.map{ |ug| [ ADSL::Lang::ASTIdent[ug.name.text] ] }
             group_nameses << [] if group_nameses.empty?
             ops = inferred_ops
             group_nameses.map do |group_names|
               ops.map do |op|
-                ADSL::Parser::ASTPermit.new :group_names => group_names, :ops => [op], :expr => objset.adsl_ast
+                ADSL::Lang::ASTPermit.new :group_names => group_names, :ops => [op], :expr => objset.adsl_ast
               end
             end.flatten
           end

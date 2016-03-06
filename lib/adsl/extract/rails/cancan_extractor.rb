@@ -1,4 +1,4 @@
-require 'adsl/parser/ast_nodes'
+require 'adsl/lang/ast_nodes'
 require 'adsl/extract/instrumenter'
 require 'adsl/extract/rails/cancan_authorization_model'
 
@@ -7,7 +7,7 @@ module ADSL
     module Rails
       module CanCanExtractor
 
-        include ADSL::Parser
+        include ADSL::Lang
         include ADSL::Extract::Rails::CancanAuthorizationModel
 
         def self.default_login_class
@@ -34,7 +34,7 @@ module ADSL
           @usergroups ||= []
           matching_groups = @usergroups.select{ |ug| ug.name.text == name.to_s }
           return matching_groups.first if matching_groups.any?
-          new_group = ADSL::Parser::ASTUserGroup.new(:name => ASTIdent.new(:text => name.to_s))
+          new_group = ASTUserGroup.new(:name => ASTIdent[name])
           @usergroups << new_group
           new_group
         end
@@ -62,9 +62,9 @@ module ADSL
           @usergroups ||= []
           
           if @usergroups.count == 2
-            @rules << ADSL::Parser::ASTRule.new(:formula => ADSL::Parser::ASTXor.new(
+            @rules << ASTRule.new(:formula => ASTXor.new(
               :subformulae => @usergroups.map do |ug|
-                ADSL::Parser::ASTInUserGroup.new(:groupname => ASTIdent.new(:text => ug.name.text))
+                ASTInUserGroup.new(:groupname => ASTIdent[ug.name.text])
               end
             ))
           end
@@ -80,9 +80,9 @@ module ADSL
           usergroups.map(&:name).map(&:text).each do |ug_name|
             login_class.class_eval <<-ruby
               def #{ug_name}
-                ADSL::Parser::ASTInUserGroup.new(
-                  :objset => ADSL::Parser::ASTCurrentUser.new,
-                  :groupname => ADSL::Parser::ASTIdent.new(:text => '#{ug_name}')
+                ADSL::Lang::ASTInUserGroup.new(
+                  :objset => ADSL::Lang::ASTCurrentUser.new,
+                  :groupname => ADSL::Lang::ASTIdent.new(:text => '#{ug_name}')
                 )
               end
               alias_method :#{ug_name}?, :#{ug_name}
@@ -95,7 +95,7 @@ module ADSL
         def define_controller_stuff
           ApplicationController.class_exec do
             def current_user
-              rails_extractor.login_class.new :adsl_ast => ADSL::Parser::ASTCurrentUser.new
+              rails_extractor.login_class.new :adsl_ast => ASTCurrentUser.new
             end
 
             def model_class_name
@@ -126,8 +126,8 @@ module ADSL
 
               if var_name
                 subject = model_class.new(
-                  :adsl_ast => ADSL::Parser::ASTVariable.new(
-                    :var_name => ADSL::Parser::ASTIdent.new(:text => "at__#{var_name}")
+                  :adsl_ast => ASTVariableRead.new(
+                    :var_name => ASTIdent["at__#{var_name}"]
                   )
                 )
               else
@@ -137,7 +137,7 @@ module ADSL
               auth_guarantee = rails_extractor.generate_can_query_formula action, subject
               
               ins_explore_all 'authorize' do
-                ins_stmt ADSL::Parser::ASTAssertFormula.new(
+                ASTAssertFormula.new(
                   :formula => auth_guarantee
                 )
               end
@@ -154,21 +154,21 @@ module ADSL
           CanCan::ControllerResource.class_exec do
             def resource_instance=(instance)
               ins_explore_all 'load_resource_instance' do
-                var_name = ADSL::Parser::ASTIdent.new(:text => "at__#{instance_name}")
-                ins_stmt(ADSL::Parser::ASTAssignment.new(
+                var_name = ASTIdent["at__#{instance_name}"]
+                ASTAssignment.new(
                   :var_name => var_name,
                   :expr => instance.adsl_ast
-                ))
+                )
               end
               @controller.instance_variable_set("@#{instance_name}", instance)
             end
             
             def collection_instance=(instance)
               ins_explore_all 'load_collection_instance' do
-                ins_stmt(ADSL::Parser::ASTAssignment.new(
-                  :var_name => ADSL::Parser::ASTIdent.new(:text => "at__#{instance_name.to_s.pluralize}"),
+                ASTAssignment.new(
+                  :var_name => ASTIdent["at__#{instance_name.to_s.pluralize}"],
                   :expr => instance.adsl_ast
-                ))
+                )
               end
               @controller.instance_variable_set("@#{instance_name.to_s.pluralize}", instance)
             end
@@ -187,7 +187,7 @@ module ADSL
             end
 
             def cannot?(*args)
-              ADSL::Parser::ASTNot.new :subformula => can?(*args)
+              ASTNot.new :subformula => can?(*args)
             end
 
             def process_ability_declaration(declaration, actions, subject, conditions_hash, &block)
@@ -195,10 +195,9 @@ module ADSL
               return if ::ADSL::Extract::Instrumenter.get_instance.ex_method.nil?
               
               if subject == :all
-                rails_extractor.ar_classes.each do |klass|
+                return rails_extractor.ar_classes.map do |klass|
                   process_ability_declaration declaration, actions, klass, conditions_hash, &block
-                end
-                return
+                end.flatten
               end
               actions = expand_actions [actions].flatten
               
@@ -246,12 +245,12 @@ module ADSL
                 end
               end
               
-              ins_stmt(ADSL::Parser::ASTDummyStmt.new(:label => {
+              ASTFlag.new(:label => {
                 :declaration => declaration,
                 :actions => actions,
                 :domain => subject,
                 :expr => expr,
-              }))
+              })
             end
 
             def cannot(actions = nil, subject = nil, conditions_hash = nil, &block)
@@ -276,58 +275,61 @@ module ADSL
           Object.lookup_const 'Rolify'
         end
 
-        def extract_rules_from_block(block, possible_groups)
-          block.statements.each do |stmt|
-            if stmt.is_a?(ADSL::Parser::ASTBlock)
-              extract_rules_from_block stmt, possible_groups
-            elsif stmt.is_a?(ADSL::Parser::ASTIf)
-              then_group, else_group = nil, nil
-              if stmt.condition.is_a?(ADSL::Parser::ASTInUserGroup)
-                is_group = stmt.condition
-                then_groups = possible_groups.select{ |g| stmt.condition.groupname.text.downcase == g.name.text.downcase }
-                if then_groups.empty?
-                  if freely_define_groups?
-                    then_groups = [define_usergroup(stmt.condition.groupname.text)]
-                  else
-                    raise "Group by name #{stmt.condition.groupname.text} not found"
-                  end
-                end
-                else_groups = possible_groups - then_groups
-              end
-              then_groups ||= possible_groups
-              else_groups ||= possible_groups
-              extract_rules_from_block stmt.then_block, then_groups
-              extract_rules_from_block stmt.else_block, else_groups
-            elsif stmt.is_a?(ADSL::Parser::ASTDummyStmt) && stmt.label.is_a?(Hash)
-              info = stmt.label
-
-              actions = [info[:actions]].flatten
-              next if actions.empty?
-              
-              if info[:domain] == :all
-                klasses = @ar_classes
-              else
-                klasses = [info[:domain]].flatten
-              end
-              next if klasses.empty?
-
-              declaration = info[:declaration]
-
-              klasses.each do |klass|
-                if info[:expr]
-                  expr = info[:expr]
+        def extract_rules_from_stmt(stmt, possible_groups)
+          if stmt.is_a?(ASTBlock)
+            stmt.exprs.each do |child|
+              extract_rules_from_stmt child, possible_groups
+            end
+          elsif stmt.is_a?(ASTReturnGuard)
+            extract_rules_from_stmt stmt.expr, possible_groups
+          elsif stmt.is_a?(ASTIf)
+            then_group, else_group = nil, nil
+            if stmt.condition.is_a?(ASTInUserGroup)
+              is_group = stmt.condition
+              then_groups = possible_groups.select{ |g| stmt.condition.groupname.text.downcase == g.name.text.downcase }
+              if then_groups.empty?
+                if freely_define_groups?
+                  then_groups = [define_usergroup(stmt.condition.groupname.text)]
                 else
-                  if klass.is_a? Symbol
-                    # klass may be unrelated to a class
-                    klass = Object.lookup_const klass.to_s.classify
-                    next if klass.nil?
-                  end
-                  expr = klass.all
+                  raise "Group by name #{stmt.condition.groupname.text} not found"
                 end
+              end
+              else_groups = possible_groups - then_groups
+            end
+            then_groups ||= possible_groups
+            else_groups ||= possible_groups
+            extract_rules_from_stmt stmt.then_expr, then_groups
+            extract_rules_from_stmt stmt.else_expr, else_groups
+          elsif stmt.is_a?(ASTFlag) && stmt.label.is_a?(Hash)
+            info = stmt.label
 
-                actions.each do |action|
-                  permit possible_groups, action, expr, declaration == :cannot
+            actions = [info[:actions]].flatten
+            return if actions.empty?
+            
+            if info[:domain] == :all
+              klasses = @ar_classes
+            else
+              klasses = [info[:domain]].flatten
+            end
+            return if klasses.empty?
+
+            declaration = info[:declaration]
+
+            klasses.each do |klass|
+              if info[:expr]
+                expr = info[:expr]
+              else
+                if klass.is_a? Symbol
+                  # klass may be unrelated to a class
+                  klass = Object.lookup_const klass.to_s.classify
+                  puts "klass is #{ klass }"
+                  return if klass.nil?
                 end
+                expr = klass.all
+              end
+
+              actions.each do |action|
+                permit possible_groups, action, expr, declaration == :cannot
               end
             end
           end
@@ -336,21 +338,21 @@ module ADSL
         def extract_ac_rules
           return unless cancan_exists?
 
-          current_user = login_class.new :adsl_ast => ADSL::Parser::ASTCurrentUser.new
+          current_user = login_class.new :adsl_ast => ASTCurrentUser.new
           @action_instrumenter.instrument Ability.new(current_user), :initialize
 
-          block = @action_instrumenter.exec_within do
-            root_method = ADSL::Extract::Rails::Method.new :name => :root
+          root_method = ADSL::Extract::Rails::RootMethod.new
+          @action_instrumenter.exec_within do
             ADSL::Extract::Instrumenter.get_instance.ex_method = root_method
             ADSL::Extract::Instrumenter.get_instance.action_name = 'ability_block'
-            statements = root_method.in_stmt_frame do
-              Ability.new current_user
-            end
-            ADSL::Extract::Instrumenter.get_instance.ex_method = nil
-            ADSL::Parser::ASTBlock.new :statements => statements
-          end
 
-          extract_rules_from_block block, usergroups
+            Ability.new current_user
+
+            ADSL::Extract::Instrumenter.get_instance.ex_method = nil
+          end
+          block = root_method.root_block
+
+          extract_rules_from_stmt block, usergroups
         end
 
         def define_rolify_stuff
@@ -358,7 +360,7 @@ module ADSL
 
           Rolify::Role.class_exec do
             def has_role?(role_name, resource = nil)
-              ADSL::Parser::ASTInUserGroup.new :groupname => ADSL::Parser::ASTIdent.new(:text => role_name.to_s)
+              ASTInUserGroup.new :groupname => ASTIdent[role_name.to_s]
             end
           end
 

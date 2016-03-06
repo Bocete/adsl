@@ -5,7 +5,7 @@ require 'adsl/extract/rails/callback_chain_simulator'
 require 'adsl/extract/rails/rails_special_gem_instrumentation'
 require 'adsl/extract/rails/basic_type_extensions'
 require 'adsl/extract/rails/other_meta'
-require 'adsl/parser/ast_nodes'
+require 'adsl/lang/ast_nodes'
 require 'adsl/util/general'
 require 'pathname'
 
@@ -46,7 +46,7 @@ module ADSL
         end
 
         def initialize(options = {})
-          options = Hash[
+          @options = options = Hash[
             :ar_classes => default_activerecord_models,
             :invariants => Dir['invariants/**/*_invs.rb'],
             :instrumentation_filters => [],
@@ -81,8 +81,10 @@ module ADSL
 
           prepare_cancan_instrumentation
           extract_ac_rules
-
-          all_routes(options[:actions]).each do |route|
+        end
+        
+        def extract_all_actions
+          all_routes(@options[:actions]).each do |route|
             translation = action_to_adsl_ast(route)
             @actions << translation unless translation.nil?
           end
@@ -164,32 +166,32 @@ module ADSL
           session = ActionDispatch::Integration::Session.new(::Rails.application)
           ::Rails.application.config.action_dispatch.show_exceptions = false
 
-          block = @action_instrumenter.exec_within do
-            root_method = ADSL::Extract::Rails::Method.new :name => :root
-            ADSL::Extract::Instrumenter.get_instance.ex_method = root_method
-            ADSL::Extract::Instrumenter.get_instance.action_name = route[:action].to_s
-            statements = root_method.in_stmt_frame do
-              request_method = route[:request_method].to_s.downcase.split('|').first
-              session.send request_method, route[:url]
-            end
-            ADSL::Extract::Instrumenter.get_instance.ex_method = nil
-            ADSL::Parser::ASTBlock.new :statements => statements
+          root_method = ::ADSL::Extract::Rails::RootMethod.new
+          @action_instrumenter.exec_within do
+            instrumenter = ADSL::Extract::Instrumenter.get_instance
+
+            instrumenter.ex_method = root_method
+            instrumenter.action_name = route[:action].to_s
+
+            request_method = route[:request_method].to_s.downcase.split('|').first
+            session.send request_method, route[:url]
+
+            instrumenter.ex_method = nil
           end
           session.reset!
 
-          block.remove_statements_after_returns!
-          block.remove_overwritten_assignments! route[:action]
-
           #interrupt_callback_chain_on_render block, route[:action]
-          action = ADSL::Parser::ASTAction.new({
-            :name => ADSL::Parser::ASTIdent.new(:text => action_name),
-            :block => block
+          action = ADSL::Lang::ASTAction.new({
+            :name => ADSL::Lang::ASTIdent[action_name],
+            :expr => root_method.root_block
           })
 
-          action = action.optimize
+          action.flatten_returns!
 
-          action.prepend_global_variables_by_signatures /^at__.*/, /^atat__.*/
-
+          action.remove_overwritten_assignments! route[:action]
+          action.optimize!
+          action.declare_instance_vars!
+          
           action
         end
 
@@ -266,7 +268,7 @@ module ADSL
             end
             usergroups = self.usergroups
           end
-          spec = ADSL::Parser::ASTSpec.new(
+          spec = ADSL::Lang::ASTSpec.new(
             :classes => klass_nodes,
             :actions => @actions,
             :invariants => @invariants,

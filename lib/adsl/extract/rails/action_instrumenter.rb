@@ -1,6 +1,6 @@
 require 'active_support'
 require 'active_record'
-require 'adsl/parser/ast_nodes'
+require 'adsl/lang/ast_nodes'
 require 'adsl/extract/instrumenter'
 require 'adsl/extract/sexp_utils'
 require 'adsl/extract/rails/other_meta'
@@ -31,7 +31,7 @@ module ADSL
             s(:call, nil, :ins_do_render)
           end
 
-          # surround the entire method with a call to abb.explore_all_choices
+          # surround the entire method with a call to abb.explore_all
           replace :defn, :defs do |sexp|
             header_elem_count = sexp.sexp_type == :defn ? 3 : 4
             stmts = sexp.pop(sexp.length - header_elem_count)
@@ -98,7 +98,7 @@ module ADSL
             )
           end
 
-          # prepend ins_stmt to every non-return or non-if statement
+          # prepend wrap blocks in ins_block
           replace :defn, :defs, :block, :iter do |sexp|
             first_stmt_index = case sexp.sexp_type
               when :defn; 3
@@ -106,13 +106,10 @@ module ADSL
               when :iter; 3
               when :block; 1
             end
-            (first_stmt_index..sexp.length-1).each do |index|
-              unless [:if, :return].include?(sexp[index].sexp_type) ||
-                  (sexp[index][1].nil? && [:ins_push_frame, :ins_pop_frame].include?(sexp[index][2]))
-                sexp[index] = s(:call, nil, :ins_stmt, sexp[index])
-              end
-            end
-            sexp
+
+            block_sexp = s(:call, nil, :ins_block, *sexp[first_stmt_index..-1])
+
+            s(*sexp.first(first_stmt_index), block_sexp)
           end
           
           # instrument branches
@@ -123,31 +120,19 @@ module ADSL
             block2 = block2_sexp.sexp_type == :block ? block2_sexp : s(:block, block2_sexp)
             s(:call, nil, :ins_if,
               sexp[1],
-              s(:array,
-                s(:call, nil, :ins_push_frame),
-                s(:splat, s(:rescue,
-                  s(:array,
-                    block1,
-                    s(:call, nil, :ins_pop_frame)
-                  ),
-                  s(:resbody,
-                    s(:array, s(:const, :Exception)),
-                    s(:array, s(:nil), s(:call, nil, :ins_pop_frame))
-                  )
-                ))
+              s(:rescue,
+                s(:call, nil, :ins_block, block1),
+                s(:resbody,
+                  s(:array, s(:const, :Exception)),
+                  s(:nil)
+                )
               ),
-              s(:array,
-                s(:call, nil, :ins_push_frame),
-                s(:splat, s(:rescue,
-                  s(:array, 
-                    block2,
-                    s(:call, nil, :ins_pop_frame)
-                  ),
-                  s(:resbody,
-                    s(:array, s(:const, :Exception)),
-                    s(:array, s(:nil), s(:call, nil, :ins_pop_frame))
-                  )
-                ))
+              s(:rescue,
+                s(:call, nil, :ins_block, block2),
+                s(:resbody,
+                  s(:array, s(:const, :Exception)),
+                  s(:nil)
+                )
               )
             )
           end
@@ -166,12 +151,6 @@ module ADSL
             s(:call, *sexp.sexp_body)
           end
 
-          # make the implicit return explicit
-          replace :defn, :defs do |sexp|
-            make_returns_explicit sexp
-            sexp
-          end
-
           # replace calls to collection_action, member_action or page_action with a def
           # these represent code sugar for defining actions with the activeadmin gem
           replace :iter do |sexp|
@@ -183,47 +162,13 @@ module ADSL
             s(:defn, sexp[1][3][1], sexp[2], sexp[3])
           end
         end
-        
-        def self.extract_stmt_from_expr(expr, method_name=nil)
-          adsl_ast = expr
-          adsl_ast = expr.adsl_ast if adsl_ast.respond_to? :adsl_ast
-          return nil unless adsl_ast.is_a? ::ADSL::Parser::ASTNode
-          return adsl_ast if adsl_ast.class.is_statement?
-          return ::ADSL::Parser::ASTExprStmt.new :expr => adsl_ast if adsl_ast.class.is_expr?
-          nil
-        end
-
-        def make_returns_explicit(sexp, last_stmt_index = -1)
-          last_stmt = sexp[last_stmt_index]
-          case last_stmt.sexp_type
-          when :block
-            make_returns_explicit last_stmt, -1
-          when :if
-            if last_stmt[2].nil?
-              last_stmt[2] = s(:return)
-            else
-              make_returns_explicit last_stmt, 2
-            end
-            if last_stmt[3].nil?
-              last_stmt[3] = s(:return)
-            else
-              make_returns_explicit last_stmt, 3
-            end
-          when :ensure
-            make_returns_explicit last_stmt, 1
-          when :rescue
-            make_returns_explicit last_stmt, 1
-          else
-            sexp[last_stmt_index] = s(:return, last_stmt) unless last_stmt.sexp_type == :return
-          end
-        end
 
         def should_instrument?(object, method_name)
           return false unless super
 
           klass = object.is_a?(Class) ? object : object.class
           method = object.method method_name
-          
+
           klass.name.match(/^ADSL::.*$/).nil? && !(method.source_location[0] =~ /.*lib\/adsl\/.*/)
         end
       end

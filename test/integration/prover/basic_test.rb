@@ -2,10 +2,17 @@ require 'adsl/util/test_helper'
 
 class BasicTest < ActiveSupport::TestCase
   include ADSL::FOL
-  
+
   def test_blank_data_store
     adsl_assert :correct, <<-ADSL
       action blah {}
+    ADSL
+  end
+
+  def test_asterisk_nondeterministic
+    adsl_assert :incorrect, <<-ADSL
+      action blah {}
+      invariant *
     ADSL
   end
 
@@ -270,12 +277,12 @@ class BasicTest < ActiveSupport::TestCase
     adsl_assert :correct, <<-ADSL
       class Class {}
       action blah {}
-      invariant subset(allof(Class)) in allof(Class)
+      invariant (subset allof(Class)) in allof(Class)
     ADSL
     adsl_assert :incorrect, <<-ADSL
       class Class {}
       action blah {}
-      invariant subset(allof(Class)) in subset(allof(Class))
+      invariant (subset allof(Class)) in subset(allof(Class))
     ADSL
   end
 
@@ -406,7 +413,7 @@ class BasicTest < ActiveSupport::TestCase
       class Class {}
       action blah {
         delete allof(Class)
-	a = oneof(allof(Class))
+        a = oneof(allof(Class))
       }
     ADSL
     adsl_assert :correct, <<-ADSL
@@ -576,23 +583,23 @@ class BasicTest < ActiveSupport::TestCase
   end
 
   def test__delete_removes_all_refs
-    adsl_assert :correct, <<-ADSL
-      class Class { 0+ Class rel }
-      action blah {
-        delete allof(Class)
-        a = create(Class)
-        b = create(Class)
-        a.rel += b
-        delete a
-      }
-      invariant forall(Class a: isempty(a.rel))
-    ADSL
+    # adsl_assert :correct, <<-ADSL
+    #   class Class { 0+ Class rel }
+    #   action blah {
+    #     delete allof(Class)
+    #     a = create(Class)
+    #     b = create(Class)
+    #     a.rel += b
+    #     delete a
+    #   }
+    #   invariant forall(Class a: isempty(a.rel))
+    # ADSL
     adsl_assert :incorrect, <<-ADSL
       class Class { 0+ Class rel }
       action blah {
-        delete allof(Class)
-        a = create(Class)
-        b = create(Class)
+        delete Class
+        a = create Class
+        b = create Class
         a.rel += b
         delete a
       }

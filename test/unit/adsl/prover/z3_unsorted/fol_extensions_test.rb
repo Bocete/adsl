@@ -2,7 +2,7 @@ require 'adsl/util/test_helper'
 require 'adsl/fol/first_order_logic'
 require 'adsl/prover/z3_unsorted/fol_extensions'
 require 'adsl/ds/data_store_spec'
-require 'adsl/translation/ds_extensions'
+require 'adsl/ds/fol_translation/ds_extensions'
 
 class ADSL::Prover::Z3UnsortedFolExtensionsTest < ActiveSupport::TestCase
   include ADSL::FOL

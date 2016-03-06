@@ -1,4 +1,4 @@
-require 'adsl/translation/typed_string'
+require 'adsl/ds/fol_translation/typed_string'
 require 'adsl/fol/first_order_logic'
 
 class String
@@ -26,10 +26,8 @@ class FalseClass
 end
 
 module ADSL
-  module Translation
-    class TypedString
-      alias_method :to_smt2_unsorted_string, :str
-    end
+  class DS::FOLTranslation::TypedString
+    alias_method :to_smt2_unsorted_string, :str
   end
   
   module FOL

@@ -1,4 +1,4 @@
-require 'adsl/parser/ast_nodes'
+require 'adsl/lang/ast_nodes'
 require 'adsl/ds/type_sig'
 
 class TrueClass
@@ -37,39 +37,10 @@ class FalseClass
   end
 end
 
-class FixedNum
-  def adsl_ast
-    ADSL::Parser::ASTNumber.new :value => self
-  end
-
-  def self.type_example
-    self.round? ? 1 : 1.5
-  end
-
-  def type_example
-    self.class.type_example
-  end
-
-  def ds_type
-    self.round? ? ADSL::DS::TypeSig::BasicType::INT : ADSL::DS::TypeSig::BasicType::REAL
-  end
-end
-
-class String
-  def adsl_ast
-    ADSL::Parser::ASTString.new :value => self
-  end
-
-  def self.type_example
-    'asd'
-  end
-
-  def type_example
-    self.class.type_example
-  end
-
-  def ds_type
-    ADSL::DS::TypeSig::BasicType::STRING
+class Object
+  def try_adsl_ast(opt_if_failed = ::ADSL::Lang::ASTEmptyObjset.new)
+    ast = respond_to?(:adsl_ast) ? adsl_ast : self
+    ast.is_a?(ADSL::Lang::ASTNode) ? ast : opt_if_failed
   end
 end
 
@@ -106,11 +77,11 @@ module ADSL
         def adsl_ast
           case @ds_type
           when BasicType::INT, BasicType::DECIMAL, BasicType::REAL
-            ADSL::Parser::ASTNumber.new :value => nil
+            ADSL::Lang::ASTNumber.new :value => nil
           when BasicType::STRING
-            ADSL::Parser::ASTString.new :value => nil
+            ADSL::Lang::ASTString.new :value => nil
           when BasicType::BOOL
-            ADSL::Parser::ASTBoolean.new :bool_value => nil
+            ADSL::Lang::ASTBoolean.new :bool_value => nil
           else
             raise "Unknown basic type: #{@ds_type}"
           end
