@@ -47,7 +47,9 @@ class ADSL::Lang::ASTNodeToADSLExtensionsTest < ActiveSupport::TestCase
   def test_if_to_adsl
     node = ASTIf.new :condition => ASTBoolean.new, :then_expr => create_objset('Asd'), :else_expr => block(create_objset 'Kme')
     assert_leading_whitespace_equal <<-adsl, node.to_adsl
-      if * create Asd else {
+      if (*) {
+        create Asd
+      } else {
         create Kme
       }
     adsl
@@ -56,7 +58,7 @@ class ADSL::Lang::ASTNodeToADSLExtensionsTest < ActiveSupport::TestCase
   def test_if_not_to_adsl
     node = ASTIf.new :condition => ASTBoolean.new, :then_expr => block, :else_expr => block(create_objset 'Kme')
     assert_leading_whitespace_equal <<-adsl, node.to_adsl
-      if not * {
+      if not (*) {
         create Kme
       }
     adsl

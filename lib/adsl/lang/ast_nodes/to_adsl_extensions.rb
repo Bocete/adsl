@@ -38,7 +38,9 @@ module ADSL
 
     class ASTSpec < ASTNode
       def to_adsl
-        output = [@classes, @usergroups, @rules, @ac_rules, @actions, @invariants].map{ |coll| coll.map(&:to_adsl).map{ |e| "#{e}\n" }.join('') }.join "\n"
+        output = [@classes, @usergroups, @rules, @ac_rules, @actions, @invariants].map do |coll|
+          coll.map(&:to_adsl).join("\n")
+        end.join("\n\n")
         output.gsub(/\n{2,}/, "\n\n")
       end
     end
@@ -72,7 +74,6 @@ module ADSL
 
     class ASTAction < ASTNode
       def to_adsl
-        args = []
         "action #{@name.text} #{ @expr.in_block.to_adsl }"
       end
     end
@@ -91,12 +92,6 @@ module ADSL
     class ASTAssignment < ASTNode
       def to_adsl
         "#{ @var_name.text } = #{ @expr.to_adsl }"
-      end
-    end
-
-    class ASTDeclareVar < ASTNode
-      def to_adsl
-        "declare #{ @var_name.text }"
       end
     end
 
@@ -145,10 +140,10 @@ module ADSL
     class ASTIf < ASTNode
       def to_adsl
         if @then_expr.noop? && !@else_expr.noop?
-          return "if not #{@condition.to_adsl} #{ @else_expr.to_adsl }"
+          return "if not (#{@condition.to_adsl}) #{ @else_expr.in_block.to_adsl }"
         end
-        else_code = @else_expr.is_a?(ASTEmptyObjset) ? "" : " else #{ @else_expr.to_adsl }"
-        "if #{@condition.to_adsl} #{ @then_expr.to_adsl }#{ else_code }"
+        else_code = @else_expr.is_a?(ASTEmptyObjset) ? "" : " else #{ @else_expr.in_block.to_adsl }"
+        "if (#{@condition.to_adsl}) #{ @then_expr.in_block.to_adsl }#{ else_code }"
       end
     end
 
@@ -222,6 +217,10 @@ module ADSL
       def to_adsl
         "empty"
       end
+
+      def in_block
+        ASTBlock.new :exprs => []
+      end
     end
 
     class ASTCurrentUser < ASTNode
@@ -254,7 +253,7 @@ module ADSL
 
     class ASTPermit < ASTNode
       def to_adsl
-        "permit #{ @group_names.map(&:text).join ', ' } #{ @ops.map(&:to_s).join ', ' } #{@expr.to_adsl}\n".gsub(/ +/, ' ')
+        "permit #{ @group_names.map(&:text).join ', ' } #{ @ops.map(&:to_s).join ', ' } #{@expr.to_adsl}".gsub(/ +/, ' ')
       end
     end
 

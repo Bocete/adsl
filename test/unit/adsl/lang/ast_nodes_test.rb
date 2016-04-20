@@ -154,10 +154,10 @@ class ADSL::Lang::Parser::ASTNodesTest < ActiveSupport::TestCase
         block(
           block(
             block(
-              ASTAssignment.new(:expr => ASTVariableRead.new(:var_name => ASTIdent['kme']))
+              ASTAssignment.new(:expr => ASTVariableRead.new(:var_name => ASTIdent['kme']), :var_name => ASTIdent['at__kme'])
             ),
             block(
-              ASTAssignment.new(:expr => ASTVariableRead.new(:var_name => ASTIdent['at__blahblah']))
+              ASTAssignment.new(:expr => ASTVariableRead.new(:var_name => ASTIdent['at__blahblah']), :var_name => ASTIdent['s'])
             ),
             block
           )
@@ -172,10 +172,12 @@ class ADSL::Lang::Parser::ASTNodesTest < ActiveSupport::TestCase
 
     assert_equal 3, action.expr.exprs.length
 
-    assert_equal ASTDeclareVar,  action.expr.exprs[0].class
-    assert_equal 'at__blahblah', action.expr.exprs[0].var_name.text
+
+    assert_equal ASTAssignment,  action.expr.exprs[0].class
+    assert_equal 'at__kme',      action.expr.exprs[0].var_name.text
+    assert_equal ASTEmptyObjset, action.expr.exprs[0].expr.class
    
-    assert_equal ASTIf,          action.expr.exprs[1].class
+    assert_equal ASTIf, action.expr.exprs[1].class
     iff = action.expr.exprs[1]
 
     assert_equal ASTBlock,        iff.then_expr.class
@@ -188,6 +190,28 @@ class ADSL::Lang::Parser::ASTNodesTest < ActiveSupport::TestCase
     assert_false                  iff.else_expr.has_side_effects?
     
     assert_equal ASTDeleteObj,   action.expr.exprs[2].class
+  end
+
+  def test__action__declare_instance_var_at_user
+    action = ASTAction.new(:expr => block(
+      iif(
+        ASTAssignment.new(:expr => ASTCurrentUser.new, :var_name => ASTIdent["at__user"]),
+        block
+      ),
+      ASTDeleteObj.new(:objset => ASTVariableRead.new(:var_name => ASTIdent["at__user"]))
+    ))
+
+    action = action.optimize
+    action.declare_instance_vars!
+
+    assert_equal 3, action.expr.exprs.length
+
+    assert_equal ASTAssignment,  action.expr.exprs[0].class
+    assert_equal 'at__user',     action.expr.exprs[0].var_name.text
+    assert_equal ASTEmptyObjset, action.expr.exprs[0].expr.class
+   
+    assert_equal ASTIf,        action.expr.exprs[1].class
+    assert_equal ASTDeleteObj, action.expr.exprs[2].class
   end
 
   def test__if_optimize__identical_paths
@@ -274,6 +298,10 @@ class ADSL::Lang::Parser::ASTNodesTest < ActiveSupport::TestCase
     ASTReturn.new
   end
 
+  def raise_stmt
+    ASTRaise.new
+  end
+
   def block(*stmts)
     ASTBlock.new :exprs => stmts
   end
@@ -283,9 +311,9 @@ class ADSL::Lang::Parser::ASTNodesTest < ActiveSupport::TestCase
   end
 
   def test_block_returns?
-    assert_equal false, block(dummy, dummy).returns?
-    assert_equal true,  block(dummy, return_stmt, dummy).returns?
-    assert_equal nil,   block(iif(block, return_stmt)).returns?
+    assert block(dummy, dummy).halting_status.returns_never?
+    assert block(dummy, return_stmt, dummy).halting_status.returns_always?
+    assert block(iif(block, return_stmt)).halting_status.returns_sometimes?
   end
 
   def test_block__remove_statements_after_return
@@ -324,6 +352,24 @@ class ADSL::Lang::Parser::ASTNodesTest < ActiveSupport::TestCase
     assert_equal 2,         b.exprs[1].else_expr.exprs.length
     assert_equal [ASTFlag, ASTFlag], b.exprs[1].else_expr.exprs.map(&:class)
     assert_equal [2, 3],             b.exprs[1].else_expr.exprs.map(&:label)
+  end
+
+  def test_block__raise_after_return_does_not_raise
+    b = block(dummy(1), return_stmt, raise_stmt)
+    assert b.halting_status.raises_never?
+    assert b.halting_status.returns_always?
+
+    b = block(dummy(1), iif(return_stmt, dummy(1)), raise_stmt)
+    assert b.halting_status.raises_sometimes?
+    assert b.halting_status.returns_sometimes?
+    
+    b = block(dummy(1), iif(raise_stmt, dummy(1)), raise_stmt)
+    assert b.halting_status.raises_always?
+    assert b.halting_status.returns_never?
+
+    b = block(dummy(1), iif(return_stmt, dummy(1)), return_stmt)
+    assert b.halting_status.raises_never?
+    assert b.halting_status.returns_always?
   end
 
 end

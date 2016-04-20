@@ -41,6 +41,10 @@ module ADSL
         def as_json(*args)
           "{}"
         end
+
+        def to_ary
+          []
+        end
       end
 
       class PartiallyUnknownHash < MetaUnknown
@@ -67,6 +71,20 @@ module ADSL
             return @options[short_method] if @options.include? short_method
           end
           super
+        end
+      end
+
+      class PartiallyUnknownParams < PartiallyUnknownHash
+        def initialize(controller, action)
+          super :controller => controller, :action => action
+        end
+
+        def permitted?(*args)
+          true
+        end
+
+        %i(permit permit! permitted= permitted? require required).each do |m|
+          define_method(m){ |*args| self }
         end
       end
 

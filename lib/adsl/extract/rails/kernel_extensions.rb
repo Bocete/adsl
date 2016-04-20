@@ -24,11 +24,16 @@ module Kernel
 
   def ins_block(*exprs)
     adsl_asts = exprs.flatten.map{ |e| e.respond_to?(:adsl_ast) ? e.adsl_ast : e }.flatten.select{ |e| e.is_a? ::ADSL::Lang::ASTNode }
-    block = ::ADSL::Lang::ASTBlock.new :exprs => adsl_asts
-    if exprs.last.is_a?(ActiveRecord::Base)
-      exprs.last.class.new :adsl_ast => block
+
+    if adsl_asts.any?
+      block = adsl_asts.length == 1 ? adsl_asts.first : ::ADSL::Lang::ASTBlock.new(:exprs => adsl_asts)
+      if exprs.last.is_a?(ActiveRecord::Base)
+        exprs.last.class.new :adsl_ast => block
+      else
+        block
+      end
     else
-      block
+      exprs.last
     end
   end
 
@@ -86,6 +91,8 @@ module Kernel
   def ins_do_return(return_value = nil)
     instrumenter = ::ADSL::Extract::Instrumenter.get_instance
 
+    instrumenter.ex_method.report_return_type return_value.class
+
     return_values = [return_value].flatten
     if return_values.length == 1
       ::ADSL::Lang::ASTReturn.new :expr => return_value.try_adsl_ast
@@ -95,6 +102,10 @@ module Kernel
   end
 
   def ins_do_raise(*args)
+    if TEST_ENV
+      pp args
+      puts caller
+    end
     ::ADSL::Lang::ASTRaise.new
   end
 
@@ -103,7 +114,8 @@ module Kernel
     if instrumenter.action_name.to_s == instrumenter.ex_method.name.to_s
       ::ADSL::Lang::ASTFlag.new(:label => :render)
     else
-      ::ADSL::Lang::ASTRaise.new 
+      # we're rendering from outside the action.  Presumably, from a filter that's aborting the action
+      ins_do_raise
     end
   end
 
@@ -114,6 +126,8 @@ module Kernel
     instrumenter.ex_method = method
 
     return_val = method.extract_from &block
+    method.report_return_type return_val.class
+
     adsl_ast = return_val.try_adsl_ast
     adsl_ast = ::ADSL::Lang::ASTReturnGuard.new :expr => adsl_ast if adsl_ast.is_a? ::ADSL::Lang::ASTNode
 
@@ -121,10 +135,11 @@ module Kernel
       old_method.root_block.exprs << adsl_ast if adsl_ast.is_a? ::ADSL::Lang::ASTNode
       old_method.root_block.exprs << ::ADSL::Lang::ASTFlag.new(:label => method_name)
     else
-      if return_val.is_a? ActiveRecord::Base
-        return_val = return_val.class.new :adsl_ast => adsl_ast
+      return_type = method.return_type
+      if return_type
+        return_val = return_type.new :adsl_ast => adsl_ast
       elsif return_val.is_a?(::ADSL::Lang::ASTNode) && adsl_ast.is_a?(::ADSL::Lang::ASTNode)
-        return_val = adsl_ast
+        return_val = adsl_ast unless return_val.noop? && adsl_ast.noop?
       end
     end
 
@@ -132,8 +147,8 @@ module Kernel
   rescue Exception => e
     if TEST_ENV
       raise e
-    else
-      return ::ADSL::Lang::ASTRaise.new
+    #else
+    #  return ins_do_raise(e.message)
     end
   ensure
     instrumenter.ex_method = old_method if instrumenter
@@ -149,8 +164,43 @@ module Kernel
     instrumenter.ex_method.pop_frame
   end
 
+  def ins_try(obj, method, *args, &block)
+    if obj.is_a? ActiveRecord::Base
+      adsl_ast = obj.adsl_ast
+
+      return obj.send method, *args, &block if adsl_ast.evals_to_something_always?
+
+      @@counter ||= 0
+      var_name = "somelonganduniquevariablename#{ @@counter += 1 }"
+      assignment = ADSL::Lang::ASTAssignment.new :var_name => ADSL::Lang::ASTIdent[var_name], :expr => obj.adsl_ast
+      condition = ADSL::Lang::ASTNot.new(:subformula => ADSL::Lang::ASTIsEmpty.new(:objset => assignment))
+      obj = obj.class.new :adsl_ast => ADSL::Lang::ASTVariableRead.new(:var_name => ADSL::Lang::ASTIdent[var_name])
+    else
+      condition = ADSL::Lang::ASTBoolean.new
+    end
+
+    result_unless_nil = obj.send method, *args, &block
+
+    ins_if condition, result_unless_nil, nil
+  end
+
   def ins_if(condition, then_expr, else_expr)
-    condition_ast = condition.try_adsl_ast ADSL::Lang::ASTBoolean.new 
+    if (condition.is_a?(ADSL::Extract::Rails::MetaUnknown) ||
+        condition.is_a?(ADSL::Extract::Rails::UnknownOfBasicType) ||
+        condition.is_a?(ADSL::Extract::Rails::ArrayOfBasicType))
+      condition_ast = ADSL::Lang::ASTBoolean.new
+    elsif condition.is_a?(ActiveRecord::Base) || condition.nil?
+      adsl_ast = condition.adsl_ast
+      if !adsl_ast.evals_to_something?
+        condition_ast = ADSL::Lang::ASTBoolean::FALSE
+      elsif adsl_ast.evals_to_something_always?
+        condition_ast = ADSL::Lang::ASTBoolean::TRUE
+      else
+        condition_ast = ADSL::Lang::ASTNot.new(:subformula => ADSL::Lang::ASTIsEmpty.new(:objset => condition.adsl_ast))
+      end
+    else 
+      condition_ast = condition.try_adsl_ast ADSL::Lang::ASTBoolean.new
+    end
     then_ast = then_expr.try_adsl_ast
     else_ast = else_expr.try_adsl_ast
 

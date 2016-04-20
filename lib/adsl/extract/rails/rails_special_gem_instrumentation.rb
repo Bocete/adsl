@@ -52,7 +52,17 @@ module ADSL
             def update_tracked_fields!(*args)
             end
           end
-          
+
+          Devise::Models::DatabaseAuthenticatable.class_exec do
+            def valid_password?(*args)
+              ADSL::Lang::ASTBoolean.new
+            end
+
+            def password_digest(*args)
+              ADSL::Extract::Rails::UnknownOfBasicType.new
+            end
+          end
+
           roles.each do |role, role_class|
             if cancan_exists?
               current_user_code = <<-RUBY.strip

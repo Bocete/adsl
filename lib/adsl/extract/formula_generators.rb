@@ -216,7 +216,7 @@ module ADSL
   end
 end
 
-class ADSL::Lang::Parser::ASTNode
+class ADSL::Lang::ASTNode
   include ADSL::Extract::FormulaGenerators
 end
 

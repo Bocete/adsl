@@ -49,17 +49,21 @@ OptionParser.new do |opts|
 
   opts.on("-a", "--actions ACTIONS",
           "A colon separated list of actions to be verified.",
-          "  Only actions whose name contains any of the arguments will be vefified",
+          "  Only actions whose name contains any of the arguments will be verified",
           "  All actions are verified by default") do |actions|
     options[:actions] = actions.split(':').map(&:strip)
   end
 
-  opts.on("-r", "--problems PROBLEMS",
-          "A colon separated list of invariant names to be verified,",
-          "  or 'ac' for access control checking.",
-          "  Only invariants whose name contains any of the arguments will be vefified",
+  opts.on("-i", "--invariants INVARIANTS",
+          "A colon separated list of invariant names to be verified.",
+          "  Only invariants whose name contains any of the arguments will be verified",
           "  All invariants are verified by default") do |invs|
-    options[:problems] = invs.split(':').map(&:strip)
+    options[:invariants] = invs.split(':').map(&:strip)
+  end
+
+  opts.on("-ac", "--[no-]access-control",
+          "Enable or disable access control verification.  Enabled by default") do |ac|
+    options[:ac] = ac
   end
 
   opts.on_tail("--help", "Show this message") do

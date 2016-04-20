@@ -5,6 +5,7 @@ require 'adsl/extract/meta'
 require 'adsl/extract/extraction_error'
 require 'adsl/extract/rails/other_meta'
 require 'adsl/extract/rails/basic_type_extensions'
+require 'adsl/extract/rails/active_record_metaclass_lookups'
 
 module ADSL
   module Extract
@@ -153,25 +154,25 @@ module ADSL
                 
               if refl.options[:dependent] == :destroy or refl.options[:dependent] == :destroy_all
                 if refl.through_reflection.nil?
-                  stmts += object.send(refl.name).destroy
+                  stmts << object.send(refl.name).destroy
                 else
-                  stmts += object.send(refl.through_reflection.name).destroy
+                  stmts << object.send(refl.through_reflection.name).destroy
                 end
               else
                 if refl.through_reflection.nil?
-                  stmts += object.send(refl.name).delete
+                  stmts << object.send(refl.name).delete
                 else
-                  stmts += object.send(refl.through_reflection.name).delete
+                  stmts << object.send(refl.through_reflection.name).delete
                 end
               end
             end
 
             stmts << ASTDeleteObj.new(:objset => object.adsl_ast)
 
-            stmts
+            stmts.length == 1 ? stmts.first : ASTBlock.new(:exprs => stmts).flatten!
           end
-          new_class.send(:define_method, :destroy!    ){ |*args| destroy *args }
-          new_class.send(:define_method, :destroy_all ){ |*args| destroy *args }
+          new_class.send(:define_method, :destroy!   ){ |*args| destroy *args }
+          new_class.send(:define_method, :destroy_all){ |*args| destroy *args }
 
           new_class.send :define_method, :delete do |*args|
             [ASTDeleteObj.new(:objset => adsl_ast)]
@@ -183,7 +184,6 @@ module ADSL
 
         def generate_class
           @ar_class.class_exec do
-
             include ADSL::Lang
 
             attr_accessor :adsl_ast
@@ -192,14 +192,15 @@ module ADSL
             def initialize(attributes = {}, options = {})
               raise ExtractionError if attributes[:adsl_ast].is_a? Class
               attributes = {} if attributes.is_a?(MetaUnknown)
-              super({
+              adsl_ast_attributes = {
                 :adsl_ast => ASTCreateObjset.new(:class_name => ASTIdent.new(:text => self.class.adsl_ast_class_name))
-              }.merge(attributes), options)
+              }
+              super(adsl_ast_attributes.merge(attributes), options)
             end
 
             # no-ops
-            def save(*args);  end
-            def save!(*args); end
+            def save(*args);  true; end
+            def save!(*args); true; end
             def reorder(*args);   self; end
             def order(*args);     self; end
             def reorder(*args);   self; end
@@ -262,6 +263,14 @@ module ADSL
               ASTIsEmpty.new :objset => self.adsl_ast
             end
 
+            def any?(&block)
+              if block_given?
+                ASTBoolean.new
+              else
+                ASTNot.new :subformula => empty?
+              end
+            end
+
             def +(other)
               return self unless other.respond_to?(:adsl_ast)
               self.class.new :adsl_ast => ASTUnion.new(:objsets => [self.adsl_ast, other.adsl_ast])
@@ -274,11 +283,13 @@ module ADSL
 
               expr = block[var]
 
-              ASTForEach.new(
-                :objset => self.adsl_ast,
-                :var_name => var_name.dup,
-                :expr => expr
-              )
+              if expr.is_a? ASTNode
+                ASTForEach.new(
+                  :objset => self.adsl_ast,
+                  :var_name => var_name.dup,
+                  :expr => expr
+                )
+              end
             end
 
             def include?(other)
@@ -413,6 +424,7 @@ module ADSL
                 #   self.all.take *args
                 # end
               end
+              alias_method :find_by, :find
 
               def where(*args)
                 self.all.where *args
@@ -432,25 +444,25 @@ module ADSL
               def build(*args)
                 new(*args)
               end
-
-              def method_missing(method, *args, &block)
-                if method.to_s =~ /^find_.*$/
-                  self.find
-                else
-                  super
-                end
+              
+              def first_or_create
+                allof = ADSL::Lang::ASTAllOf.new(:class_name => ASTIdent[adsl_ast_class_name])
+                adsl_ast = ADSL::Lang::ASTIf.new(
+                  :condition => ADSL::Lang::ASTIsEmpty.new(:objset => allof),
+                  :then_expr => ADSL::Lang::ASTCreateObjset.new(:class_name => ASTIdent[adsl_ast_class_name]),
+                  :else_expr => ADSL::Lang::ASTOneOf.new(:objset => allof.dup)
+                )
+                self.new(:adsl_ast => adsl_ast)
               end
 
-              def respond_to?(method, include_all = false)
-                return true if method.to_s =~ /^find_.*$/
-                super
-              end
+              include ADSL::Extract::Rails::ActiveRecordMetaclassLookups
             end
           end
 
           create_destroys @ar_class
 
           @ar_class.send :default_scope, lambda{ @ar_class.all }
+          serialized_attributes = @ar_class.serialized_attributes.keys
           @ar_class.columns_hash.each do |name, column|
             next if name.split('_').last == 'id'
             
@@ -468,8 +480,6 @@ module ADSL
                    else
                      nil
                    end
-            
-            next if type.nil?
 
             value = ADSL::Extract::Rails::UnknownOfBasicType.new type
             if Object.lookup_const('Enumerize::Value')
@@ -478,8 +488,23 @@ module ADSL
               end
             end
 
+            value = ADSL::Extract::Rails::MetaUnknown.new if serialized_attributes.include? name
+            
+            next if type.nil?
+
             @ar_class.new.replace_method name do
               value
+            end
+          end
+
+          reflections(:polymorhhic => false, :through => false).each do |assoc|
+            build_method_name = "build_#{ assoc.name }"
+            @ar_class.send :define_method, build_method_name do |*args|
+              send(assoc.name).build *args
+            end
+            @ar_class.class_exec do
+              alias_method "create_#{ assoc.name }",  build_method_name
+              alias_method "create_#{ assoc.name }!", build_method_name
             end
           end
 

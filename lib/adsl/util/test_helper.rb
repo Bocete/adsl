@@ -15,13 +15,6 @@ Minitest::Reporters.use!
 class ActiveSupport::TestCase
   TESTING_TIMEOUT = 5.seconds
 
-  setup do
-    if !TEST_ENV
-      Object.send :remove_const, :TEST_ENV
-      Object.const_set :TEST_ENV, true
-    end
-  end
-
   def adsl_assert(expected_result, input, options={})
     options[:timeout] ||= TESTING_TIMEOUT
 

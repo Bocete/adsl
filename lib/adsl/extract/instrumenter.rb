@@ -80,13 +80,24 @@ module ADSL
         replace :call do |sexp|
           # expected format: s(:call, object, method_name, *args)
           # replaced with Extract::Instrumenter.e(instrumenter_id, object, method_name, *args)
+          #
+          # if the last arg is a s(:block_pass), unroll it into a proper block
           original_object = sexp.sexp_body[0] || s(:self)
           original_method_name = sexp.sexp_body[1]
           original_args = sexp.sexp_body[2..-1]
 
           next sexp if [s(:self), nil].include? original_object and Kernel.respond_to? original_method_name
 
-          s(:call, nil, :ins_call, original_object, s(:lit, original_method_name), *original_args)
+          result = s(:call, nil, :ins_call, original_object, s(:lit, original_method_name), *original_args)
+          if result.sexp_body.last.sexp_type == :block_pass
+            block = result.last.sexp_body[0]
+            if block.sexp_type == :lit
+              result = s(:iter, result[0..-2], s(:args, :e), s(:call, nil, :ins_call, s(:call, nil, :e), block))
+            else
+              raise "not supported"
+            end
+          end
+          result
         end
       end
 
@@ -162,7 +173,6 @@ module ADSL
             
             source = method.source
             
-            # Ruby 2.0.0 support is in development as of writing this
             sexp = ruby_parser.process source
 
             unless sexp.nil?

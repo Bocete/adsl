@@ -25,10 +25,10 @@ module ADSL
       
       def self.evals_to_something(*args)
         raise if args.empty?
-        if args.length == 1 && args.first == true || args.first == false
+        if args.length == 1 && (args.first == true || args.first == false)
           @evals_to_something = args.first
         elsif Set[*args] < Set[*container_for_fields.map(&:to_sym)]
-          @evals_to_something_delegates = args
+          @evals_to_something_delegate = args
         else
           "What do these args mean? #{ args }"
         end
@@ -46,10 +46,20 @@ module ADSL
       def evals_to_something?
         default_val = self.class.instance_variable_get :@evals_to_something
         return default_val unless default_val.nil?
-
+        
         delegate_fields = self.class.instance_variable_get(:@evals_to_something_delegate) || self.class.container_for_fields
         delegates = delegate_fields.map{ |field_name| send field_name }.flatten.compact
         delegates.any?{ |c| c.evals_to_something? }
+      end
+
+      def evals_to_something_always?
+        return true if @evals_to_something_always
+        default_val = self.class.instance_variable_get :@evals_to_something
+        return default_val == :always unless default_val.nil?
+        
+        delegate_fields = self.class.instance_variable_get(:@evals_to_something_delegate) || self.class.container_for_fields
+        delegates = delegate_fields.map{ |field_name| send field_name }.flatten.compact
+        delegates.any?{ |c| c.evals_to_something_always? }
       end
 
       def noop?
@@ -210,6 +220,13 @@ module ADSL
     end
 
     class ASTBlock < ASTNode
+      def flatten!
+        @exprs.map! do |e|
+          e.is_a?(ASTBlock) ? e.exprs : e
+        end.flatten!
+        self
+      end
+
       def optimize
         optimized = super
         return optimized unless optimized == self
@@ -388,6 +405,11 @@ module ADSL
         self
       end
     end
+
+    class ASTSubset < ASTNode
+      has_side_effects :objset
+      evals_to_something true
+    end
     
     class ASTTryOneOf < ASTNode
       has_side_effects false
@@ -406,7 +428,7 @@ module ADSL
 
     class ASTOneOf < ASTNode
       has_side_effects false
-      evals_to_something true
+      evals_to_something :always
 
       def optimize
         optimized = super

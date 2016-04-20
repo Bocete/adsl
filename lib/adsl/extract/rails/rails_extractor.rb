@@ -125,16 +125,15 @@ module ADSL
         end
 
         def prepare_instrumentation(controller_class, action)
-          extractor_id = self.object_id
-          controller_class.class_eval <<-ruby, __FILE__, __LINE__ + 1
+          controller_class.class_exec do
+            def params
+              ::ADSL::Extract::Rails::PartiallyUnknownParams.new self.class.name, action_name
+            end
             def default_render(*args); end
             def verify_authenticity_token; end
-            def params
-              ADSL::Extract::Rails::PartiallyUnknownHash.new(
-                :controller => '#{ controller_class.controller_name }',
-                :action => '#{ action }'
-              )
-            end
+          end
+          extractor_id = self.object_id
+          controller_class.class_eval <<-ruby, __FILE__, __LINE__ + 1
             def rails_extractor
               ObjectSpace._id2ref #{ extractor_id }
             end

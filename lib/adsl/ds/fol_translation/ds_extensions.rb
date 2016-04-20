@@ -632,9 +632,7 @@ module ADSL
     class DSRaise < DSNode
       def migrate_state(translation)
         translation.reserve translation.current_loop_context.make_ps do |ps|
-          translation.create_formula ADSL::FOL::ForAll.new(ps, ADSL::FOL::Not.new(
-            translation.branch_condition translation, ps
-          ))
+          translation.create_formula ADSL::FOL::ForAll.new(ps, false)
         end
       end
     end

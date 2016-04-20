@@ -12,7 +12,11 @@ module ADSL
           :extract_options => {}
         }.merge options
         ast = options[:ast]
-        ast ||= ADSL::Extract::Rails::RailsExtractor.new(options[:extract_options]).adsl_ast
+        if ast.nil?
+          extractor = ADSL::Extract::Rails::RailsExtractor.new(options[:extract_options])
+          extractor.extract_all_actions
+          ast = extractor.adsl_ast
+        end
         ast
       end
 

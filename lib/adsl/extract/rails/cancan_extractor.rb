@@ -81,7 +81,7 @@ module ADSL
             login_class.class_eval <<-ruby
               def #{ug_name}
                 ADSL::Lang::ASTInUserGroup.new(
-                  :objset => ADSL::Lang::ASTCurrentUser.new,
+                  :objset => self.adsl_ast,
                   :groupname => ADSL::Lang::ASTIdent.new(:text => '#{ug_name}')
                 )
               end

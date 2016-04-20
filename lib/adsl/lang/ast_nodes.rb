@@ -82,24 +82,26 @@ module ADSL
           exprs = [node.condition, node.then_expr, node.else_expr] if node.is_a?(ASTIf)
           exprs = [node.objset, node.expr] if node.is_a?(ASTForEach)
 
-          var_reads = exprs.map{ |e| e.recursively_gather{ |n| n.is_a?(ASTVariableRead) ? n : nil } }.flatten.map(&:var_name).map(&:text)
+          assignments = exprs.map{ |e| e.recursively_gather{ |n| n.is_a?(ASTAssignment) ? n : nil } }.flatten
+          var_reads = assignments.map(&:var_name).map(&:text)
           var_reads.select!{ |var| var =~ regex }
 
           nested_variable_names += var_reads
         end
 
-        root_variable_names = Set[*recursively_select do |node|
-          next true if node.is_a?(ASTVariableRead) || node.is_a?(ASTAssignment)
+        root_assignments_names = Set[*recursively_select do |node|
+          next true if node.is_a?(ASTAssignment)
           next false if node.is_a?(ASTIf) || node.is_a?(ASTForEach)
         end.map(&:var_name).map(&:text).select{ |var| var =~ regex }]
         
-        vars_that_need_declaring = nested_variable_names - root_variable_names
+        vars_that_need_declaring = nested_variable_names - root_assignments_names
 
         if vars_that_need_declaring.any?
           @expr = ASTBlock.new(:exprs => [@expr]) unless @expr.is_a? ASTBlock
           vars_that_need_declaring.each do |name|
-            @expr.exprs.unshift ASTDeclareVar.new(
-              :var_name => ASTIdent.new(:text => name)
+            @expr.exprs.unshift ASTAssignment.new(
+              :var_name => ASTIdent.new(:text => name),
+              :expr => ASTEmptyObjset.new
             )
           end
         end
@@ -114,18 +116,19 @@ module ADSL
         return if action_index.nil?
   
         action_index -= 1
-        before_action_assignments = Set[]
+        before_action_assignments = {}
         exprs.first(action_index).each do |stmt|
           stmt.preorder_traverse do |node|
-            before_action_assignments << node.var_name.text if node.is_a? ADSL::Lang::ASTAssignment
+            before_action_assignments[node.var_name.text] = node.expr if node.is_a? ADSL::Lang::ASTAssignment
           end
         end
   
         exprs[action_index..-1].each do |stmt|
           stmt.block_replace do |node|
             if node.is_a? ADSL::Lang::ASTAssignment
-              if before_action_assignments.delete? node.var_name.text
+              if before_action_assignments[node.var_name.text] == node.expr
                 # this assigment, and its expression, never happened
+                before_action_assignments.delete node.var_name.text
                 next ADSL::Lang::ASTEmptyObjset.new
               end
             elsif node.is_a? ADSL::Lang::ASTVariableRead
@@ -143,10 +146,6 @@ module ADSL
 
     class ASTAssignment < ASTNode
       node_fields :var_name, :expr
-    end
-
-    class ASTDeclareVar < ASTNode
-      node_fields :var_name
     end
 
     class ASTAssertFormula < ASTNode
@@ -172,53 +171,19 @@ module ADSL
 
     class ASTReturnGuard < ASTNode
       node_fields :expr
-
-      def returns?
-        false
-      end
     end
 
     class ASTReturn < ASTNode
       node_fields :expr
-      
-      def returns?
-        true
-      end
     end
 
     class ASTRaise < ASTNode
       node_fields
-
-      def raises?
-        true
-      end
     end
 
     class ASTIf < ASTNode
       node_fields :condition, :then_expr, :else_expr
 
-      def stmt_type_inevitable(type)
-        return @then_expr.send type if @condition.is_a?(ASTBoolean) && @condition.bool_value == true
-        return @else_expr.send type if @condition.is_a?(ASTBoolean) && @condition.bool_value == false
-        
-        results = [@then_expr, @else_expr].map{ |b| b.send type }
-        return true  if results.all?{ |v| v == true }
-        return false if results.all?{ |v| v == false }
-        return nil
-      end
-
-      def returns?
-        stmt_type_inevitable :returns?
-      end
-
-      def raises?
-        stmt_type_inevitable :raises?
-      end
-
-      def reaches_view?
-        stmt_type_inevitable :reaches_view?
-      end
-      
       def list_entity_classes_written_to
         [@then_expr, @else_expr].map(&:list_entity_classes_written_to).flatten
       end

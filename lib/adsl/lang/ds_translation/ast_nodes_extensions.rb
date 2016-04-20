@@ -270,18 +270,6 @@ module ADSL
       end
     end
 
-    class ASTDeclareVar < ASTNode
-      def typecheck_and_resolve(context)
-        var = context.lookup_var @var_name.text, false
-        if var.nil?
-          assignment = ASTAssignment.new :var_name => @var_name.dup, :expr => ASTEmptyObjset.new
-          assignment.typecheck_and_resolve context
-        else
-          ADSL::Lang::DSTranslation::DSTranslationResult::EMPTY
-        end
-      end
-    end
-
     class ASTAssertFormula < ASTNode
       def typecheck_and_resolve(context)
         formula_result = @formula.typecheck_and_resolve context

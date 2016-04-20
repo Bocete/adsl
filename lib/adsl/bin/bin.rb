@@ -17,7 +17,8 @@ module ADSL
         :timeout => 1.minute,
         :output => 'text',
         :actions => nil,
-        :problems => nil,
+        :invariants => nil,
+        :ac => true,
         :translate => false
       }
 
@@ -56,8 +57,8 @@ module ADSL
 
       def gen_problems
         actions              = filter_list @ds.actions,    @options[:actions]
-        invariants           = filter_list @ds.invariants, @options[:problems]
-        check_access_control = @options[:problems].nil? || @options[:problems].include?('ac')
+        invariants           = filter_list @ds.invariants, @options[:invariants]
+        check_access_control = @options[:ac]
 
         problems = []
 

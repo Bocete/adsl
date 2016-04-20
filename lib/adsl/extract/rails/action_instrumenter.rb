@@ -120,20 +120,20 @@ module ADSL
             block2 = block2_sexp.sexp_type == :block ? block2_sexp : s(:block, block2_sexp)
             s(:call, nil, :ins_if,
               sexp[1],
-              s(:rescue,
+            #  s(:rescue,
                 s(:call, nil, :ins_block, block1),
-                s(:resbody,
-                  s(:array, s(:const, :Exception)),
-                  s(:nil)
-                )
-              ),
-              s(:rescue,
+            #    s(:resbody,
+            #      s(:array, s(:const, :Exception)),
+            #      s(:nil)
+            #    )
+            #  ),
+            #  s(:rescue,
                 s(:call, nil, :ins_block, block2),
-                s(:resbody,
-                  s(:array, s(:const, :Exception)),
-                  s(:nil)
-                )
-              )
+            #    s(:resbody,
+            #      s(:array, s(:const, :Exception)),
+            #      s(:nil)
+            #    )
+            #  )
             )
           end
 
@@ -144,6 +144,17 @@ module ADSL
             res_block = resbody[2..-1]
             res_block = res_block.length > 1 ? s(:block, *res_block) : res_block.first
             s(:if, s(:lit, :symbols_get_translated_as_star_conditions), res_block, sexp[1])
+          end
+
+          # replace try with ins_try
+          replace :call do |sexp|
+            next sexp if sexp.sexp_body[1] != :try
+
+            original_object = sexp.sexp_body[0] || s(:self)
+            original_method_name = sexp.sexp_body[2]
+            original_args = sexp.sexp_body[3..-1]
+
+            s(:call, nil, :ins_try, original_object, original_method_name, *original_args)
           end
 
           # change attrasgn into a normal call

@@ -68,7 +68,8 @@ rule
   opt_inverse: inverseof IDENT { return val[1] }
              |                 { return nil }
 
-  action_decl: action IDENT expr { return ASTAction.new :lineno => val[0], :name => val[1], :expr => val[2] }
+  action_decl: action IDENT expr       { return ASTAction.new :lineno => val[0], :name => val[1], :expr => val[2] }
+             | action CLASS_IDENT expr { return ASTAction.new :lineno => val[0], :name => val[1], :expr => val[2] }
 
   exprs: expr exprs { val[1].unshift val[0]; return val[1] }
        |            { return [] }
@@ -79,7 +80,9 @@ rule
       | member_expr                { return val[0] }
       | CLASS_IDENT                { return ASTAllOf.new :lineno => val[0].lineno, :class_name => val[0] }
       | create CLASS_IDENT         { return ASTCreateObjset.new :lineno => val[0], :class_name => val[1] }
-      | create '(' member_expr ')' { return ASTDereferenceCreate.new :lineno => val[0], :objset => val[2], :rel_name => val[4] }
+      | create '(' member_expr ')' { return ASTDereferenceCreate.new(:lineno => val[0],
+          :objset => val[2].objset, :rel_name => val[2].member_name)
+        }
       | delete expr                { return ASTDeleteObj.new :lineno => val[0], :objset => val[1] }
       | member_expr '+=' expr { return ASTCreateTup.new(:lineno => val[0].lineno,
           :objset1 => val[0].objset, :rel_name => val[0].member_name, :objset2 => val[2])

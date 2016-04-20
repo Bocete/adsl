@@ -48,6 +48,32 @@ module ADSL
   module Extract
     module Rails
 
+      class ArrayOfBasicType < Array
+        include ADSL::DS::TypeSig
+
+        attr_reader :ds_type
+
+        def initialize(ds_type)
+          @ds_type = ds_type
+        end
+
+        def type_example
+          [self[0]]
+        end
+
+        def [](*args)
+          UnknownOfBasicType.new @ds_type
+        end
+
+        def []=(index, arg)
+          arg
+        end
+
+        def method_missing(*args)
+          self
+        end
+      end
+
       # this represents an unknown value
       # of a known basic type
       class UnknownOfBasicType
@@ -66,7 +92,7 @@ module ADSL
           when BasicType::DECIMAL, BasicType::REAL
             1.5
           when BasicType::STRING
-            'asd'
+            'string'
           when BasicType::BOOL
             true
           else
@@ -85,6 +111,10 @@ module ADSL
           else
             raise "Unknown basic type: #{@ds_type}"
           end
+        end
+
+        def to_ary
+          ArrayOfBasicType.new @ds_type
         end
 
         def method_missing(*args)

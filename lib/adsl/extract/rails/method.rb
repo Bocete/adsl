@@ -1,3 +1,5 @@
+require 'set'
+
 module ADSL
   module Extract
     module Rails
@@ -6,6 +8,7 @@ module ADSL
         attr_reader :name
 
         def initialize(options = {})
+          @return_types = []
           @name = options[:name]
         end
 
@@ -13,15 +16,50 @@ module ADSL
           false
         end
 
-        def extract_from
-          original_expressions = [yield].flatten
-          
-          block = ADSL::Lang::ASTBlock.new :exprs => original_expressions.map(&:try_adsl_ast).compact
+        def report_return_type(type)
+          @return_types << type
+        end
 
-          if original_expressions.last.is_a?(ActiveRecord::Base)
-            original_expressions.last.class.new :adsl_ast => block
+        def self.ancestors(types, index)
+          Set[types.map{ |t| t.ancestors[index] }]
+        end
+
+        def return_type
+          @return_types.delete NilClass
+          @return_types.reject!{ |c| c <= ADSL::Lang::ASTNode }
+          @return_types.uniq!
+          return if @return_types.empty?
+          if @return_types.all?{ |c| c < ActiveRecord::Base }
+            if @return_types.length == 1
+              @return_types.first
+            else
+              min_index = -1 * @return_types.map{ |t| t.ancestors.length }.min
+             
+              while Method.ancestors(@return_types, min_index).count > 1
+                min_index += 1
+              end
+              
+              sample = @return_types.first.ancestors[min_index]
+              sample if sample < ActiveRecord::Base
+            end
+          end
+        end
+
+        def extract_from
+          return_value = yield
+          original_expressions = [return_value].flatten
+          
+          adsl_ast_exprs = original_expressions.map(&:try_adsl_ast).compact
+
+          unless adsl_ast_exprs.all? &:noop?
+            block = ADSL::Lang::ASTBlock.new :exprs => adsl_ast_exprs
+            if original_expressions.last.is_a?(ActiveRecord::Base)
+              original_expressions.last.class.new :adsl_ast => block
+            else
+              block
+            end
           else
-            block
+            return return_value
           end
         end
       end
