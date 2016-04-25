@@ -75,7 +75,7 @@ class ActiveSupport::TestCase
     end
   end
 
-  def assert_false(actual, failure_msg = nil)
+  def assert_false(actual, failure_msg = '')
     assert !actual, failure_msg
   end
 

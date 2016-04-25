@@ -83,7 +83,7 @@ module ADSL
           true
         end
 
-        %i(permit permit! permitted= permitted? require required).each do |m|
+        %w(permit permit! permitted= permitted? require required).map(&:to_sym).each do |m|
           define_method(m){ |*args| self }
         end
       end

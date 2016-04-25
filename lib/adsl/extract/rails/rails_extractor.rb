@@ -107,6 +107,12 @@ module ADSL
           }.uniq{ |a|
             [a[:controller], a[:action]]
           }.select{ |route|
+            # ignore devise actions
+            next false if route[:controller].to_s.downcase.start_with? 'devise'
+            # ignore Rails 4 default controllers
+            next false if route[:controller].to_s.downcase.start_with? 'rails'
+            true
+          }.select{ |route|
             next true if action_name_patterns.empty?
             action_name_patterns.map{ |patt| "#{ route[:controller] }__#{ route[:action] }".include? patt }.include? true
           }.sort{ |a, b| [a[:controller].to_s, a[:action]] <=> [b[:controller].to_s, b[:action]] }
@@ -127,7 +133,7 @@ module ADSL
         def prepare_instrumentation(controller_class, action)
           controller_class.class_exec do
             def params
-              ::ADSL::Extract::Rails::PartiallyUnknownParams.new self.class.name, action_name
+              ::ADSL::Extract::Rails::PartiallyUnknownParams.new controller_name, action_name
             end
             def default_render(*args); end
             def verify_authenticity_token; end
@@ -188,7 +194,9 @@ module ADSL
           action.flatten_returns!
 
           action.remove_overwritten_assignments! route[:action]
+
           action.optimize!
+          
           action.declare_instance_vars!
           
           action

@@ -10,7 +10,14 @@ module ADSL
         include ADSL::Lang
         include ADSL::Extract::Rails::CancanAuthorizationModel
 
-        def self.default_login_class
+        def default_login_class
+          if Object.lookup_const 'Devise'
+            candidates = ar_classes.select{ |c| c.included_modules.include? ::Devise::Models::DatabaseAuthenticatable }
+
+            if candidates.length == 1
+              return candidates.first
+            end
+          end
           consts = ['User', 'AdminUser']
           consts.each do |const|
             c = Object.lookup_const const
@@ -21,13 +28,20 @@ module ADSL
 
         def login_class
           return @login_class if @login_class
-          klass = CanCanExtractor.default_login_class
+          klass = default_login_class
           raise "Login class #{ klass.name } is not a model class" unless klass < ActiveRecord::Base
           @login_class = klass
         end
 
         def define_login_class
-          login_class
+          klass = login_class
+          CanCanExtractor.instance_variable_set :@login_class, klass
+          klass
+        end
+
+        def self.login_class
+          raise 'Login class undefined' unless instance_variable_defined? :@login_class
+          @login_class
         end
 
         def define_usergroup(name)
@@ -52,10 +66,16 @@ module ADSL
             # see if 'admin' is defined somewhere, and if it is, define an admin usergroup
             method_names = login_class.instance_methods.map &:to_s
             column_names = login_class.column_names
-            things_that_exist = Set[*(method_names + column_names)]
-            if (things_that_exist & Set['admin', 'admin?', 'is_admin', 'is_admin?']).any?
-              define_usergroup :admin
-              define_usergroup :nonadmin
+            things_that_exist = Set[*(method_names + column_names).map(&:to_sym)]
+
+            %w(admin administrator).each do |role|
+              role_markers = [role, "#{role}?", "is_#{role}", "is_#{role}?"].map(&:to_sym)
+              intersection = things_that_exist & Set[*role_markers]
+              if intersection.any?
+                define_usergroup role
+                define_usergroup "non#{role}".to_sym
+                break
+              end
             end
           end
           
@@ -89,6 +109,14 @@ module ADSL
               alias_method :is_#{ug_name}, :#{ug_name}
               alias_method :is_#{ug_name}?, :#{ug_name}
             ruby
+            login_class.class_exec do
+              def role?(sym)
+                ADSL::Lang::ASTInUserGroup.new(
+                  :objset => self.adsl_ast,
+                  :groupname => ADSL::Lang::ASTIdent.new(:text => sym.to_s)
+                )
+              end
+            end
           end
         end
 
@@ -118,7 +146,7 @@ module ADSL
               controller_name.gsub('Controller', '').underscore.singularize
             end
         
-            def authorize!(action = action_name, resource = nil)
+            def authorize!(action = action_name, resource = nil, message = nil)
               @_authorized = true
               return if respond_to?(:should_authorize?) && (!should_authorize?)
 
@@ -202,12 +230,11 @@ module ADSL
               actions = expand_actions [actions].flatten
               
               expr = nil
-              login_class = CanCanExtractor.default_login_class
               equality_lhs = nil
               # try to deduce equality from arg hash
               if conditions_hash.present?
                 conditions_hash.each do |key, val|
-                  if val.is_a?(login_class) && val.adsl_ast.is_a?(ASTCurrentUser)
+                  if val.try_adsl_ast.is_a?(ASTCurrentUser)
                     equality_lhs = subject.new(:adsl_ast => :subject).send(key)
                   end
                 end
@@ -233,7 +260,7 @@ module ADSL
                   name = equality_lhs.member_name.text.to_sym
                   reflection = subject.reflections[name]
 
-                  inverse_refs = login_class.reflections.values.select do |r|
+                  inverse_refs = CanCanExtractor.login_class.reflections.values.select do |r|
                     r.class_name == subject.name && r.foreign_key == reflection.foreign_key
                   end
                   if inverse_refs.length == 1
@@ -322,7 +349,6 @@ module ADSL
                 if klass.is_a? Symbol
                   # klass may be unrelated to a class
                   klass = Object.lookup_const klass.to_s.classify
-                  puts "klass is #{ klass }"
                   return if klass.nil?
                 end
                 expr = klass.all

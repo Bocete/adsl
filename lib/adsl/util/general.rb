@@ -244,6 +244,13 @@ module Kernel
   end
 end
 
+class Set
+  alias_method :<, :proper_subset?   unless public_method_defined? :<
+  alias_method :>, :proper_superset? unless public_method_defined? :>
+  alias_method :<=, :subset?   unless public_method_defined? :<=
+  alias_method :>=, :superset? unless public_method_defined? :>=
+end
+
 module Enumerable
   def find_one(&block)
     raise ArgumentError, "find_one expects a block" unless block_given?

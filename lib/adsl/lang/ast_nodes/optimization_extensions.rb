@@ -1,3 +1,4 @@
+require 'backports/std_lib'
 
 class Array
   def optimize
@@ -97,6 +98,10 @@ module ADSL
       
       def has_side_effects?
         !arbitrary?
+      end
+
+      def optimize
+        ASTEmptyObjset.new
       end
     end
 
@@ -409,6 +414,16 @@ module ADSL
     class ASTSubset < ASTNode
       has_side_effects :objset
       evals_to_something true
+
+      def optimize
+        optimized = super
+        return optimized unless optimized == self
+
+        return @objset if @objset.is_a?(ASTSubset)
+        return ASTTryOneOf.new :objset => @objset.objset if @objset.is_a?(ASTTryOneOf) or @objset.is_a?(ASTOneOf)
+
+        self
+      end
     end
     
     class ASTTryOneOf < ASTNode
@@ -645,7 +660,7 @@ module ADSL
           return ASTAnd.new(:subformulae => @exprs.map{ |sub| ASTNot.new(:subformula => sub) }).optimize
         end
         # if there are fewer than 2 elements, we had duplicates making 'equal' trivially true
-        return ASTBoolean::TRUE if subs.length < 2
+        return ASTBoolean::TRUE if @exprs.length < 2
 
         self
       end

@@ -59,7 +59,7 @@ module ADSL
             end
 
             def password_digest(*args)
-              ADSL::Extract::Rails::UnknownOfBasicType.new
+              ADSL::Extract::Rails::UnknownOfBasicType.new ADSL::DS::TypeSig::BasicType::STRING
             end
           end
 

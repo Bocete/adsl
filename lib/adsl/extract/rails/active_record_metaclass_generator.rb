@@ -195,7 +195,11 @@ module ADSL
               adsl_ast_attributes = {
                 :adsl_ast => ASTCreateObjset.new(:class_name => ASTIdent.new(:text => self.class.adsl_ast_class_name))
               }
-              super(adsl_ast_attributes.merge(attributes), options)
+              if options.empty?
+                super(adsl_ast_attributes.merge(attributes))
+              else
+                super(adsl_ast_attributes.merge(attributes), options)
+              end
             end
 
             # no-ops
@@ -208,6 +212,7 @@ module ADSL
             def all(*args);       self; end
             def scope_for_create; self; end
             def id;               self; end   # used to allow foreign key assignment
+            def records;          self; end   # elasticsearch
 
             def count_by_group(*args); MetaUnknown.new; end
             def size;                  MetaUnknown.new; end
@@ -234,7 +239,9 @@ module ADSL
             alias_method :only,     :where
             alias_method :except,   :where
             alias_method :my,       :where
+            alias_method :limit,    :where
             alias_method :paginate, :where    # will_paginate
+            alias_method :page,     :where    # will_paginate
             def merge(other)
               if other.adsl_ast.is_a? ASTAllOf
                 self
@@ -432,6 +439,8 @@ module ADSL
               alias_method :only,   :where
               alias_method :except, :where
               alias_method :my,     :where
+              alias_method :limit,  :where
+              alias_method :search, :where    # elasticsearch
 
               def select(*args)
                 self

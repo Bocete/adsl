@@ -62,7 +62,7 @@ module ADSL
       end
 
       def to_h
-        self.class.container_for_fields.map{ |f| [f, send(f)] }.to_h
+        Hash[ self.class.container_for_fields.map{ |f| [f, send(f)] } ]
       end
 
       def children
@@ -80,6 +80,7 @@ module ADSL
       module RecursivelyComparable
         def eql?(other)
           return false if other.class != self.class
+          return true if other.object_id == self.object_id
           self.class.container_for_fields.each do |field|
             f1 = self.send field
             f2 = other.send field
