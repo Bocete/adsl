@@ -1,4 +1,4 @@
-require 'backports/std_lib'
+require 'backports'
 
 class Array
   def optimize
