@@ -34,8 +34,12 @@ module ADSL
           end
         end
 
+        def devise_exists?
+          Object.lookup_const('Devise')
+        end
+
         def instrument_gem_devise(controller_class, action)
-          return unless Object.lookup_const('Devise')
+          return unless devise_exists?
 
           roles = []
           Devise.mappings.values.each do |mapping|
@@ -59,20 +63,15 @@ module ADSL
             end
 
             def password_digest(*args)
-              ADSL::Extract::Rails::UnknownOfBasicType.new ADSL::DS::TypeSig::BasicType::STRING
+              #ADSL::Extract::Rails::UnknownOfBasicType.new# ADSL::DS::TypeSig::BasicType::STRING
+              :unknown
             end
           end
 
           roles.each do |role, role_class|
-            if cancan_exists?
-              current_user_code = <<-RUBY.strip
-                #{role_class}.new(:adsl_ast => ADSL::Lang::ASTCurrentUser.new)
-              RUBY
-            else
-              current_user_code = <<-RUBY.strip
-                #{role_class}.find(-1)
-              RUBY
-            end
+            current_user_code = <<-RUBY.strip
+              #{role_class}.new(:adsl_ast => ADSL::Lang::ASTCurrentUser.new)
+            RUBY
 
             controller_class.class_eval <<-ruby
               def authenticate_#{role}!(*args); end
@@ -80,6 +79,7 @@ module ADSL
               def current_#{role}(*args); #{ current_user_code }; end
               def #{role}_session(*args); ::ADSL::Extract::MetaUnknown.new; end
               def only_render_implemented_actions(*args); end
+              def respond_with(*args); ::ADSL::Lang::ASTFlag.new(:label => :render); end
             ruby
           end
         end
@@ -123,12 +123,12 @@ module ADSL
           instance_name = collection_name.singularize
           class_name = controller_class.controller_name.singularize.camelize
           method_pattern = <<-ruby
-            def ${1}
+            def ${1}(*args)
               ins_explore_all :${1} do
-                ins_stmt(ADSL::Lang::ASTAssignment.new(
+                ADSL::Lang::ASTAssignment.new(
                   :var_name => ADSL::Lang::ASTIdent["at__${2}"],
                   :expr => ${3}.adsl_ast
-                ))
+                )
               end
             end
           ruby
@@ -137,8 +137,8 @@ module ADSL
             controller_class.class_eval method_pattern.resolve_params(:index, collection_name, "#{class_name}.where")
           when :show
             controller_class.class_eval method_pattern.resolve_params(:show, instance_name, "#{class_name}.find")
-          #when :new
-          #  controller_class.class_eval method_pattern.resolve_params(:new, instance_name, "#{class_name}.new")
+          # when :new
+          #   controller_class.class_eval method_pattern.resolve_params(:create, instance_name, "#{class_name}.new")
           when :create
             controller_class.class_eval method_pattern.resolve_params(:create, instance_name, "#{class_name}.new")
           when :edit
@@ -149,11 +149,11 @@ module ADSL
             controller_class.class_eval <<-ruby, __FILE__, __LINE__
               def destroy
                 ins_explore_all :destroy do
-                  ins_stmt(ADSL::Lang::ASTAssignment.new(
+                  ins_block(ADSL::Lang::ASTAssignment.new(
                     :var_name => ADSL::Lang::ASTIdent["at__#{collection_name}"],
                     :expr => #{class_name}.where.adsl_ast
-                  ))
-                  ins_stmt(ADSL::Lang::ASTDeleteObj.new(
+                  ),
+                  ADSL::Lang::ASTDeleteObj.new(
                     :objset => ADSL::Lang::ASTVariableRead.new(
                       :var_name => ADSL::Lang::ASTIdent["at__#{collection_name}"]
                     )
@@ -164,6 +164,16 @@ module ADSL
           end
         end
 
+        def instrument_gem_has_scope(controller_class, action)
+          return unless Object.lookup_const('HasScope')
+
+          controller_class.class_exec do
+            def apply_scopes(klass)
+              klass.where
+            end
+          end
+        end
+
         def instrument_gems(controller_class, action)
           instrument_gem_ransack controller_class, action
           instrument_gem_authlogic controller_class, action
@@ -171,6 +181,7 @@ module ADSL
           instrument_gem_paperclip controller_class, action
           instrument_gem_paper_trail controller_class, action
           instrument_gem_active_admin controller_class, action
+          instrument_gem_has_scope controller_class, action
         end
 
       end

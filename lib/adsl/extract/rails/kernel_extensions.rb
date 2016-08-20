@@ -16,7 +16,8 @@ module Kernel
         object_example = object.respond_to?(:type_example) ? object.type_example : object
         arg_examples = args.map{ |a| a.respond_to?(:type_example) ? a.type_example : a }
         result = old_ins_call object_example, method_name, *arg_examples, &block
-        return ADSL::Extract::Rails::UnknownOfBasicType.new result.ds_type
+        result_type = result.respond_to?(:ds_type) ? result.ds_type : result
+        return ADSL::Extract::Rails::UnknownOfBasicType.new result_type
       end
     end
     old_ins_call object, method_name, *args, &block
@@ -55,14 +56,22 @@ module Kernel
 
       value_adsl_ast = value.try_adsl_ast
       
-      if value_adsl_ast
+      if value_adsl_ast and !value_adsl_ast.is_a?(::ADSL::Lang::ASTBoolean)
         if operator == '||='
           old_value = outer_binding.eval name rescue nil
-          if old_value.respond_to?(:adsl_ast)
+          
+          # sometimes ||= is used on a variable that doesn't exist before
+          if old_value.nil?
+            old_value_adsl_ast = ::ADSL::Lang::ASTVariableRead.new(:var_name => ::ADSL::Lang::ASTIdent[adsl_ast_name])
+          else
+            old_value_adsl_ast = old_value.try_adsl_ast
+          end
+          
+          if old_value_adsl_ast
             value_adsl_ast = ::ADSL::Lang::ASTIf.new(
-              :condition => ::ADSL::Lang::ASTIsEmpty.new(:objset => old_value.adsl_ast),
+              :condition => ::ADSL::Lang::ASTIsEmpty.new(:objset => old_value_adsl_ast),
               :then_expr => value_adsl_ast,
-              :else_expr => old_value.adsl_ast
+              :else_expr => old_value_adsl_ast
             )
           end
         end
@@ -102,7 +111,7 @@ module Kernel
   end
 
   def ins_do_raise(*args)
-    if TEST_ENV
+    if TEST_ENV && args.any?
       pp args
       puts caller
     end
@@ -146,6 +155,8 @@ module Kernel
     return return_val
   rescue Exception => e
     if TEST_ENV
+      pp e.message
+      puts e.backtrace
       raise e
     #else
     #  return ins_do_raise(e.message)
@@ -185,11 +196,7 @@ module Kernel
   end
 
   def ins_if(condition, then_expr, else_expr)
-    if (condition.is_a?(ADSL::Extract::Rails::MetaUnknown) ||
-        condition.is_a?(ADSL::Extract::Rails::UnknownOfBasicType) ||
-        condition.is_a?(ADSL::Extract::Rails::ArrayOfBasicType))
-      condition_ast = ADSL::Lang::ASTBoolean.new
-    elsif condition.is_a?(ActiveRecord::Base) || condition.nil?
+    if condition.is_a?(ActiveRecord::Base) || condition.nil?
       adsl_ast = condition.adsl_ast
       if !adsl_ast.evals_to_something?
         condition_ast = ADSL::Lang::ASTBoolean::FALSE
@@ -198,15 +205,17 @@ module Kernel
       else
         condition_ast = ADSL::Lang::ASTNot.new(:subformula => ADSL::Lang::ASTIsEmpty.new(:objset => condition.adsl_ast))
       end
+    elsif condition.is_a?(ADSL::Lang::ASTNode)
+      condition_ast = condition
     else 
-      condition_ast = condition.try_adsl_ast ADSL::Lang::ASTBoolean.new
+      condition_ast = ADSL::Lang::ASTBoolean.new
     end
     then_ast = then_expr.try_adsl_ast
     else_ast = else_expr.try_adsl_ast
 
     iff = ::ADSL::Lang::ASTIf.new :condition => condition_ast, :then_expr => then_ast, :else_expr => else_ast
 
-    classes = [then_expr, else_expr].map(&:class).select{ |c| c < ActiveRecord::Base }
+    classes = [then_expr, else_expr].map(&:class).select{ |c| c < ActiveRecord::Base }.uniq
     if classes.length == 1
       iff = classes.first.new :adsl_ast => iff
     end

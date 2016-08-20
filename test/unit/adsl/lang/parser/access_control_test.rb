@@ -152,7 +152,9 @@ module ADSL::Lang
             authenticable class User {}
             usergroup ug
             action blah {
-              a = inusergroup(ug)
+              if inusergroup(ug) {
+                create User
+              }
             }
           adsl
         end
@@ -161,7 +163,9 @@ module ADSL::Lang
             authenticable class User {}
             usergroup ug
             action blah {
-              a = inusergroup(uga)
+              if inusergroup(uga) {
+                create User
+              }
             }
           adsl
         end
@@ -174,7 +178,9 @@ module ADSL::Lang
             authenticable class User {}
             usergroup ug
             action blah {
-              a = inusergroup(ug)
+              if inusergroup(ug) {
+                create User
+              }
             }
           adsl
         end
@@ -183,7 +189,9 @@ module ADSL::Lang
             class User {}
             usergroup ug
             action blah {
-              a = inusergroup(ug)
+              if inusergroup(ug) {
+                create User
+              }
             }
           adsl
         end
@@ -192,6 +200,18 @@ module ADSL::Lang
       def test_in_user_group__is_bool_expression
         parser = ADSLParser.new
         assert_nothing_raised ADSLError do
+          parser.parse <<-adsl
+            authenticable class User {}
+            usergroup ug
+            action blah {
+              if inusergroup(ug) {
+                create User
+              }
+            }
+            invariant not inusergroup(ug)
+          adsl
+        end
+        assert_raises ADSLError do
           parser.parse <<-adsl
             authenticable class User {}
             usergroup ug
@@ -210,7 +230,9 @@ module ADSL::Lang
             authenticable class User {}
             usergroup ug
             action blah {
-              a = inusergroup(ug)
+              if inusergroup(ug) {
+                create User
+              }
             }
             invariant not inusergroup(allof(User), ug)
           adsl

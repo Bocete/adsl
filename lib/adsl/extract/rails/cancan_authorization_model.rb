@@ -23,7 +23,7 @@ module ADSL
           related_entries = @entries.select{ |e| e.related? action, subject }
           can_entries, cannot_entries = related_entries.select_reject &:can?
           
-          if subject.is_a?(Class) && subject < ActiveRecord::Base
+          if (subject.is_a?(Class) && subject < ActiveRecord::Base)
             # just check whether the current user is of the right usergroup
             permitted_usergroups = Set[*can_entries.map(&:usergroups).flatten]
             forbidden_usergroups = Set[*cannot_entries.map(&:usergroups).flatten]
@@ -63,6 +63,9 @@ module ADSL
                 ASTIn.new(:objset1 => subject.adsl_ast, :objset2 => ASTUnion.new(:objsets => objsets))
               ]
             }
+          elsif subject.is_a? Symbol
+            # not supported
+            ASTBoolean.new
           else
             raise "Unknown subject for `#{ action }` permission check: #{ subject }"
           end

@@ -6,6 +6,11 @@ module ADSL
 
       attr_reader :fol, :commands, :provers
 
+      def self.load_engine(prover)
+        require "adsl/prover/#{prover}/engine_extensions"
+        Engine.send :include, ADSL::Prover.lookup_const("#{prover.to_s.camelize}::EngineExtensions")
+      end
+
       def initialize(provers, fol, options={})
         @provers = provers.respond_to?(:each) ? provers : [provers]
         @fol = fol
@@ -15,8 +20,7 @@ module ADSL
         }.merge options
 
         @provers.each do |prover|
-          require "adsl/prover/#{prover}/engine_extensions"
-          Engine.send :include, ADSL::Prover.lookup_const("#{prover.to_s.camelize}::EngineExtensions")
+          Engine.load_engine prover
         end
       end
 

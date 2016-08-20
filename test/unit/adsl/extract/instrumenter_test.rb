@@ -10,6 +10,11 @@ class ADSL::Extract::InstrumenterTest < ActiveSupport::TestCase
       def blah
         [1, 2, 3]
       end
+      
+      def preinstrumented_blah
+        ::ADSL::Extract::Instrumenter.instrumented
+        blah
+      end
 
       def call_blah
         blah
@@ -97,5 +102,15 @@ class ADSL::Extract::InstrumenterTest < ActiveSupport::TestCase
     end
 
     assert_equal [6, 4, 2], instrumenter.execute_instrumented(Foo, :call_blah) 
+  end
+
+  def test_execute_instrumented__instrumentation_can_be_skipped
+    instrumenter = ADSL::Extract::Instrumenter.new
+
+    instrumenter.replace :lit do |sexp|
+      s(:lit, sexp[1]*2)
+    end
+
+    assert_equal [1, 2, 3], instrumenter.execute_instrumented(Foo.new, :preinstrumented_blah)
   end
 end

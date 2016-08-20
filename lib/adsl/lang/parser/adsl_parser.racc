@@ -3,7 +3,8 @@ class ADSLParser
     left '*'
     left '+'
     left '.'
-    left in
+    noassoc subset oneof tryoneof create
+    left in isempty
     left '==' '!='
     noassoc NOT
     left and or xor
@@ -12,8 +13,7 @@ class ADSLParser
     left forall exists
     left '+=' '-='
     right '='
-    noassoc subset oneof tryoneof isempty
-    noassoc delete create
+    noassoc delete
     noassoc assert
     right if elsif else
     noassoc return returnguard

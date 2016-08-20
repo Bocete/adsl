@@ -179,6 +179,7 @@ module ADSL
             instrumenter.action_name = route[:action].to_s
 
             request_method = route[:request_method].to_s.downcase.split('|').first
+            
             session.send request_method, route[:url]
 
             instrumenter.ex_method = nil
@@ -233,10 +234,12 @@ module ADSL
           return nil unless route.defaults.include? :controller
           controller_parts = route.defaults[:controller].split('/')
           controller_names = controller_parts.length.times.map{ |i| controller_parts.last(i+1).join '/' }
-          possible_names = controller_names.map{ |n| [
-            "#{n.singularize}_controller".camelize,
-            "#{n.pluralize}_controller".camelize
-          ] }.flatten
+          
+          possible_names = controller_names.map{ |cn| "#{cn}_controller" } + controller_names.map do |cn|
+            other = cn == cn.singularize ? cn.pluralize : cn.singularize
+            "#{ other }_controller"
+          end
+          possible_names.map! &:camelize
           possible_names.each do |name|
             begin
               return name.constantize

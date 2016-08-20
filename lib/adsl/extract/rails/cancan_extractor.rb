@@ -11,7 +11,7 @@ module ADSL
         include ADSL::Extract::Rails::CancanAuthorizationModel
 
         def default_login_class
-          if Object.lookup_const 'Devise'
+          if devise_exists?
             candidates = ar_classes.select{ |c| c.included_modules.include? ::Devise::Models::DatabaseAuthenticatable }
 
             if candidates.length == 1
@@ -179,6 +179,8 @@ module ADSL
         end
 
         def define_controller_resource_stuff
+          return unless cancan_exists?
+
           CanCan::ControllerResource.class_exec do
             def resource_instance=(instance)
               ins_explore_all 'load_resource_instance' do
@@ -204,6 +206,8 @@ module ADSL
         end
 
         def instrument_ability
+          return unless cancan_exists?
+
           CanCan::Ability.class_eval <<-ruby
             def rails_extractor
               ObjectSpace._id2ref #{ self.object_id }
@@ -221,6 +225,12 @@ module ADSL
             def process_ability_declaration(declaration, actions, subject, conditions_hash, &block)
               return if ::ADSL::Extract::Instrumenter.get_instance.nil?
               return if ::ADSL::Extract::Instrumenter.get_instance.ex_method.nil?
+
+              if subject.is_a? Array
+                return subject.map do |sub|
+                  process_ability_declaration declaration, actions, sub, conditions_hash, &block
+                end
+              end
               
               if subject == :all
                 return rails_extractor.ar_classes.map do |klass|
@@ -258,7 +268,7 @@ module ADSL
                   expr = subject.new :adsl_ast => ASTCurrentUser.new
                 elsif equality_lhs.is_a?(ASTMemberAccess) && equality_lhs.objset == :subject
                   name = equality_lhs.member_name.text.to_sym
-                  reflection = subject.reflections[name]
+                  reflection = subject.reflections[name] || subject.reflections[name.to_s]
 
                   inverse_refs = CanCanExtractor.login_class.reflections.values.select do |r|
                     r.class_name == subject.name && r.foreign_key == reflection.foreign_key
@@ -291,7 +301,7 @@ module ADSL
         end
 
         def authorization_defined?
-          cancan_exists?
+          cancan_exists? || devise_exists? || Object.lookup_const('User')
         end
         
         def cancan_exists?
@@ -394,12 +404,13 @@ module ADSL
             def add_role(role_name, resource = nil)
               rails_extractor = ObjectSpace._id2ref(#{ self.object_id })
               rails_extractor.define_usergroup role_name
+              raise unless self.has_role? role_name
             end
           add_role
         end
 
         def prepare_cancan_instrumentation
-          return unless cancan_exists?
+          return unless authorization_defined?
 
           define_login_class
           define_usergroups

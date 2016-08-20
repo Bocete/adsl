@@ -671,4 +671,17 @@ class BasicTest < ActiveSupport::TestCase
       rule false
     ADSL
   end
+
+  def test__delete_subset
+    adsl_assert :correct, <<-ADSL
+      class Class {
+        0+ Class2 ref
+      }
+      class Class2 {}
+      action blah {
+        delete(subset(Class))
+      }
+      invariant forall(Class c: not isempty(c.ref))
+    ADSL
+  end
 end

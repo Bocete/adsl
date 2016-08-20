@@ -259,7 +259,13 @@ module ADSL
       end
 
       def self.typecheck_and_resolve_assignment(context, var_name, ds_expr)
+        # assignments to booleans are not supported yet
+        unless ds_expr.type_sig.is_objset_type?
+          raise ADSLError, "Assignments to booleans are not supported (var name #{ var_name.text })"
+        end
+
         var = ADSL::DS::DSVariable.new :name => var_name.text, :type_sig => ds_expr.type_sig
+
         context.redefine_var var, var_name
         assignment = ADSL::DS::DSAssignment.new :var => var, :expr => ds_expr
         var_read = ADSL::DS::DSVariableRead.new :variable => var

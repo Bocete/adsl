@@ -149,7 +149,7 @@ module ADSL
 
     class ASTDeleteObj < ASTNode
       def to_adsl
-        "delete #{ @objset.to_adsl }"
+        "delete(#{ @objset.to_adsl })"
       end
     end
 
@@ -179,19 +179,19 @@ module ADSL
 
     class ASTSubset < ASTNode
       def to_adsl
-        "subset #{ @objset.to_adsl }"
+        "subset(#{ @objset.to_adsl })"
       end
     end
     
     class ASTTryOneOf < ASTNode
       def to_adsl
-        "tryoneof #{ @objset.to_adsl }"
+        "tryoneof(#{ @objset.to_adsl })"
       end
     end
 
     class ASTOneOf < ASTNode
       def to_adsl
-        "oneof #{ @objset.to_adsl }"
+        "oneof(#{ @objset.to_adsl })"
       end
     end
     

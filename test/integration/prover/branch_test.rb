@@ -609,4 +609,20 @@ class BranchTest < ActiveSupport::TestCase
       invariant not exists(Class o, Class o2, Class o3: o2 in o.rel and o3 in o.rel and o2 != o3)
     ADSL
   end
+
+  def test_oneof_in_branch_is_tied_to_prestate
+    adsl_assert :correct, <<-ADSL
+      class Class {
+        0+ Class2 rel
+      }
+      class Class2 {}
+      action blah {
+        if * {
+          var = create Class
+          var.rel = oneof Class2
+        }
+      }
+      invariant forall(Class c: not isempty(c.rel))
+    ADSL
+  end
 end

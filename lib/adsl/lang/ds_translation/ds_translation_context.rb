@@ -91,9 +91,9 @@ module ADSL
               raise ADSLError, "Unmatched type signatures '#{ old_var.type_sig }' and  '#{ var.type_sig }' for variable '#{var.name}' on line #{node.lineno}"
             end
             var.type_sig = type_sig
-  
+            
             frame[var.name][1] = var
-  
+
             @stack_frame_stack[frame_index..-1].reverse.each do |subframe|
               subframe.fire_write_event var.name
             end
@@ -107,16 +107,16 @@ module ADSL
           @stack_frame_stack.length.times do |index|
             frame = @stack_frame_stack[index]
             next if frame[name].nil?
-            var = frame[name]
+            node, var = frame[name]
   
             if fire_read_event
               @stack_frame_stack[index..-1].reverse.each do |subframe|
                 subframe.fire_read_event name
               end
             end
-  
+
             # handle events here, none defined atm
-            return var
+            return node, var
           end
           nil
         end

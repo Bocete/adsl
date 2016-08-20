@@ -192,7 +192,8 @@ class Module
     lookup_container = self
     const.to_s.split('::').each do |portion|
       portion = 'Object' if portion.empty?
-      return nil unless lookup_container.const_defined? portion
+      defined = lookup_container.const_defined? portion rescue false
+      return nil unless defined
       lookup_container = lookup_container.const_get portion
     end
     lookup_container

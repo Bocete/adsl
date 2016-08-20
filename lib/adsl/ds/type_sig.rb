@@ -107,15 +107,14 @@ module ADSL
 
         UNKNOWN = BasicType.new nil
         BOOL    = BasicType.new :bool
-        STRING  = BasicType.new :string
-        INT     = BasicType.new :int
-        DECIMAL = BasicType.new :decimal, BasicType::INT
-        REAL    = BasicType.new :real, BasicType::INT, BasicType::DECIMAL
+        # STRING  = BasicType.new :string
+        # INT     = BasicType.new :int
+        # DECIMAL = BasicType.new :decimal, BasicType::INT
+        # REAL    = BasicType.new :real, BasicType::INT, BasicType::DECIMAL
 
         def self.for_sym(sym)
           return BasicType::UNKNOWN if sym == :unknown
-          return nil unless [:bool, :string, :int, :decimal, :real].include? sym
-          BasicType.const_get sym.to_s.upcase
+          BasicType.const_get sym.to_s.upcase if sym == :bool
         end
       end
 
@@ -338,7 +337,7 @@ module ADSL
         raise_on_incorrect = (true == args.last || false == args.last) ? args.pop : true
         injected = args.inject &:&
         if injected.is_invalid_type? && raise_on_incorrect
-          raise OncompatibleTypesException.new *args
+          raise IncompatibleTypesException.new *args
         end
         injected
       end

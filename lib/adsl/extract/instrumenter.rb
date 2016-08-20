@@ -91,6 +91,7 @@ module ADSL
           result = s(:call, nil, :ins_call, original_object, s(:lit, original_method_name), *original_args)
           if result.sexp_body.last.sexp_type == :block_pass
             block = result.last.sexp_body[0]
+            
             if block.sexp_type == :lit
               result = s(:iter, result[0..-2], s(:args, :e), s(:call, nil, :ins_call, s(:call, nil, :e), block))
             else
@@ -179,7 +180,7 @@ module ADSL
               sexp = convert_root_defs_into_defn sexp
 
               instrumented_sexp = instrument_sexp sexp
-              
+
               new_code = Ruby2Ruby.new.process instrumented_sexp
 
               object.replace_method method_name, new_code

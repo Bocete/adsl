@@ -87,12 +87,12 @@ module ADSL
 
         def type_example
           case @ds_type
-          when BasicType::INT
-            1
-          when BasicType::DECIMAL, BasicType::REAL
-            1.5
-          when BasicType::STRING
-            'string'
+          # when BasicType::INT
+          #   1
+          # when BasicType::DECIMAL, BasicType::REAL
+          #   1.5
+          #when BasicType::STRING
+          #  'string'
           when BasicType::BOOL
             true
           else
@@ -102,10 +102,10 @@ module ADSL
 
         def adsl_ast
           case @ds_type
-          when BasicType::INT, BasicType::DECIMAL, BasicType::REAL
-            ADSL::Lang::ASTNumber.new :value => nil
-          when BasicType::STRING
-            ADSL::Lang::ASTString.new :value => nil
+          # when BasicType::INT, BasicType::DECIMAL, BasicType::REAL
+          #   ADSL::Lang::ASTNumber.new :value => nil
+          # when BasicType::STRING
+          #   ADSL::Lang::ASTString.new :value => nil
           when BasicType::BOOL
             ADSL::Lang::ASTBoolean.new :bool_value => nil
           else

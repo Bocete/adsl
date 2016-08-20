@@ -65,7 +65,7 @@ class ADSL::DS::TypeSigTest < ActiveSupport::TestCase
 
     assert ADSL::DS::TypeSig::UNKNOWN.is_unknown_type?
 
-    assert_false ADSL::DS::TypeSig::BasicType::INT.is_unknown_type?
+#    assert_false ADSL::DS::TypeSig::BasicType::INT.is_unknown_type?
     assert_false ADSL::DS::TypeSig::BasicType::BOOL.is_unknown_type?
   end
 
@@ -75,7 +75,7 @@ class ADSL::DS::TypeSigTest < ActiveSupport::TestCase
 
     assert_false ADSL::DS::TypeSig::UNKNOWN.is_bool_type?
 
-    assert_false ADSL::DS::TypeSig::BasicType::INT.is_bool_type?
+#    assert_false ADSL::DS::TypeSig::BasicType::INT.is_bool_type?
     assert       ADSL::DS::TypeSig::BasicType::BOOL.is_bool_type?
   end
 
@@ -87,21 +87,7 @@ class ADSL::DS::TypeSigTest < ActiveSupport::TestCase
 
     assert_false ADSL::DS::TypeSig::UNKNOWN.is_objset_type?
 
-    assert_false ADSL::DS::TypeSig::BasicType::INT.is_objset_type?
+#    assert_false ADSL::DS::TypeSig::BasicType::INT.is_objset_type?
     assert_false ADSL::DS::TypeSig::BasicType::BOOL.is_objset_type?
-  end
-
-  def test_type_sig__basic_type__hierarchy
-    assert BasicType::INT < BasicType::REAL
-    assert BasicType::INT < BasicType::DECIMAL
-    assert BasicType::DECIMAL < BasicType::REAL
-    assert_false BasicType::BOOL < BasicType::INT
-    assert_false BasicType::BOOL > BasicType::INT
-  end
-
-  def test_type_sig__basic_type__join
-    assert_equal BasicType::DECIMAL, BasicType::DECIMAL & BasicType::INT
-    assert_equal BasicType::REAL, BasicType::DECIMAL & BasicType::REAL
-    assert (BasicType::DECIMAL & BasicType::STRING).is_invalid_type?
   end
 end

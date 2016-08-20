@@ -241,8 +241,9 @@ module ADSL
         @exprs = @exprs.map do |stmt|
           stmt.is_a?(ASTBlock) ? stmt.exprs : [stmt]
         end.flatten(1)
+
         @exprs = @exprs[0..-2].select(&:has_side_effects?) + [@exprs.last]
-        
+
         return @exprs.first if @exprs.length == 1
 
         self
@@ -285,6 +286,8 @@ module ADSL
           when false
             return ASTRaise.new
           end
+        elsif @formula.is_a? ASTEmptyObjset
+          return ASTRaise.new
         end
 
         self
@@ -356,6 +359,15 @@ module ADSL
           return ASTBlock.new :exprs => [ @condition, ASTEmptyObjset::INSTANCE ] if @condition.has_side_effects?
           return ASTEmptyObjset::INSTANCE
         end
+
+        if @then_expr.noop?
+          t = @then_expr
+          @then_expr = @else_expr
+          @else_expr = t
+          @condition = ASTNot.new(:subformula => @condition).optimize
+        end
+
+        flush_halting_status
 
         return (ASTBlock.new :exprs => [@condition, @then_expr]).optimize if @then_expr == @else_expr
 
@@ -574,6 +586,8 @@ module ADSL
           when nil
             return @subformula
           end
+        elsif @subformula.is_a? ASTEmptyObjset
+          return ASTBoolean.new :bool_value => true
         end
 
         self

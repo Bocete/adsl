@@ -102,12 +102,19 @@ module ADSL
       end
 
       def translate
-        tasks = gen_problems
+        @ds = input_ds
+        problems = gen_problems
+
+        provers.each do |p|
+          ADSL::Prover::Engine.load_engine p
+        end
         
-        tasks.each do |action, invariant|
-          fol = @ds.translate_action action.name, invariant
+        problems.each do |action, problem|
+          translation = @ds.translate_action action.name, problem
+          fol = translation.to_fol
           provers.each do |p|
-            puts fol.send "to_#{p}_string"
+            lang = p.to_s == 'spass' ? 'spass' : 'smt2'
+            puts fol.send "to_#{ lang }_string"
             puts
           end
         end

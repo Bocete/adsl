@@ -79,7 +79,7 @@ class ADSL::Extract::BranchVerificationTest < ADSL::Extract::Rails::RailsInstrum
   def test__branch_conditions_decide_branch_choice
     AsdsController.class_exec do
       def nothing
-        if true
+        if Asd.all.empty? 
         else
           Asd.build
         end
@@ -91,7 +91,7 @@ class ADSL::Extract::BranchVerificationTest < ADSL::Extract::Rails::RailsInstrum
     ruby
     extractor.extract_all_actions
     ast = extractor.adsl_ast
-    
+
     assert verify :ast => ast, :verify_options => verify_options_for(:AsdsController__nothing)
   end
   

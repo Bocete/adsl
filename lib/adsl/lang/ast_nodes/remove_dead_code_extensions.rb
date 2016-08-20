@@ -267,7 +267,7 @@ module ADSL
 
     class ASTRaise
       def gen_halting_status
-        HaltingStatus.new :raises => :always
+        HaltingStatus.new :raises => :always, :returns => :never
       end
     end
 

@@ -90,6 +90,7 @@ module ADSL::DS
       def test_generate_problems_simple_reads
         spec = ADSLParser.new.parse <<-adsl
           authenticable class Class {}
+          permit create Class
           action blah {
             at__x = allof(Class)
           }
@@ -102,6 +103,7 @@ module ADSL::DS
         spec = ADSLParser.new.parse <<-adsl
           authenticable class Class {}
           class Class2 {}
+          permit create Class
           action blah {
             foreach v: allof(Class) {
               at__y = allof(Class2)

@@ -186,7 +186,7 @@ module ADSL
       end
     end
 
-    class DSForEachCommon < DSNode
+    class DSForEach < DSNode
       def effect_domain_analysis(context, info)
         types, local = @objset.objset_effect_domain_analysis(context, info)
         info.read types, local

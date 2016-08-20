@@ -78,16 +78,22 @@ module ADSL
           when :has_and_belongs_to_many
             join_table = reflection.options[:join_table] || reflection.join_table
             return nil unless join_table.present?
+            join_table = join_table.to_s
 
             candidates = target_class.constantize.reflections.values.select do |r|
-              r.macro == :has_and_belongs_to_many && r.options[:join_table] == join_table
+              next unless r.macro == :has_and_belongs_to_many
+              other_join_table = (r.options[:join_table] || r.join_table).to_s
+              other_join_table == join_table && r.foreign_key == reflection.association_foreign_key
             end
+
             if candidates.empty?
               nil
             else 
               origin_str = "#{ reflection.active_record.name }.#{ assoc_name }"
               candidates_str = candidates.map{ |c| "#{ c.active_record.name }.#{ c.name }" }.join(', ')
-              raise ExtractionError, "#{candidates.length} opposite relations found for #{origin_str} over join table #{join_table}: #{candidates_str}" if candidates.length > 1
+              if candidates.length > 1
+                raise ExtractionError, "#{candidates.length} opposite relations found for #{origin_str} over join table #{join_table}: #{candidates_str}"
+              end
               foreign_name = candidates.first.name.to_s
               assoc_name < foreign_name ? nil : foreign_name
             end
@@ -187,9 +193,11 @@ module ADSL
             include ADSL::Lang
 
             attr_accessor :adsl_ast
-            attr_accessible :adsl_ast if respond_to? :attr_accessible
+            attr_accessible :adsl_ast if respond_to?(:attr_accessible) and Object.lookup_const('ActiveModel::DeprecatedMassAssignmentSecurity').nil?
 
             def initialize(attributes = {}, options = {})
+              attributes ||= {}
+              options ||= {}
               raise ExtractionError if attributes[:adsl_ast].is_a? Class
               attributes = {} if attributes.is_a?(MetaUnknown)
               adsl_ast_attributes = {
@@ -210,7 +218,16 @@ module ADSL
             def reorder(*args);   self; end
             def includes(*args);  self; end
             def all(*args);       self; end
+            def joins(*args);     self; end
+            def group(*args);     self; end
+            def compact(*args);   self; end
+            def group_by(*args);  self; end
+            def values_at(*args); self; end
+            def uniq(*args);      self; end
+            def pluck(*args);     self; end
             def scope_for_create; self; end
+            def sort(*args);      self; end
+            def reverse(*args);   self; end
             def id;               self; end   # used to allow foreign key assignment
             def records;          self; end   # elasticsearch
 
@@ -226,12 +243,20 @@ module ADSL
             end
 
             def take(*params)
+              self.class.new :adsl_ast => ASTTryOneOf.new(:objset => self.adsl_ast)
+            end
+            alias_method :first,   :take
+            alias_method :last,    :take
+            alias_method :find_by, :take
+
+            def take!(*params)
               self.class.new :adsl_ast => ASTOneOf.new(:objset => self.adsl_ast)
             end
-            alias_method :take!, :take
-            alias_method :first, :take
-            alias_method :last,  :take
-            alias_method :find,  :take
+            alias_method :first!,   :take!
+            alias_method :last!,    :take!
+            alias_method :find,     :take!
+            alias_method :find!,    :take!
+            alias_method :find_by!, :take!
 
             def where(*args)
               self.class.new :adsl_ast => ASTSubset.new(:objset => self.adsl_ast)
@@ -242,6 +267,13 @@ module ADSL
             alias_method :limit,    :where
             alias_method :paginate, :where    # will_paginate
             alias_method :page,     :where    # will_paginate
+            alias_method :per,      :where    # kaminari (paginate)
+            alias_method :select,   :where
+            alias_method :keep_if,  :where
+            alias_method :reject,   :where
+            alias_method :offset,   :where
+            alias_method :result,   :where
+
             def merge(other)
               if other.adsl_ast.is_a? ASTAllOf
                 self
@@ -258,8 +290,8 @@ module ADSL
               end
             end
 
-            def joins(*args)
-              self
+            def unscoped
+              self.class.all
             end
 
             def apply_finder_options(options)
@@ -269,6 +301,7 @@ module ADSL
             def empty?
               ASTIsEmpty.new :objset => self.adsl_ast
             end
+            alias_method :!, :empty?
 
             def any?(&block)
               if block_given?
@@ -277,6 +310,7 @@ module ADSL
                 ASTNot.new :subformula => empty?
               end
             end
+            alias_method :exists?, :any?
 
             def +(other)
               return self unless other.respond_to?(:adsl_ast)
@@ -329,7 +363,7 @@ module ADSL
             end
 
             def method_missing(method, *args, &block)
-              if without_by = ActiveRecordMetaclassGenerator.remove_by_from_method(method)
+              if without_by = ActiveRecordMetaclassGenerator.remove_by_from_method(method) and self.respond_to?(without_by)
                 self.send(without_by)
               # maybe this is a scope invocation?
               elsif self.class.respond_to? method
@@ -361,6 +395,29 @@ module ADSL
             end
             alias_method :create, :build
             alias_method :create!, :build
+
+            def first_or_initialize(*args)
+              if self.adsl_ast.is_a? ASTMemberAccess
+                self.class.new(:adsl_ast => ASTIf.new(
+                  :condition => ADSL::Lang::ASTIsEmpty.new(:objset => self.adsl_ast),
+                  :then_expr => self.build.adsl_ast,
+                  :else_expr => ADSL::Lang::ASTOneOf.new(:objset => self.adsl_ast)
+                ))
+              else
+                var_name = 'longanduniqvarname' 
+                self.class.new(:adsl_ast => ASTBlock.new(:exprs => [
+                  ASTAssignment.new(:var_name => ASTIdent[var_name], :expr => self.adsl_ast),
+                  ASTIf.new(
+                    :condition => ADSL::Lang::ASTIsEmpty.new(:objset => ASTVariableRead.new(:var_name => ASTIdent[var_name])),
+                    :then_expr => ADSL::Lang::ASTCreateObjset.new(:class_name => ASTIdent[self.class.adsl_ast_class_name]),
+                    :else_expr => ADSL::Lang::ASTOneOf.new(:objset => ASTVariableRead.new(:var_name => ASTIdent[var_name]))
+                  )
+                ]))
+              end
+            end
+            alias_method :create_or_update, :first_or_initialize
+            alias_method :find_or_create, :first_or_initialize
+            alias_method :find_or_instantiator_by_attributes, :first_or_initialize
             
             # note that this method does not apply to objsets
             # acquired using :through associations
@@ -409,7 +466,7 @@ module ADSL
               alias_method :pluck,   :calculate
 
               def find(*args)
-                self.all.take *args
+                self.all.find *args
                 # TODO this should ensure lookups using params[:id] return the same result every time. Doesnt work
                 # if args.length == 1 && args[0].is_a?(ADSL::Extract::Rails::MetaUnknown) && args[0].label
                 #   # presume we're loading this using params with key supplied in label
@@ -433,14 +490,32 @@ module ADSL
               end
               alias_method :find_by, :find
 
+              def find!(*args)
+                self.all.find args
+              end
+
               def where(*args)
                 self.all.where *args
               end
-              alias_method :only,   :where
-              alias_method :except, :where
-              alias_method :my,     :where
-              alias_method :limit,  :where
-              alias_method :search, :where    # elasticsearch
+              alias_method :only,     :where
+              alias_method :except,   :where
+              alias_method :my,       :where
+              alias_method :limit,    :where
+              alias_method :offset,   :where
+              alias_method :search,   :where    # elasticsearch
+              alias_method :paginate, :where    # elasticsearch
+              alias_method :result,   :where
+
+              def find_or_create_by(*args)
+                allof = ADSL::Lang::ASTAllOf.new(:class_name => ASTIdent[adsl_ast_class_name])
+                self.new :adsl_ast => ASTIf.new(
+                  :condition => ADSL::Lang::ASTBoolean.new(:bool_value => nil),
+                  :then_expr => ADSL::Lang::ASTCreateObjset.new(:class_name => ASTIdent[adsl_ast_class_name]),
+                  :else_expr => ADSL::Lang::ASTOneOf.new(:objset => allof.dup)
+                )
+              end
+              alias_method :find_or_create, :find_or_create_by
+              alias_method :find_or_instantiator_by_attributes, :find_or_create_by
 
               def select(*args)
                 self
@@ -463,6 +538,14 @@ module ADSL
                 )
                 self.new(:adsl_ast => adsl_ast)
               end
+              alias_method :create_of_update, :first_or_create
+              
+              def any?
+                self.all.any?
+              end
+              alias_method :exists?, :any?
+
+              def update_all(*args); nil; end
 
               include ADSL::Extract::Rails::ActiveRecordMetaclassLookups
             end
@@ -471,21 +554,22 @@ module ADSL
           create_destroys @ar_class
 
           @ar_class.send :default_scope, lambda{ @ar_class.all }
+          
           serialized_attributes = @ar_class.serialized_attributes.keys
           @ar_class.columns_hash.each do |name, column|
             next if name.split('_').last == 'id'
             
             type = case column.type
-                   when :integer
-                     ADSL::DS::TypeSig::BasicType::INT
-                   when :text, :string
-                     ADSL::DS::TypeSig::BasicType::STRING
+                   # when :integer
+                   #   ADSL::DS::TypeSig::BasicType::INT
+                   # when :text, :string
+                   #   ADSL::DS::TypeSig::BasicType::STRING
                    when :boolean
                      ADSL::DS::TypeSig::BasicType::BOOL
-                   when :decimal
-                     ADSL::DS::TypeSig::BasicType::DECIMAL
-                   when :float, :real, :double
-                     ADSL::DS::TypeSig::BasicType::REAL
+                   # when :decimal
+                   #   ADSL::DS::TypeSig::BasicType::DECIMAL
+                   # when :float, :real, :double
+                   #   ADSL::DS::TypeSig::BasicType::REAL
                    else
                      nil
                    end
@@ -518,7 +602,7 @@ module ADSL
           end
 
           reflections(:polymorphic => false, :through => false).each do |assoc|
-            @ar_class.new.replace_method assoc.name do
+            @ar_class.new.replace_method assoc.name do |*args|
               self_adsl_ast = self.adsl_ast
               target_class = assoc.class_name.constantize
               result = target_class.new :adsl_ast => ASTMemberAccess.new(
@@ -550,17 +634,11 @@ module ADSL
                 end
               elsif assoc.macro == :has_and_belongs_to_many
                 result.singleton_class.send :define_method, :delete do |*args|
-                  object = if args.empty?
-                    self
-                  elsif args.length == 1
-                    self.find
-                  else
-                    self.where
-                  end
+                  object = ASTUnion.new(:objsets => args.map(&:try_adsl_ast))
                   [ASTDeleteTup.new(
                     :objset1 => self_adsl_ast.dup,
                     :rel_name => ASTIdent.new(:text => assoc.name.to_s),
-                    :objset2 => object.adsl_ast
+                    :objset2 => object
                   )]
                 end
               end

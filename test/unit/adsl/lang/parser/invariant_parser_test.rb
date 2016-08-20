@@ -133,6 +133,20 @@ module ADSL::Lang
           end  
         end
       end
+
+      def test_invariant__isempty_equals_precedence
+        parser = ADSLParser.new
+        spec = parser.parse <<-ADSL
+          class Class {}
+          class Class2 {}
+          invariant isempty(Class) == isempty(Class2)
+        ADSL
+
+        invariant = spec.invariants.first
+        assert_equal DSEqual, invariant.formula.class
+        assert_equal DSIsEmpty, invariant.formula.exprs[0].class
+        assert_equal DSIsEmpty, invariant.formula.exprs[1].class
+      end
   
       def test_invariant__forall_and_exists_can_use_objsets
         parser = ADSLParser.new

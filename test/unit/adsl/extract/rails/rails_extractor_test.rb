@@ -479,12 +479,18 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
 
     assert_equal 2, exprs.length
 
-    assert_equal ASTAssignment, exprs[0].class
-    assert_equal 'at__a',       exprs[0].var_name.text
-    assert_equal ASTOneOf,      exprs[0].expr.class
-    assert_equal ASTAllOf,      exprs[0].expr.objset.class
-    assert_equal 'Asd',         exprs[0].expr.objset.class_name.text
-
+    assert_equal ASTAssignment,   exprs[0].class
+    assert_equal 'at__a',         exprs[0].var_name.text
+    assert_equal ASTIf,           exprs[0].expr.class
+    assert_equal ASTIsEmpty,      exprs[0].expr.condition.class
+    assert_equal ASTVariableRead, exprs[0].expr.condition.objset.class
+    assert_equal 'at__a',         exprs[0].expr.condition.objset.var_name.text
+    assert_equal ASTOneOf,        exprs[0].expr.then_expr.class
+    assert_equal ASTAllOf,        exprs[0].expr.then_expr.objset.class
+    assert_equal 'Asd',           exprs[0].expr.then_expr.objset.class_name.text
+    assert_equal ASTVariableRead, exprs[0].expr.else_expr.class
+    assert_equal 'at__a',         exprs[0].expr.else_expr.var_name.text
+    
     assert_equal ASTAssignment, exprs[1].class
     assert_equal 'at__a',       exprs[1].var_name.text
     assert_equal ASTSubset,     exprs[1].expr.class
@@ -1242,8 +1248,8 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal ASTIf,          exprs[0].expr.class
     assert_equal ASTBoolean,     exprs[0].expr.condition.class
     assert_equal nil,            exprs[0].expr.condition.bool_value
-    assert_equal ASTEmptyObjset, exprs[0].expr.then_expr.class
-    assert_equal ASTAllOf,       exprs[0].expr.else_expr.class
+    assert_equal ASTAllOf,       exprs[0].expr.then_expr.class
+    assert_equal ASTEmptyObjset, exprs[0].expr.else_expr.class
 
     assert_equal ASTDeleteObj,    exprs[1].class
     assert_equal ASTVariableRead, exprs[1].objset.class
@@ -1450,16 +1456,15 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 'at__kme',        ast.expr.exprs[0].var_name.text
 
     assert_equal ASTIf,            ast.expr.exprs[1].class
-    assert_equal ASTNot,           ast.expr.exprs[1].condition.class
-    assert_equal ASTIsEmpty,       ast.expr.exprs[1].condition.subformula.class
-    assert_equal ASTSubset,        ast.expr.exprs[1].condition.subformula.objset.class
-    assert_equal ASTEmptyObjset,   ast.expr.exprs[1].then_expr.class
-    assert_equal ASTBlock,         ast.expr.exprs[1].else_expr.class
-    assert_equal 3,                ast.expr.exprs[1].else_expr.exprs.length
-    assert_equal ASTAssignment,    ast.expr.exprs[1].else_expr.exprs[0].class
-    assert_equal 'at__kme',        ast.expr.exprs[1].else_expr.exprs[0].var_name.text
-    assert_equal ASTAssertFormula, ast.expr.exprs[1].else_expr.exprs[1].class
-    assert_equal ASTEmptyObjset,   ast.expr.exprs[1].else_expr.exprs[2].class
+    assert_equal ASTIsEmpty,       ast.expr.exprs[1].condition.class
+    assert_equal ASTSubset,        ast.expr.exprs[1].condition.objset.class
+    assert_equal ASTEmptyObjset,   ast.expr.exprs[1].else_expr.class
+    assert_equal ASTBlock,         ast.expr.exprs[1].then_expr.class
+    assert_equal 3,                ast.expr.exprs[1].then_expr.exprs.length
+    assert_equal ASTAssignment,    ast.expr.exprs[1].then_expr.exprs[0].class
+    assert_equal 'at__kme',        ast.expr.exprs[1].then_expr.exprs[0].var_name.text
+    assert_equal ASTAssertFormula, ast.expr.exprs[1].then_expr.exprs[1].class
+    assert_equal ASTEmptyObjset,   ast.expr.exprs[1].then_expr.exprs[2].class
   end
 
   def test_extract__block_pass
@@ -1496,5 +1501,30 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
       assert_equal ASTDeleteObj, stmt.class
     end
     assert_equal ASTEmptyObjset, loop_body[3].class
+  end
+
+  def test_extract__bool_vars_unsupported
+    AsdsController.class_exec do
+      def nothing
+        @asd1 = Asd.where
+        @asd2 = true
+        @asd3 = Asd.find
+      end
+    end
+
+    extractor = create_rails_extractor
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+
+    exprs = ast.expr.exprs
+
+    assert_equal 2, exprs.length
+    
+    assert_equal ASTAssignment, exprs[0].class
+    assert_equal 'at__asd1',    exprs[0].var_name.text
+    assert_equal ASTSubset,     exprs[0].expr.class
+    
+    assert_equal ASTAssignment, exprs[1].class
+    assert_equal 'at__asd3',    exprs[1].var_name.text
+    assert_equal ASTOneOf,      exprs[1].expr.class
   end
 end

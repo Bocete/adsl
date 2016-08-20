@@ -13,7 +13,7 @@ module ADSL
 
         if access_control
           action = find_action_by_name action_name
-          if auth_class && action
+          if auth_class && action && @ac_rules.any?
             # creates
             sigs = action.recursively_gather do |elem|
               elem.klass.to_sig if elem.is_a? DSCreateObj

@@ -170,7 +170,9 @@ module ADSL
               sexp[1][1] == nil &&
               [:collection_action, :member_action, :page_action].include?(sexp[1][2])
             )
-            s(:defn, sexp[1][3][1], sexp[2], sexp[3])
+            args = sexp[2]
+            args = s(:args) if args == 0
+            s(:defn, sexp[1][3][1], args, sexp[3])
           end
         end
 

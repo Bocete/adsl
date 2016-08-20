@@ -442,36 +442,43 @@ module ADSL
         
         translation.reserve context.make_ps do |ps|
           translation.reserve sort, :o do |o|
+            deleted_pred = translation.create_predicate "deleted_objset", *context.sort_array, @objset.type_sig.to_sort
+
+            translation.create_formula ForAll[ps, o, Equiv[
+              deleted_pred[ps, o],
+              @objset.resolve_expr(translation, ps, o)
+            ]]
+
             translation.create_formula ForAll.new(ps, o,
               Equiv.new(
                 post_state[ps, o],
-                And.new(pre_state[ps, o], Not.new(@objset.resolve_expr(translation, ps, o)))
+                And.new(pre_state[ps, o], Not.new(deleted_pred[ps, o]))
               )
             )
+
+            relations = type_sig.classes.map(&:relations).flatten.uniq
+            relevant_relations = relations.map do |r|
+              relevant_links = []
+              relevant_links << r.left_link  if type_sig.classes.any?{ |klass| r.from_class >= klass }
+              relevant_links << r.right_link if type_sig.classes.any?{ |klass| r.to_class >= klass }
+              [r, relevant_links]
+            end.select{ |r, links| links.any? }
+
+            translation.create_formula ForAll.new(ps, Implies.new(
+              translation.current_loop_context.type_pred(ps),
+              And[relevant_relations.map do |rel, links|
+                translation.reserve rel, :r do |r|
+                  ForAll[r, Equiv[
+                    post_state[ps, r],
+                    And[
+                      pre_state[ps, r],
+                      links.map{ |link| Not[deleted_pred[ps, link[r]]] }
+                    ]
+                  ]]
+                end
+              end]
+            ))
           end
-
-          relations = type_sig.classes.map(&:relations).flatten.uniq
-          relevant_relations = relations.map do |r|
-            relevant_links = []
-            relevant_links << r.left_link  if type_sig.classes.any?{ |klass| r.from_class >= klass }
-            relevant_links << r.right_link if type_sig.classes.any?{ |klass| r.to_class >= klass }
-            [r, relevant_links]
-          end.select{ |r, links| links.any? }
-
-          translation.create_formula ForAll.new(ps, Implies.new(
-            translation.current_loop_context.type_pred(ps),
-            And[relevant_relations.map do |rel, links|
-              translation.reserve rel, :r do |r|
-                ForAll[r, Equiv[
-                  post_state[ps, r],
-                  And[
-                    pre_state[ps, r],
-                    links.map{ |link| Not[@objset.resolve_expr(translation, ps, link[r])] }
-                  ]
-                ]]
-              end
-            end]
-          ))
         end
 
         post_state.link_to_previous_state pre_state
@@ -490,22 +497,33 @@ module ADSL
         context = translation.current_loop_context
 
         translation.reserve context.make_ps, @relation.to_sort, :r, @objset1.type_sig, :o1, @objset2.type_sig, :o2 do |ps, r, o1, o2|
-          links_match = And.new(
-            @objset1.resolve_expr(translation, ps, @relation.left_link[r]),
-            @objset2.resolve_expr(translation, ps, @relation.right_link[r])
-          )
+          objset1_predicate = translation.create_predicate('create_tup_objset1', *context.sort_array, @objset1.type_sig.to_sort)
+          translation.create_formula ForAll[ps, o1, Equiv[
+            objset1_predicate[ps, o1],
+            @objset1.resolve_expr(translation, ps, o1)
+          ]]
+          objset2_predicate = translation.create_predicate('create_tup_objset2', *context.sort_array, @objset2.type_sig.to_sort)
+          translation.create_formula ForAll[ps, o2, Equiv[
+            objset2_predicate[ps, o2],
+            @objset2.resolve_expr(translation, ps, o2)
+          ]]
+          
+          links_match = 
           translation.create_formula FOL::ForAll.new(ps, r, FOL::Equiv.new(
             state[ps, r],
             Or.new(
               prev_state[ps, r],
-              links_match
+              And.new(
+                objset1_predicate[ps, @relation.left_link[r]],
+                objset2_predicate[ps, @relation.right_link[r]]
+              )
             )
           ))
           # this is needed because the quantification above does not force tuples to exist
           translation.create_formula FOL::ForAll.new(ps, o1, o2, FOL::Implies.new(
             And.new(
-              @objset1.resolve_expr(translation, ps, o1), 
-              @objset2.resolve_expr(translation, ps, o2)
+              objset1_predicate[ps, o1],
+              objset2_predicate[ps, o2]
             ),
             FOL::Exists.new(r, And.new(
               state[ps, r],
@@ -561,7 +579,7 @@ module ADSL
         translation.reserve context.make_ps do |ps|
           translation.create_formula FOL::ForAll.new(ps, FOL::Equiv.new(
             @condition_pred[ps],
-            @condition.resolve_expr(translation, ps, nil)
+            @condition.resolve_expr(translation, ps)
           ))
         end
         
@@ -569,6 +587,10 @@ module ADSL
    
         conditions  = [@condition_pred, @condition_pred.negate]
         pre_states  = [translation.create_state(:pre_then), translation.create_state(:pre_else)]
+        pre_states.each do |pre_state|
+          pre_state.link_to_previous_state prev_state
+        end
+        
         post_states = []
         
         blocks.length.times do |i|
