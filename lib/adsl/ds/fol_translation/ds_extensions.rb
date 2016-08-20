@@ -587,9 +587,6 @@ module ADSL
    
         conditions  = [@condition_pred, @condition_pred.negate]
         pre_states  = [translation.create_state(:pre_then), translation.create_state(:pre_else)]
-        pre_states.each do |pre_state|
-          pre_state.link_to_previous_state prev_state
-        end
         
         post_states = []
         
@@ -599,7 +596,7 @@ module ADSL
           post_states << translation.state
         end
         
-        affected_sorts = 2.times.map{ |i| pre_states[i].sort_difference(post_states[i]) }.flatten.uniq
+        affected_sorts = 2.times.map{ |i| pre_states[i].sort_difference(prev_state) }.flatten.uniq
 
         translation.state = @condition_state
         translation.reserve context.make_ps do |ps|

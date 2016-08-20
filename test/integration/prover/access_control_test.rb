@@ -10,14 +10,21 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
     ADSL
   end
 
-  def test_auth_test_triggered_if_auth_class_exists
+  def test_auth_test_triggered_if_auth_class_and_permits_exist
     adsl_assert :correct, <<-ADSL
       authenticable class User {}
       action blah {
       }
     ADSL
+    adsl_assert :correct, <<-ADSL
+      authenticable class User {}
+      action blah {
+        create(User)
+      }
+    ADSL
     adsl_assert :incorrect, <<-ADSL
       authenticable class User {}
+      permit read User
       action blah {
         create(User)
       }
@@ -40,22 +47,24 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
   def test_create_needs_permission
     adsl_assert :incorrect, <<-ADSL
       authenticable class User {}
+      permit read User
       action blah {
         create(User)
       }
     ADSL
     adsl_assert :correct, <<-ADSL
       authenticable class User {}
+      permit create allof(User)
       action blah {
         create(User)
       }
-      permit create allof(User)
     ADSL
   end
 
   def test_delete_needs_permission
     adsl_assert :incorrect, <<-ADSL
       authenticable class User {}
+      permit read User
       action blah {
         delete allof(User)
       }
@@ -81,27 +90,27 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
   def test_edit_implies_create_or_delete
     adsl_assert :incorrect, <<-ADSL
       authenticable class User {}
+      permit delete allof(User)
       action blah {
         create(User)
         delete oneof(allof(User))
       }
-      permit delete allof(User)
     ADSL
     adsl_assert :incorrect, <<-ADSL
       authenticable class User {}
+      permit create allof(User)
       action blah {
         create(User)
         delete oneof(allof(User))
       }
-      permit create allof(User)
     ADSL
     adsl_assert :correct, <<-ADSL
       authenticable class User {}
+      permit edit allof(User)
       action blah {
         create(User)
         delete oneof(allof(User))
       }
-      permit edit allof(User)
     ADSL
   end
 
@@ -195,6 +204,7 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
   def test_read__basic
     adsl_assert :incorrect, <<-ADSL
       authenticable class User {}
+      permit create User
       action blah {
         at__v = allof(User)
       }

@@ -625,4 +625,23 @@ class BranchTest < ActiveSupport::TestCase
       invariant forall(Class c: not isempty(c.rel))
     ADSL
   end
+
+  def test_delete_deref_and_original_in_branch_when_defined_outside
+    adsl_assert :correct, <<-ADSL
+      class Class {
+        0+ Sub subs inverseof owner
+      }
+      class Sub {
+        0+ Class owner 
+      }
+      action blah {
+        var = oneof Class
+        if * {
+          delete var.subs
+          delete var
+        }
+      }
+      invariant forall(Sub s: not isempty(s.owner))
+    ADSL
+  end
 end

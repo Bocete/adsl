@@ -158,7 +158,7 @@ module ADSL
             :functions => @functions,
             :axioms => @formulae,
             :conjecture => And[@conjectures].optimize
-          )
+          ).optimize!
         end
 
       end
