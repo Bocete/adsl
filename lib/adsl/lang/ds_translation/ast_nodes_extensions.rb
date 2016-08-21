@@ -268,6 +268,10 @@ module ADSL
 
         context.redefine_var var, var_name
         assignment = ADSL::DS::DSAssignment.new :var => var, :expr => ds_expr
+
+        # even though we want to join types for the variable, we don't want to join the cardinality
+        var.type_sig = var.type_sig.with_cardinality ds_expr.type_sig.cardinality.dup if var.type_sig.is_a? ADSL::DS::TypeSig::ObjsetType
+        
         var_read = ADSL::DS::DSVariableRead.new :variable => var
         ADSL::Lang::DSTranslation::DSTranslationResult.new(
           :state_transitions => [assignment],

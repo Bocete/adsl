@@ -838,7 +838,7 @@ module ADSL
 
     class DSAssignment < DSNode
       def migrate_state(translation)
-        return if @expr.type_sig.is_objset_type? && @expr.type_sig.cardinality.empty?
+        return if @expr.type_sig.cardinality.empty?
        
         @var.define_variable_pred translation
 
@@ -871,7 +871,7 @@ module ADSL
 
     class DSVariableRead < DSNode
       def resolve_expr(translation, ps, var = nil)
-        return false if type_sig.is_objset_type? && type_sig.cardinality.empty?
+        return false if type_sig.cardinality.empty?
         @variable.resolve_expr(translation, ps, var)
       end
     end

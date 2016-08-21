@@ -644,4 +644,18 @@ class BranchTest < ActiveSupport::TestCase
       invariant forall(Sub s: not isempty(s.owner))
     ADSL
   end
+
+  def test_variables_in_branches_are_initialized
+    adsl_assert :correct, <<-ADSL
+      class A {}
+      action blah {
+        var = subset(A)
+        if * {
+          var = empty
+        }
+      }
+      invariant true
+    ADSL
+  end
 end
+
