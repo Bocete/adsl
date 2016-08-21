@@ -74,7 +74,7 @@ module ADSL
             RUBY
 
             controller_class.class_eval <<-ruby
-              def authenticate_#{role}!(*args); end
+              def authenticate_#{role}!(*args); @current_#{role} = current_#{role}; end
               def #{role}_signed_in?(*args); true; end
               def current_#{role}(*args); #{ current_user_code }; end
               def #{role}_session(*args); ::ADSL::Extract::MetaUnknown.new; end
