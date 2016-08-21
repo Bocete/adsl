@@ -203,7 +203,7 @@ module ADSL
       end
 
       def name
-        "ac read #{@expr.type_sig}"
+        "ac read #{@expr.variable.name}"
       end
       
       def to_adsl
