@@ -878,7 +878,6 @@ module ADSL
 
     class DSAllOf < DSNode
       def resolve_expr(translation, ps, var)
-        puts caller if translation.state.nil?
         FOL::And.new(translation.state[ps, var], @klass[var])
       end
     end

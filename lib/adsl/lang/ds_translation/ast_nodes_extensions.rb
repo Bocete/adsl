@@ -341,8 +341,6 @@ module ADSL
           :statements => assignment_result.state_transitions + block_result.state_transitions
         )
 
-        context.pop_frame
-
         vars_read_before_being_written_to.each do |var_name|
           vars_read_before_being_written_to.delete var_name unless vars_written_to.include? var_name
         end
@@ -378,12 +376,15 @@ module ADSL
         post_lambda_assignments = vars_needing_post_lambdas.map do |var_name|
           before_var_node, before_var = before_context.lookup_var var_name, false
           inside_var_node, inside_var = context.lookup_var var_name, false
+
           lambda_expr = ADSL::DS::DSForEachPostLambdaExpr.new(
             :for_each => for_each, :before_var => before_var, :inside_var => inside_var
           )
-          var = ADSL::DS::DSVariable.new :name => var_name, :type_sig => before_var.type_sig
+          var = ADSL::DS::DSVariable.new :name => var_name, :type_sig => ADSL::DS::TypeSig.join(before_var.type_sig, inside_var.type_sig)
           ADSL::DS::DSAssignment.new :var => var, :expr => lambda_expr
         end
+
+        context.pop_frame
 
         gen_translation_result(
           :state_transitions => [for_each] + post_lambda_assignments

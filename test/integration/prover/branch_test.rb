@@ -657,5 +657,19 @@ class BranchTest < ActiveSupport::TestCase
       invariant true
     ADSL
   end
+
+  def test_assignment_in_loop_with_branch
+    adsl_assert :correct, <<-ADSL
+      class Klass {}
+      class Klass2 {}
+      action blah {
+        foreach b: Klass {
+          a = create Klass2
+          if (*) {}
+        }
+      }
+      invariant true
+    ADSL
+  end
 end
 

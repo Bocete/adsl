@@ -177,7 +177,7 @@ module ADSL
           all_vars = vars_per_context.map{ |c| c.keys }.flatten.uniq
           packed = ActiveSupport::OrderedHash.new
           all_vars.each do |v|
-            packed[v] = vars_per_context.map{ |vpc| vpc[v][1] }
+            packed[v] = vars_per_context.select{ |vpc| vpc.include? v }.map{ |vpc| vpc[v][1] }
           end
           packed.delete_if { |v, vars| vars.uniq.length == 1 }
           packed
