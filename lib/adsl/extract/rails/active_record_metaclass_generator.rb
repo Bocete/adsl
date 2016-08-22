@@ -45,7 +45,9 @@ module ADSL
         end
 
         def self.adsl_ast_class_name(klass)
-          klass.name.sub('::', '_')
+          str = klass.is_a?(Class) ? klass.name : klass.to_s
+          str = str[2..-1] if str.start_with? '::'
+          str.gsub('::', '_')
         end
 
         def self.remove_by_from_method(method)
@@ -103,9 +105,9 @@ module ADSL
 
           ASTRelation.new(
             :cardinality => cardinality,
-            :to_class_name => ASTIdent.new(:text => target_class.sub('::', '_')),
+            :to_class_name => ASTIdent[ ActiveRecordMetaclassGenerator.adsl_ast_class_name target_class ],
             :name => ASTIdent.new(:text => assoc_name.to_s),
-            :inverse_of_name => (inverse_of.nil? ? nil : ASTIdent.new(:text => inverse_of.sub('::', '_')))
+            :inverse_of_name => (inverse_of.nil? ? nil : ASTIdent[ ActiveRecordMetaclassGenerator.adsl_ast_class_name inverse_of.to_s ])
           )
         end
 

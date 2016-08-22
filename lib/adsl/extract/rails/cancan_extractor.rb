@@ -183,24 +183,31 @@ module ADSL
 
           CanCan::ControllerResource.class_exec do
             def resource_instance=(instance)
+              var_name = ASTIdent["at__#{instance_name}"]
+              
               ins_explore_all 'load_resource_instance' do
-                var_name = ASTIdent["at__#{instance_name}"]
                 ASTAssignment.new(
                   :var_name => var_name,
                   :expr => instance.adsl_ast
                 )
               end
-              @controller.instance_variable_set("@#{instance_name}", instance)
+
+              var_read = instance.class.new :adsl_ast => ASTVariableRead.new(:var_name => var_name.dup)
+              @controller.instance_variable_set("@#{instance_name}", var_read)
             end
             
             def collection_instance=(instance)
+              var_name = ASTIdent["at__#{instance_name.to_s.pluralize}"]
+              
               ins_explore_all 'load_collection_instance' do
                 ASTAssignment.new(
-                  :var_name => ASTIdent["at__#{instance_name.to_s.pluralize}"],
+                  :var_name => var_name,
                   :expr => instance.adsl_ast
                 )
               end
-              @controller.instance_variable_set("@#{instance_name.to_s.pluralize}", instance)
+
+              var_read = instance.class.new :adsl_ast => ASTVariableRead.new(:var_name => var_name.dup)
+              @controller.instance_variable_set("@#{instance_name.to_s.pluralize}", var_read)
             end
           end
         end
