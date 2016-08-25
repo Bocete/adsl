@@ -97,26 +97,33 @@ module ADSL
         end
 
         def define_usergroup_getters
+          login_class.class_eval <<-ruby
+            def rails_extractor
+              ObjectSpace._id2ref #{ self.object_id }
+            end
+          ruby
+          login_class.class_exec do
+            def role?(sym)
+              extractor = rails_extractor
+              if extractor.freely_define_groups?
+                extractor.define_usergroup sym
+              end
+              ADSL::Lang::ASTInUserGroup.new(
+                :objset => self.adsl_ast,
+                :groupname => ADSL::Lang::ASTIdent.new(:text => sym.to_s)
+              )
+            end
+            alias_method :has_role?, :role?
+          end
           usergroups.map(&:name).map(&:text).each do |ug_name|
             login_class.class_eval <<-ruby
               def #{ug_name}
-                ADSL::Lang::ASTInUserGroup.new(
-                  :objset => self.adsl_ast,
-                  :groupname => ADSL::Lang::ASTIdent.new(:text => '#{ug_name}')
-                )
+                role? :#{ ug_name }
               end
               alias_method :#{ug_name}?, :#{ug_name}
               alias_method :is_#{ug_name}, :#{ug_name}
               alias_method :is_#{ug_name}?, :#{ug_name}
             ruby
-            login_class.class_exec do
-              def role?(sym)
-                ADSL::Lang::ASTInUserGroup.new(
-                  :objset => self.adsl_ast,
-                  :groupname => ADSL::Lang::ASTIdent.new(:text => sym.to_s)
-                )
-              end
-            end
           end
         end
 
@@ -340,8 +347,8 @@ module ADSL
               end
               else_groups = possible_groups - then_groups
             end
-            then_groups ||= possible_groups
-            else_groups ||= possible_groups
+            then_groups = possible_groups if then_groups.nil?
+            else_groups = possible_groups if else_groups.nil?
             extract_rules_from_stmt stmt.then_expr, then_groups
             extract_rules_from_stmt stmt.else_expr, else_groups
           elsif stmt.is_a?(ASTFlag) && stmt.label.is_a?(Hash)
@@ -403,7 +410,8 @@ module ADSL
 
           Rolify::Role.class_exec do
             def has_role?(role_name, resource = nil)
-              ASTInUserGroup.new :groupname => ASTIdent[role_name.to_s]
+              role? role_name
+              #ASTInUserGroup.new :groupname => ASTIdent[role_name.to_s]
             end
           end
 

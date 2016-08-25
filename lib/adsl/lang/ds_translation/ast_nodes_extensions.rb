@@ -462,7 +462,7 @@ module ADSL
         unless objset_result.type_sig.is_objset_type?
           raise ADSLError, "DeleteObj can delete object sets only (type provided `#{objset_result.type_sig}` on line #{ @lineno })"
         end
-        return ADSL::Lang::DSTranslation::DSTranslationResult::EMPTY if objset_result.type_sig.cardinality.empty?
+        return gen_translation_result if objset_result.type_sig.cardinality.empty?
         gen_translation_result(
           :state_transitions => objset_result.state_transitions + [ADSL::DS::DSDeleteObj.new(:objset => objset_result.expr)]
         )
@@ -513,7 +513,7 @@ module ADSL
           raise ADSLError, "Ambiguous type on the left hand side on line #{@objset1.lineno}"
         end
         if objset1_result.type_sig.cardinality.empty? || objset2_result.type_sig.cardinality.empty?
-          return ADSL::Lang::DSTranslation::DSTranslationResult::EMPTY
+          return gen_translation_result
         end
 
         relation = context.find_member objset1_result.type_sig, @rel_name.text, @rel_name.lineno, objset2_result.type_sig
@@ -1007,6 +1007,8 @@ module ADSL
         expr = ADSL::DS::Boolean::TRUE if objset1_result.type_sig.cardinality.empty?
         expr ||= ADSL::DS::Boolean::FALSE if objset1_result.type_sig.cardinality.min > objset2_result.type_sig.cardinality.max
         expr ||= ADSL::DS::DSEmpty.new :objset => objset1_result.expr if objset2_result.type_sig.cardinality.empty?
+        expr ||= ADSL::DS::Boolean::TRUE if objset2_result.is_a?(ADSL::DS::DSAllOf) && objset2_result.klass.parents.empty?
+        
         expr ||= ADSL::DS::DSIn.new :objset1 => objset1_result.expr, :objset2 => objset2_result.expr
 
         gen_translation_result(
