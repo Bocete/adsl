@@ -43,6 +43,9 @@ module ADSL
             result[:result] = :timeout
           end
 
+          result[:input] = @smt_unsorted_code
+          result[:output] = output
+
           result
         end
 
