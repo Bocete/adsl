@@ -13,6 +13,7 @@ module ADSL
       DEFAULT_OPTS = {
         :input => 'stdin',
         :prover => 'all',
+        :prover_args => nil,
         :halt_on_error => false,
         :timeout => 1.minute,
         :output => 'text',
@@ -128,6 +129,7 @@ module ADSL
           translation = @ds.translate_action action.name, problem
           fol = translation.to_fol
           engine = ADSL::Prover::Engine.new provers, fol, @options
+          engine.set_prover_args @options[:prover_args] if @options[:prover_args].present?
           result = engine.verify
           output result, action, problem
           if @options[:halt_on_error]

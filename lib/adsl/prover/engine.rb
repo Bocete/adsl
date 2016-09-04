@@ -11,6 +11,12 @@ module ADSL
         Engine.send :include, ADSL::Prover.lookup_const("#{prover.to_s.camelize}::EngineExtensions")
       end
 
+      def set_prover_args(args)
+        @provers.each do |prover|
+          self.send "_set_#{ prover }_args", args if args.present?
+        end
+      end
+
       def initialize(provers, fol, options={})
         @provers = provers.respond_to?(:each) ? provers : [provers]
         @fol = fol

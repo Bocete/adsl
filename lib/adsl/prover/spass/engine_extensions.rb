@@ -6,15 +6,23 @@ module ADSL
     module Spass
       module EngineExtensions
 
-        attr_accessor :spass_temp_file, :spass_code
+        attr_accessor :spass_temp_file, :spass_code, :spass_force_sorts
         
         def _prepare_spass
           @spass_temp_file = Tempfile.new 'ADSL_spass'
           @spass_code = @fol.to_spass_string
           @spass_temp_file.write @spass_code
           @spass_temp_file.close
-          arg_combos = ["", "-Sorts=0"]
+          if @spass_args
+            arg_combos = [@spass_args]
+          else 
+            arg_combos = ["", "-Sorts=0"]
+          end
           arg_combos.map{ |a| "SPASS #{a} -TimeLimit=#{@options[:timeout]} #{@spass_temp_file.path}" }
+        end
+
+        def _set_spass_args(args = nil)
+          @spass_args = args if args.present?
         end
 
         def _analyze_spass_output(output)

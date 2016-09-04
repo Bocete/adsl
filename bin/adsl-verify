@@ -23,6 +23,12 @@ OptionParser.new do |opts|
           "  Default: #{ options[:prover] }") do |lang|
     options[:prover] = lang
   end
+  
+  opts.on("--pargs ARGS",
+          "Pass arguments to the theorem prover",
+          "  Default: no special arguments") do |args|
+    options[:prover_args] = args
+  end
 
   opts.on("--translate",
           "Translate the specification onto the target language, skipping verification.") do |translate|
