@@ -1147,6 +1147,20 @@ module ADSL::Lang
         assert_equal DSOneOf,      assignment.expr.class
       end
 
+      def test__foreach_does_not_destroy_variable_scoping
+        parser = ADSLParser.new
+        assert_nothing_raised ADSLError do
+          spec = parser.parse <<-ADSL
+            class Class {}
+            action blah {
+              var = oneof Class
+              foreach a: var {}
+              delete var
+            }
+          ADSL
+        end
+      end
+
     end
   end
 end

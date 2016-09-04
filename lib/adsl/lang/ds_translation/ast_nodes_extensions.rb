@@ -235,7 +235,10 @@ module ADSL
       def typecheck_and_resolve(context, open_subcontext=true)
         return gen_translation_result if @exprs.empty?
 
-        context.push_frame if open_subcontext
+        if open_subcontext
+          context.push_frame
+          pushed = true
+        end
         
         results = @exprs.map{ |e| e.typecheck_and_resolve context }
 
@@ -244,7 +247,7 @@ module ADSL
           :expr => results.last.expr
         )
       ensure
-        context.pop_frame if open_subcontext
+        context.pop_frame if pushed
       end
     end
 
@@ -335,8 +338,9 @@ module ADSL
               vars_written_to.include?(name) or vars_read_before_being_written_to.include? name
           vars_read << name unless vars_read.include? name
         end
-
+        
         block_result = @expr.typecheck_and_resolve context
+
         for_each.block = ADSL::DS::DSBlock.new(
           :statements => assignment_result.state_transitions + block_result.state_transitions
         )
