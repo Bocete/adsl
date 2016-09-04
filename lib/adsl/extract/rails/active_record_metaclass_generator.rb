@@ -325,12 +325,13 @@ module ADSL
               var = self.class.new(:adsl_ast => ADSL::Lang::ASTVariableRead.new(:var_name => var_name))
 
               expr = block[var]
+              expr_adsl_ast = expr.try_adsl_ast
 
-              if expr.is_a? ASTNode
+              if expr_adsl_ast
                 ASTForEach.new(
                   :objset => self.adsl_ast,
                   :var_name => var_name.dup,
-                  :expr => expr
+                  :expr => expr_adsl_ast
                 )
               end
             end

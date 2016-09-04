@@ -104,8 +104,8 @@ module ADSL
           version_class.class_exec do
             belongs_to :item, :polymorphic => true
           end
-          generator = ActiveRecordMetaclassGenerator.new version_class
-          @ar_classes << generator.generate_class
+          # generator = ActiveRecordMetaclassGenerator.new version_class
+          # @ar_classes << generator.generate_class
 
           ActiveRecord::Base.class_exec do
             include PaperTrail

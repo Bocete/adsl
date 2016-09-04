@@ -1527,4 +1527,27 @@ class ADSL::Extract::Rails::RailsExtractorTest < ADSL::Extract::Rails::RailsInst
     assert_equal 'at__asd3',    exprs[1].var_name.text
     assert_equal ASTOneOf,      exprs[1].expr.class
   end
+
+  def test_extract__empty_foreach_can_be_forced
+    old_setting = ADSL::Lang::ASTForEach.include_empty_loops?
+    
+    AsdsController.class_exec do
+      def nothing
+        Asd.where.each do |asd|
+        end
+      end
+    end
+
+    extractor = create_rails_extractor
+    
+    ADSL::Lang::ASTForEach.include_empty_loops = false
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    assert_equal ast.expr.class, ASTEmptyObjset
+
+    ADSL::Lang::ASTForEach.include_empty_loops = true
+    ast = extractor.action_to_adsl_ast(extractor.route_for AsdsController, :nothing)
+    assert_equal ast.expr.class, ASTForEach
+  ensure
+    ADSL::Lang::ASTForEach.include_empty_loops = old_setting
+  end
 end

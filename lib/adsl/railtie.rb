@@ -59,6 +59,7 @@ module ADSL
         
         actions = extract_actions_param_from_args
         options[:actions] = actions unless actions.nil?
+        options[:include_empty_loops] = extract_arg('INCLUDE_EMPTY_LOOPS') == 'true'
 
         adsl_translate :verify_options => options, :extract_options => options
       end

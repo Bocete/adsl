@@ -300,10 +300,32 @@ module ADSL
     end
 
     class ASTForEach < ASTNode
+      @@include_empty_loops = false
+
+      def self.include_empty_loops?
+        @@include_empty_loops
+      end
+
+      def self.include_empty_loops=(val)
+        @@include_empty_loops = val
+      end
+      
       has_side_effects :objset, :expr
       evals_to_something :objset
 
+      def has_side_effects?
+        return true if ASTForEach.include_empty_loops?
+        super
+      end
+
+      def evals_to_something?
+        return true if ASTForEach.include_empty_loops?
+        super
+      end
+
       def optimize
+        return self if ASTForEach.include_empty_loops?
+        
         optimized = super
         return optimized unless optimized == self
         return @objset if @expr.noop?

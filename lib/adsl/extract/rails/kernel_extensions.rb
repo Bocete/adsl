@@ -80,7 +80,13 @@ module Kernel
           :expr => value_adsl_ast
         )
 
-        new_value = !value.is_a?(ActiveRecord::Base) ? value : value.class.new(
+        if value.is_a?(ActiveRecord::Base)
+          new_value_type = value.class
+        elsif old_value = outer_binding.eval("#{name}") && old_value.is_a?(ActiveRecord::Base)
+          new_value_type = old_value.class
+        end
+        
+        new_value = new_value_type.nil? ? value : new_value_type.new(
           :adsl_ast => ::ADSL::Lang::ASTVariableRead.new(:var_name => ::ADSL::Lang::ASTIdent[adsl_ast_name]
         ))
         outer_binding.eval "#{name} #{operator} ObjectSpace._id2ref(#{new_value.object_id})"

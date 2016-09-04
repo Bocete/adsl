@@ -50,15 +50,20 @@ module ADSL
             :ar_classes => default_activerecord_models,
             :invariants => Dir['invariants/**/*_invs.rb'],
             :instrumentation_filters => [],
-            :actions => []
+            :actions => [],
+            :include_empty_loops => false
           ].merge options
           
           raise "Cyclic destroy dependency detected. Translation aborted" if cyclic_destroy_dependency?(options)
 
+          if options.include? :include_empty_loops
+            ::ADSL::Lang::ASTForEach.include_empty_loops = options[:include_empty_loops]
+          end
+
           @ar_classes = []
 
           prepare_paper_trail_models
-          
+
           options[:ar_classes].each do |ar_class|
             generator = ActiveRecordMetaclassGenerator.new ar_class
             @ar_classes << generator.generate_class
@@ -84,7 +89,8 @@ module ADSL
         end
         
         def extract_all_actions
-          all_routes(@options[:actions]).each do |route|
+          routes = all_routes(@options[:actions])
+          routes.each do |route|
             translation = action_to_adsl_ast(route)
             @actions << translation unless translation.nil?
           end
@@ -221,13 +227,14 @@ module ADSL
             raise "Could not find class corresponding to path #{path}" if klass.nil?
             klass
           }.select{ |klass| klass < ActiveRecord::Base }
-          until_no_change(classes) do |classes|
+          classes = until_no_change(classes) do |classes|
             all = classes.dup
             classes.each do |c|
               all << c.superclass unless classes.include?(c.superclass) || c.superclass == ActiveRecord::Base
             end
             all
-          end
+          end.uniq
+          classes
         end
 
         def controller_of(route)
