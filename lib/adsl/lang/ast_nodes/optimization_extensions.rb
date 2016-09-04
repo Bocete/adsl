@@ -324,10 +324,12 @@ module ADSL
       end
 
       def optimize
-        return self if ASTForEach.include_empty_loops?
-        
         optimized = super
         return optimized unless optimized == self
+
+        @expr = ASTEmptyObjset.new unless @expr.has_side_effects?
+        return self if ASTForEach.include_empty_loops?
+        
         return @objset if @expr.noop?
         self
       end

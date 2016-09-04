@@ -82,8 +82,9 @@ module Kernel
 
         if value.is_a?(ActiveRecord::Base)
           new_value_type = value.class
-        elsif old_value = outer_binding.eval("#{name}") && old_value.is_a?(ActiveRecord::Base)
-          new_value_type = old_value.class
+        else
+          old_value = outer_binding.eval("#{name}")# && old_value.is_a?(ActiveRecord::Base)
+          new_value_type = old_value.class if old_value.is_a? ActiveRecord::Base
         end
         
         new_value = new_value_type.nil? ? value : new_value_type.new(
