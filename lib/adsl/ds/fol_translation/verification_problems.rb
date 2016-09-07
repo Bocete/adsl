@@ -29,9 +29,11 @@ module ADSL
             # reads
             assignments = action.recursively_gather{ |elem|
               elem if elem.is_a?(DSAssignment)
-            }.reverse.uniq{ |asgn| asgn.var.name }.select{ |asgn|
-              asgn.expr.type_sig.is_objset_type? && !asgn.expr.type_sig.cardinality.empty?
-            }.select{ |asgn|
+            }.reverse.uniq{ |asgn| asgn.var.name }
+            # assignments.select! do |asgn|
+            #   asgn.expr.type_sig.is_objset_type? && !asgn.expr.type_sig.cardinality.empty?
+            # end
+            assignments.select!{ |asgn|
               asgn.var.name.start_with?('at__')
             }
             problems += assignments.map do |asgn|

@@ -114,6 +114,22 @@ module ADSL::DS
         problems = spec.generate_problems 'blah'
         assert_equal 2, problems.length
       end
+
+      def test_generate_problems_assignment_in_branch
+        spec = ADSLParser.new.parse <<-adsl
+          authenticable class Class {}
+          class Class2 {}
+          permit create Class
+          action blah {
+            at__x = empty
+            if * {
+              at__x = oneof Class
+            }
+          }
+        adsl
+        problems = spec.generate_problems 'blah'
+        assert_equal 1, problems.length
+      end
     
     end 
   end
