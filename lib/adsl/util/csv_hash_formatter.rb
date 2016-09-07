@@ -92,7 +92,7 @@ module ADSL
         types = infer_column_types
         @row_hashes.each do |row|
           output += @columns.map do |c|
-            next row[c] || '' if types[c] == :numeric
+            next row[c].to_s || '' if types[c] == :numeric
             next row[c].nil? ? '' : "\"#{row[c]}\"" if types[c] == :boolean
             escape_str(row[c] || '')
           end.join(',') + "\n"
