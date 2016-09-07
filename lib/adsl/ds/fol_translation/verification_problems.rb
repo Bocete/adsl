@@ -29,13 +29,11 @@ module ADSL
             # reads
             assignments = action.recursively_gather{ |elem|
               elem if elem.is_a?(DSAssignment)
-            }.reverse.uniq{ |asgn| asgn.var.name }
-            # assignments.select! do |asgn|
-            #   asgn.expr.type_sig.is_objset_type? && !asgn.expr.type_sig.cardinality.empty?
-            # end
-            assignments.select!{ |asgn|
-              asgn.var.name.start_with?('at__')
             }
+            assignments = assignments.group_by{ |asgn| asgn.var.name }.map do |name, assignments|
+              next unless name.start_with?('at__')
+              assignments.reverse.find{ |asgn| asgn.expr.type_sig.is_objset_type? && !asgn.expr.type_sig.cardinality.empty? }
+            end.compact
             problems += assignments.map do |asgn|
               ADSL::Translation::AccessControlReadProblem.new ADSL::DS::DSVariableRead.new(:variable => asgn.var)
             end

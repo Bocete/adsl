@@ -407,4 +407,18 @@ class IntegrationsAccessControlTest < ActiveSupport::TestCase
       }
     ADSL
   end
+
+  def test_reads_of_initially_ambiguous_types
+    adsl_assert :incorrect, <<-ADSL
+      authenticable class User {
+      }
+      permit read currentuser
+      action blah {
+        at__unknown = empty
+        if * {
+          at__unknown = oneof User
+        }
+      }
+    ADSL
+  end
 end
