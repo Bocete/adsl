@@ -53,7 +53,7 @@ module ADSL
 
       def filter_list(list, filters)
         return list if filters.nil? || filters.empty?
-        filters.map{ |f| list.select{ |l| l.name =~ /#{f}/} }.inject(&:+).uniq
+        list.select{ |l| filters.include? l.name.to_s }
       end
 
       def gen_problems

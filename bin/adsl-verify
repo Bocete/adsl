@@ -55,14 +55,14 @@ OptionParser.new do |opts|
 
   opts.on("-a", "--actions ACTIONS",
           "A colon separated list of actions to be verified.",
-          "  Only actions whose name contains any of the arguments will be verified",
+          "  Only actions whose name matches any of the arguments will be verified",
           "  All actions are verified by default") do |actions|
     options[:actions] = actions.split(':').map(&:strip)
   end
 
   opts.on("-i", "--invariants INVARIANTS",
           "A colon separated list of invariant names to be verified.",
-          "  Only invariants whose name contains any of the arguments will be verified",
+          "  Only invariants whose name matches any of the arguments will be verified",
           "  All invariants are verified by default") do |invs|
     options[:invariants] = invs.split(':').map(&:strip)
   end
