@@ -8,18 +8,19 @@ Address has a User) and run `rake verify`!
 Besides the verification algorithm, this tool includes a DSL for specifying invariants.  The syntax should feel
 natural to any Rails user. Look at /examples.
 
-This tool is distributed as a Ruby gem and is uploaded to [RubyGems.org] [2]. It requires Spass[1] to run. Install
+This tool is distributed as a Ruby gem and is uploaded to [RubyGems.org] [1]. It requires Z3[2] and Spass[3] to run. Install
 it and give it a try!
 
 
 Installation
 ------------
 
-This gem is tested on 32 and 64 bit Linux. OS-X compatibility not tested, give it a try
+This gem is tested on 64 bit Linux. OS-X compatibility not tested, give it a try
 and tell us if it works! Windows is not supported at this moment.
 
- - Ruby 1.9.3 or later required, along with Rails 3.2.  We suggest using the [Ruby Version Manager](https://rvm.io/rvm/install/) to manage this installation.
- - [Download and install Spass](http://www.spass-prover.org/download/index.html) and make sure its executable (`bin/SPASS`) on your $PATH
+ - Ruby 2.0.0 or later required, along with Rails 3.2.  The gem has limited support for 1.9.3 and Rails 4.  We suggest using the [Ruby Version Manager](https://rvm.io/rvm/install/) to manage this installation.
+ - [Download and install Z3](https://github.com/Z3Prover/z3) and make sure its executable (`z3`) on your $PATH
+ - [Download and install Spass](http://www.spass-prover.org/download/index.html) and make sure its executable (`SPASS`) on your $PATH
  - Install the ADSL gem by running `gem install adsl`.
    If you receive an error while generating documentation for 'activesupport' run `gem install rdoc adsl` instead.
  
@@ -31,6 +32,8 @@ Usage
 Or, to just observe the extracted model,
 
     rake adsl_translate
+
+The gem also adds an executable `adsl` that can be used for more fine tuned options.  Use `adsl --help` to look at options.
 
 Development
 -----------
@@ -49,7 +52,12 @@ Feature requests and bug reports can be made at https://github.com/Bocete/adsl/i
 Publications
 ------------
 
-* Ivan Bocic and Tevfik Bultan. "[Inductive Verification of Data Model Invariants for Web Applications.](http://www.cs.ucsb.edu/~bo/papers/icse14.pdf)" To be published at ICSE 2014, Hyderabad, India, June 2014
+* Ivan Bocic and Tevfik Bultan. "[Symbolic Model Extraction for Web Application Verification.](https://cs.ucsb.edu/~bo/papers/icse17.pdf)" ICSE 2017
+* Ivan Bocic and Tevfik Bultan. "[Finding Access Control Bugs in Web Applications with CanCheck.](https://cs.ucsb.edu/~bo/papers/ase16.pdf)". ASE 2016
+* Ivan Bocic and Tevfik Bultan. "[Efficient Data Model Verification with Many-Sorted Logic](https://cs.ucsb.edu/~bo/papers/ase15.pdf)". ASE 2015
+* Ivan Bocic and Tevfik Bultan. "[Coexecutability for Efficient Verification of Data Model Updates.](https://cs.ucsb.edu/~bo/papers/icse15.pdf)". ICSE 2015
+* Ivan Bocic and Tevfik Bultan. "[Data Model Bugs.](https://cs.ucsb.edu/~bo/papers/nfm15.pdf)". NFM 2015
+* Ivan Bocic and Tevfik Bultan. "[Inductive Verification of Data Model Invariants for Web Applications.](https://www.cs.ucsb.edu/~bo/papers/icse14.pdf)". ICSE 2014
 
 License
 -------
@@ -65,5 +73,6 @@ implied warranties, including, without limitation, the implied
 warranties of merchantibility and fitness for a particular
 purpose.
 
-  [1]: http://www.spass-prover.org/ "Spass"
-  [2]: https://rubygems.org/gems/adsl "RubyGems.org"
+  [1]: https://rubygems.org/gems/adsl "RubyGems.org"
+  [2]: https://github.com/Z3Prover/z3 "The Z3 Theorem Prover"
+  [3]: http://www.spass-prover.org/ "Spass"
