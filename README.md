@@ -52,10 +52,12 @@ Feature requests and bug reports can be made at https://github.com/Bocete/adsl/i
 Publications
 ------------
 
-* Ivan Bocic and Tevfik Bultan. "[Finding Access Control Bugs in Web Applications with CanCheck.](http://cs.ucsb.edu/~bo/papers/ase16.pdf)". ASE 2016
-* Ivan Bocic and Tevfik Bultan. "[Efficient Data Model Verification with Many-Sorted Logic](http://cs.ucsb.edu/~bo/papers/ase15.pdf)". ASE 2015
-* Ivan Bocic and Tevfik Bultan. "[Coexecutability for Efficient Verification of Data Model Updates.](http://cs.ucsb.edu/~bo/papers/icse15.pdf)". ICSE 2015
-* Ivan Bocic and Tevfik Bultan. "[Inductive Verification of Data Model Invariants for Web Applications.](http://www.cs.ucsb.edu/~bo/papers/icse14.pdf)". ICSE 2014
+* Ivan Bocic and Tevfik Bultan. "[Symbolic Model Extraction for Web Application Verification.](https://cs.ucsb.edu/~bo/papers/icse17.pdf)" ICSE 2017
+* Ivan Bocic and Tevfik Bultan. "[Finding Access Control Bugs in Web Applications with CanCheck.](https://cs.ucsb.edu/~bo/papers/ase16.pdf)". ASE 2016
+* Ivan Bocic and Tevfik Bultan. "[Efficient Data Model Verification with Many-Sorted Logic](https://cs.ucsb.edu/~bo/papers/ase15.pdf)". ASE 2015
+* Ivan Bocic and Tevfik Bultan. "[Coexecutability for Efficient Verification of Data Model Updates.](https://cs.ucsb.edu/~bo/papers/icse15.pdf)". ICSE 2015
+* Ivan Bocic and Tevfik Bultan. "[Data Model Bugs.](https://cs.ucsb.edu/~bo/papers/nfm15.pdf)". NFM 2015
+* Ivan Bocic and Tevfik Bultan. "[Inductive Verification of Data Model Invariants for Web Applications.](https://www.cs.ucsb.edu/~bo/papers/icse14.pdf)". ICSE 2014
 
 License
 -------
